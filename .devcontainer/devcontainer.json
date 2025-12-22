@@ -1,0 +1,29 @@
+{
+    "name": "Scala Dev Environment",
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "ghcr.io/devcontainers/features/git:1": {},
+      "ghcr.io/devcontainers/features/common-utils:2": {
+        "installZsh": true,
+        "configureZshAsDefaultShell": true,
+        "username": "vscode"
+      }
+    },
+    "customizations": {
+      "vscode": {
+        "settings": {
+          "metals.showImplicitArguments": true,
+          "metals.showInferredType": true
+        },
+        "extensions": [
+          "scalameta.metals",
+          "scala-lang.scala",
+          "vscjava.vscode-java-pack" 
+        ]
+      }
+    },
+    "postCreateCommand": "sbt sbtVersion",
+    "remoteUser": "vscode"
+}

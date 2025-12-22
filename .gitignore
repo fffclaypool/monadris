@@ -1,0 +1,33 @@
+# sbt
+target/
+project/target/
+project/project/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.bsp/
+metals.sbt
+.metals/
+.bloop/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coursier cache (local)
+.coursier/
+
+# Runtime
+*.log
+*.class
+
+# Downloaded sbt
+sbt/
+sbt.zip
+
+# Temporary files
+*.swp
+*.swo
+*~
