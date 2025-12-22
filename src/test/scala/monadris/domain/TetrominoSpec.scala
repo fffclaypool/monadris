@@ -1,4 +1,4 @@
-package tetris.domain
+package monadris.domain
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

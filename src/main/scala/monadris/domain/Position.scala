@@ -1,4 +1,4 @@
-package tetris.domain
+package monadris.domain
 
 /**
  * 2次元座標を表す不変データ構造

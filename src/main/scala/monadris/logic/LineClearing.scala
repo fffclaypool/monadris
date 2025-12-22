@@ -1,6 +1,6 @@
-package tetris.logic
+package monadris.logic
 
-import tetris.domain.*
+import monadris.domain.*
 
 /**
  * ライン消去とスコア計算を行う純粋関数群

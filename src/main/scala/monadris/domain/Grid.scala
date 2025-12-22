@@ -1,4 +1,4 @@
-package tetris.domain
+package monadris.domain
 
 /**
  * セルの状態

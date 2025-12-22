@@ -1,6 +1,6 @@
-package tetris.logic
+package monadris.logic
 
-import tetris.domain.*
+import monadris.domain.*
 
 /**
  * ゲームの状態遷移を管理する純粋関数群

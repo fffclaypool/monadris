@@ -7,4 +7,4 @@ CLASSPATH="/workspaces/fp-puzzle/target/scala-3.3.1/classes:/home/vscode/.cache/
 
 # ターミナルをリセットしてから実行
 clear
-exec java -cp "$CLASSPATH" tetris.Main
+exec java -cp "$CLASSPATH" monadris.Main

@@ -1,4 +1,4 @@
-package tetris.domain
+package monadris.domain
 
 /**
  * ゲームの進行状態

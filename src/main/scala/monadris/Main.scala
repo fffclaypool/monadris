@@ -1,9 +1,9 @@
-package tetris
+package monadris
 
 import zio.*
-import tetris.domain.*
-import tetris.logic.*
-import tetris.effect.*
+import monadris.domain.*
+import monadris.logic.*
+import monadris.effect.*
 import java.io.FileInputStream
 
 /**

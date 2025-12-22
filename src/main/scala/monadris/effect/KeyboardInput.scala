@@ -1,10 +1,10 @@
-package tetris.effect
+package monadris.effect
 
 import zio.*
 import zio.stream.*
 import org.jline.terminal.{Terminal, TerminalBuilder}
 import org.jline.utils.NonBlockingReader
-import tetris.domain.Input
+import monadris.domain.Input
 
 /**
  * JLineを使用したキーボード入力ハンドラー

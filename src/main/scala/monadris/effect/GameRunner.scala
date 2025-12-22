@@ -1,9 +1,9 @@
-package tetris.effect
+package monadris.effect
 
 import zio.*
 import zio.stream.*
-import tetris.domain.*
-import tetris.logic.*
+import monadris.domain.*
+import monadris.logic.*
 
 /**
  * 副作用をZIOで管理するゲーム実行層

@@ -1,4 +1,4 @@
-package tetris.domain
+package monadris.domain
 
 /**
  * 回転状態（4方向）

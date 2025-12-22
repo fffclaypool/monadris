@@ -1,8 +1,8 @@
-package tetris.logic
+package monadris.logic
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import tetris.domain.*
+import monadris.domain.*
 
 class GameLogicSpec extends AnyFlatSpec with Matchers:
 

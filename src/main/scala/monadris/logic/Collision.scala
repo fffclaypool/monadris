@@ -1,6 +1,6 @@
-package tetris.logic
+package monadris.logic
 
-import tetris.domain.*
+import monadris.domain.*
 
 /**
  * 当たり判定を行う純粋関数群
