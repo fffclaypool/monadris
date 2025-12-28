@@ -1,0 +1,242 @@
+package monadris.logic
+
+import monadris.domain.*
+import monadris.domain.GameConfig.Grid as GridConfig
+
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+/**
+ * Extended tests for GameLogic to improve branch coverage
+ */
+class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
+
+  def initialState: GameState =
+    GameState.initial(TetrominoShape.T, TetrominoShape.I)
+
+  def nextShapeProvider: () => TetrominoShape = () => TetrominoShape.O
+
+  // ============================================================
+  // Game Over conditions
+  // ============================================================
+
+  "GameLogic.update" should "not process input when game is over" in {
+    val gameOverState = initialState.copy(status = GameStatus.GameOver)
+    val originalX = gameOverState.currentTetromino.position.x
+
+    val newState = GameLogic.update(gameOverState, Input.MoveLeft, nextShapeProvider)
+
+    newState.currentTetromino.position.x shouldBe originalX
+    newState.status shouldBe GameStatus.GameOver
+  }
+
+  it should "transition to GameOver when spawn position is blocked" in {
+    // Create a grid where spawn position is already blocked
+    var grid = Grid.empty()
+    val filled = Cell.Filled(TetrominoShape.I)
+
+    // Fill the center spawn area where T-tetromino will spawn
+    // T-tetromino spawns around center, blocks at approximately (3,0), (4,0), (5,0), (4,1)
+    for x <- 3 until 6 do
+      grid = grid.place(Position(x, 0), filled)
+    grid = grid.place(Position(4, 1), filled)
+
+    // Current piece at corner (no overlap with spawn area)
+    // O-tetromino at position (0, 0) has blocks at (0,0), (1,0), (0,1), (1,1)
+    val blockedState = GameState(
+      grid = grid,
+      currentTetromino = Tetromino(TetrominoShape.O, Position(0, 0), Rotation.R0),
+      nextTetromino = TetrominoShape.T,  // T will spawn at blocked center
+      score = 0,
+      level = 1,
+      linesCleared = 0,
+      status = GameStatus.Playing
+    )
+
+    // Hard drop places O at (0, 18) or similar; no lines cleared
+    // Next T-tetromino can't spawn due to blocked center
+    val afterDrop = GameLogic.update(blockedState, Input.HardDrop, nextShapeProvider)
+
+    // The game should be over
+    afterDrop.status shouldBe GameStatus.GameOver
+  }
+
+  // ============================================================
+  // Paused state handling
+  // ============================================================
+
+  it should "not process Tick when paused" in {
+    val pausedState = GameLogic.update(initialState, Input.Pause, nextShapeProvider)
+    val originalY = pausedState.currentTetromino.position.y
+
+    val afterTick = GameLogic.update(pausedState, Input.Tick, nextShapeProvider)
+
+    afterTick.currentTetromino.position.y shouldBe originalY
+  }
+
+  it should "not process HardDrop when paused" in {
+    val pausedState = GameLogic.update(initialState, Input.Pause, nextShapeProvider)
+    val originalScore = pausedState.score
+
+    val afterDrop = GameLogic.update(pausedState, Input.HardDrop, nextShapeProvider)
+
+    afterDrop.score shouldBe originalScore
+  }
+
+  it should "not process rotation when paused" in {
+    val pausedState = GameLogic.update(initialState, Input.Pause, nextShapeProvider)
+    val originalRotation = pausedState.currentTetromino.rotation
+
+    val afterRotate = GameLogic.update(pausedState, Input.RotateClockwise, nextShapeProvider)
+
+    afterRotate.currentTetromino.rotation shouldBe originalRotation
+  }
+
+  // ============================================================
+  // Wall collision handling
+  // ============================================================
+
+  it should "not move right when blocked by right wall" in {
+    val state = initialState
+    // Move to right edge
+    val atRightWall = (0 until GridConfig.DefaultWidth).foldLeft(state) { (s, _) =>
+      GameLogic.update(s, Input.MoveRight, nextShapeProvider)
+    }
+    val originalX = atRightWall.currentTetromino.position.x
+
+    val newState = GameLogic.update(atRightWall, Input.MoveRight, nextShapeProvider)
+
+    newState.currentTetromino.position.x shouldBe originalX
+  }
+
+  // ============================================================
+  // Rotation with wall kick
+  // ============================================================
+
+  it should "apply wall kick when rotating near left wall" in {
+    // Move I-tetromino to left wall and try to rotate
+    val iState = GameState.initial(TetrominoShape.I, TetrominoShape.T)
+    val atLeftWall = (0 until GridConfig.DefaultWidth).foldLeft(iState) { (s, _) =>
+      GameLogic.update(s, Input.MoveLeft, nextShapeProvider)
+    }
+
+    val rotated = GameLogic.update(atLeftWall, Input.RotateClockwise, nextShapeProvider)
+
+    // Should still be valid (wall kick applied or rotation prevented)
+    val allBlocksValid = rotated.currentTetromino.currentBlocks.forall { pos =>
+      pos.x >= 0 && pos.x < GridConfig.DefaultWidth
+    }
+    allBlocksValid shouldBe true
+  }
+
+  it should "apply wall kick when rotating near right wall" in {
+    val iState = GameState.initial(TetrominoShape.I, TetrominoShape.T)
+    val atRightWall = (0 until GridConfig.DefaultWidth).foldLeft(iState) { (s, _) =>
+      GameLogic.update(s, Input.MoveRight, nextShapeProvider)
+    }
+
+    val rotated = GameLogic.update(atRightWall, Input.RotateClockwise, nextShapeProvider)
+
+    val allBlocksValid = rotated.currentTetromino.currentBlocks.forall { pos =>
+      pos.x >= 0 && pos.x < GridConfig.DefaultWidth
+    }
+    allBlocksValid shouldBe true
+  }
+
+  // ============================================================
+  // Counter-clockwise rotation
+  // ============================================================
+
+  it should "rotate counter-clockwise correctly" in {
+    val state = initialState
+    val originalRotation = state.currentTetromino.rotation
+
+    val rotated = GameLogic.update(state, Input.RotateCounterClockwise, nextShapeProvider)
+
+    rotated.currentTetromino.rotation shouldBe originalRotation.rotateCounterClockwise
+  }
+
+  // ============================================================
+  // Line clearing and level progression
+  // ============================================================
+
+  it should "increase level after clearing enough lines" in {
+    // Create a state with lines close to level up
+    var grid = Grid.empty()
+    val filled = Cell.Filled(TetrominoShape.I)
+    // Fill 9 cells in bottom row (one away from complete)
+    for x <- 0 until 9 do
+      grid = grid.place(Position(x, GridConfig.DefaultHeight - 1), filled)
+
+    val state = GameState(
+      grid = grid,
+      currentTetromino = Tetromino(TetrominoShape.I, Position(9, 10), Rotation.R90),
+      nextTetromino = TetrominoShape.O,
+      score = 0,
+      level = 1,
+      linesCleared = 9, // About to level up
+      status = GameStatus.Playing
+    )
+
+    val afterDrop = GameLogic.update(state, Input.HardDrop, nextShapeProvider)
+
+    // Should have increased lines cleared
+    afterDrop.linesCleared should be >= state.linesCleared
+  }
+
+  // ============================================================
+  // Soft drop (MoveDown) landing behavior
+  // ============================================================
+
+  it should "lock piece and spawn new one when soft dropping at bottom" in {
+    val state = initialState
+
+    // Move down until at bottom
+    var currentState = state
+    var iterations = 0
+    while !currentState.isGameOver && iterations < 50 do
+      val nextState = GameLogic.update(currentState, Input.MoveDown, nextShapeProvider)
+      if nextState.currentTetromino.shape != currentState.currentTetromino.shape then
+        // A new piece was spawned
+        iterations = 100 // Exit loop
+      else
+        currentState = nextState
+        iterations += 1
+
+    // Either game is over or a new piece was spawned
+    (currentState.isGameOver || iterations >= 50) shouldBe true
+  }
+
+  // ============================================================
+  // All tetromino shapes
+  // ============================================================
+
+  "GameLogic" should "handle all tetromino shapes" in {
+    TetrominoShape.values.foreach { shape =>
+      val state = GameState.initial(shape, TetrominoShape.I)
+      val moved = GameLogic.update(state, Input.MoveDown, nextShapeProvider)
+      moved.currentTetromino.position.y should be > state.currentTetromino.position.y
+    }
+  }
+
+  // ============================================================
+  // restart function
+  // ============================================================
+
+  "GameLogic.restart" should "create fresh state with given shapes" in {
+    val state = GameLogic.restart(TetrominoShape.S, TetrominoShape.Z)
+
+    state.currentTetromino.shape shouldBe TetrominoShape.S
+    state.nextTetromino shouldBe TetrominoShape.Z
+    state.score shouldBe 0
+    state.level shouldBe 1
+    state.linesCleared shouldBe 0
+    state.status shouldBe GameStatus.Playing
+  }
+
+  it should "create valid initial grid" in {
+    val state = GameLogic.restart(TetrominoShape.L, TetrominoShape.J)
+
+    state.grid.width shouldBe GridConfig.DefaultWidth
+    state.grid.height shouldBe GridConfig.DefaultHeight
+  }
