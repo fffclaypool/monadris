@@ -13,23 +13,25 @@ import monadris.effect.*
 object Main extends ZIOAppDefault:
 
   override def run: Task[Unit] =
-    program.catchAll { error =>
-      Console.printLineError(s"Error: $error").orDie
-    }
+    program
+      .provideLayer(GameEnv.live)
+      .catchAll { error =>
+        Console.printLineError(s"Error: $error").orDie
+      }
 
-  val program: Task[Unit] =
+  val program: ZIO[GameEnv, Throwable, Unit] =
     ZIO.scoped {
-      (for
+      for
         _ <- GameRunner.ServiceRenderer.showTitle
-        _ <- ZIO.sleep(1.second)
+        _ <- TtyService.sleep(1000)
         firstShape <- GameRunner.RandomPieceGenerator.nextShape
         nextShape <- GameRunner.RandomPieceGenerator.nextShape
         initialState = GameState.initial(firstShape, nextShape)
         _ <- TerminalControl.enableRawMode
-        finalState <- GameRunner.interactiveGameLoopZIO(initialState)
+        finalState <- GameRunner.interactiveGameLoop(initialState)
           .ensuring(TerminalControl.disableRawMode.ignore)
         _ <- GameRunner.ServiceRenderer.renderGameOver(finalState)
         _ <- ConsoleService.print("\nGame ended.\r\n")
-        _ <- ZIO.sleep(2.seconds)
-      yield ()).provideLayer(GameEnv.live)
+        _ <- TtyService.sleep(2000)
+      yield ()
     }
