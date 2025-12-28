@@ -1,7 +1,9 @@
 package monadris.effect
 
 import zio.*
-import zio.stream.*
+import zio.stream.UStream
+import zio.stream.ZStream
+
 import monadris.domain.*
 import monadris.logic.*
 
@@ -108,10 +110,10 @@ object GameRunner:
    */
   def gameLoop(
     initialState: GameState,
-    inputStream: ZStream[Any, Nothing, Input],
+    inputStream: UStream[Input],
     renderer: Renderer,
     randomPiece: RandomPiece
-  ): ZIO[Any, Nothing, GameState] =
+  ): UIO[GameState] =
 
     // Refを使って状態を管理（内部的には可変だが、外部からは不変）
     for
@@ -163,7 +165,7 @@ object GameRunner:
    */
   private def createTickStream(
     stateRef: Ref[GameState]
-  ): ZStream[Any, Nothing, Unit] =
+  ): UStream[Unit] =
     ZStream.repeatZIOWithSchedule(
       stateRef.get.map(s => LineClearing.dropInterval(s.level)),
       Schedule.fixed(100.millis) // 基本間隔

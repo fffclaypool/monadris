@@ -1,7 +1,9 @@
 package monadris.effect
 
+import java.io.FileInputStream
+import java.io.InputStream
+
 import monadris.domain.Input
-import java.io.{FileInputStream, InputStream}
 
 /**
  * ターミナル入力のパース処理を集約
@@ -59,30 +61,29 @@ object TerminalInput:
    */
   def parseEscapeSequence(in: InputStream, waitMs: Int = 20): Option[Input] =
     Thread.sleep(waitMs)
-    val hasData = in.available() > 0
-    if !hasData then return None
-
-    val second = in.read()
-    if second != '[' then return None
-
-    Thread.sleep(5)
-    if in.available() <= 0 then return None
-
-    arrowKeyMap.get(in.read().toChar)
+    for
+      _      <- Option.when(in.available() > 0)(())
+      second =  in.read()
+      _      <- Option.when(second == '[')(())
+      _      =  Thread.sleep(5)
+      _      <- Option.when(in.available() > 0)(())
+      key    =  in.read()
+      input  <- arrowKeyMap.get(key.toChar)
+    yield input
 
   /**
    * FileInputStreamから1キーを読み取り、Inputに変換
    */
   def readKey(in: FileInputStream): Option[ParseResult] =
-    if in.available() <= 0 then return Some(ParseResult.Timeout)
-
-    val key = in.read()
-    if key == 27 then
-      parseEscapeSequence(in) match
-        case Some(input) => Some(ParseResult.Arrow(input))
-        case None        => Some(ParseResult.Unknown)
+    if in.available() <= 0 then Some(ParseResult.Timeout)
     else
-      Some(ParseResult.Regular(key))
+      val key = in.read()
+      if key == 27 then
+        parseEscapeSequence(in) match
+          case Some(input) => Some(ParseResult.Arrow(input))
+          case None        => Some(ParseResult.Unknown)
+      else
+        Some(ParseResult.Regular(key))
 
   /**
    * ParseResultをOption[Input]に変換

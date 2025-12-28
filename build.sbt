@@ -17,6 +17,9 @@ lazy val root = project
     scalacOptions ++= Seq(
       "-deprecation",
       "-feature",
+      "-Wunused:imports",
       "-Xfatal-warnings"
-    )
+    ),
+    semanticdbEnabled := true,
+    semanticdbVersion := scalafixSemanticdb.revision,
   )

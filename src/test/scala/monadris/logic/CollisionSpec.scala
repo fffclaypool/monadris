@@ -1,8 +1,9 @@
 package monadris.logic
 
+import monadris.domain.*
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import monadris.domain.*
 
 class CollisionSpec extends AnyFlatSpec with Matchers:
 
