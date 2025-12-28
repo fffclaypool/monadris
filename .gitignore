@@ -31,3 +31,5 @@ sbt.zip
 *.swp
 *.swo
 *~
+
+repomix-output.xml
