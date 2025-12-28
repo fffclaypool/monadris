@@ -1,5 +1,7 @@
 package monadris.effect
 
+import java.io.FileInputStream
+
 import zio.*
 import zio.stream.UStream
 import zio.stream.ZStream
@@ -40,6 +42,28 @@ object GameRunner:
   object ConsoleRenderer extends Renderer:
     // raw modeでは \r\n が必要
     private val NL = "\r\n"
+
+    /**
+     * タイトル画面を表示
+     */
+    def showTitle: Task[Unit] =
+      val lines = List(
+        "╔════════════════════════════════════╗",
+        "║    🎮 Functional Tetris            ║",
+        "║    Scala 3 + ZIO                   ║",
+        "╠════════════════════════════════════╣",
+        "║  Controls:                         ║",
+        "║    ← → or H L : Move left/right    ║",
+        "║    ↓ or J     : Soft drop          ║",
+        "║    ↑ or K     : Rotate             ║",
+        "║    Z          : Rotate CCW         ║",
+        "║    Space      : Hard drop          ║",
+        "║    P          : Pause              ║",
+        "║    Q          : Quit               ║",
+        "╚════════════════════════════════════╝",
+        ""
+      )
+      ZIO.foreachDiscard(lines)(Console.printLine(_))
 
     def render(state: GameState): UIO[Unit] = ZIO.succeed {
       // ANSI エスケープでカーソルを先頭に移動して画面クリア
@@ -177,3 +201,124 @@ object GameRunner:
     ).mapZIO { interval =>
       ZIO.sleep(Duration.fromMillis(interval - 100)) // 動的間隔調整
     }
+
+  // ============================================================
+  // インタラクティブゲームループ（Main.scalaから移動）
+  // ============================================================
+
+  /** 入力ポーリング待機時間（ミリ秒） */
+  private final val InputPollIntervalMs: Int = 20
+
+  /**
+   * インタラクティブなゲームループを実行
+   */
+  def interactiveGameLoop(initialState: GameState): Task[GameState] =
+    for
+      stateRef <- Ref.make(initialState)
+      quitRef <- Ref.make(false)
+      _ <- renderCurrentState(stateRef)
+      tickFiber <- tickLoop(stateRef, quitRef).fork
+      _ <- inputLoop(stateRef, quitRef)
+      _ <- tickFiber.interrupt
+      finalState <- stateRef.get
+    yield finalState
+
+  private def renderCurrentState(stateRef: Ref[GameState]): UIO[Unit] =
+    stateRef.get.flatMap(ConsoleRenderer.render)
+
+  private def tickLoop(stateRef: Ref[GameState], quitRef: Ref[Boolean]): UIO[Unit] =
+    val shouldContinue = checkGameActive(stateRef, quitRef)
+    val processTick = processTickUpdate(stateRef)
+
+    val tick = shouldContinue.flatMap {
+      case false => ZIO.succeed(false)
+      case true  => processTick
+    }
+    tick.repeatWhile(identity).unit
+
+  private def checkGameActive(
+    stateRef: Ref[GameState],
+    quitRef: Ref[Boolean]
+  ): UIO[Boolean] =
+    for
+      quit <- quitRef.get
+      state <- stateRef.get
+    yield !quit && !state.isGameOver
+
+  private def processTickUpdate(stateRef: Ref[GameState]): UIO[Boolean] =
+    for
+      nextShape <- RandomPieceGenerator.nextShape
+      _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape))
+      newState <- stateRef.get
+      _ <- ConsoleRenderer.render(newState)
+      interval = LineClearing.dropInterval(newState.level)
+      _ <- ZIO.sleep(Duration.fromMillis(interval))
+    yield !newState.isGameOver
+
+  private def inputLoop(stateRef: Ref[GameState], quitRef: Ref[Boolean]): Task[Unit] =
+    ZIO.acquireReleaseWith(
+      ZIO.attempt(new FileInputStream("/dev/tty"))
+    )(fis => ZIO.succeed(fis.close())) { ttyIn =>
+      processInputLoop(ttyIn, stateRef, quitRef)
+    }
+
+  private def processInputLoop(
+    ttyIn: FileInputStream,
+    stateRef: Ref[GameState],
+    quitRef: Ref[Boolean]
+  ): Task[Unit] =
+    val step = checkGameActive(stateRef, quitRef).flatMap {
+      case false => ZIO.succeed(false)
+      case true  => readAndHandleKey(ttyIn, stateRef, quitRef)
+    }
+    step.repeatWhile(identity).unit
+
+  private def readAndHandleKey(
+    ttyIn: FileInputStream,
+    stateRef: Ref[GameState],
+    quitRef: Ref[Boolean]
+  ): Task[Boolean] =
+    for
+      keyOpt <- ZIO.attemptBlocking(readKeyFromTty(ttyIn))
+      result <- keyOpt match
+        case None      => ZIO.sleep(InputPollIntervalMs.millis).as(true)
+        case Some(key) => handleKey(key, ttyIn, stateRef, quitRef)
+    yield result
+
+  private def readKeyFromTty(ttyIn: FileInputStream): Option[Int] =
+    if ttyIn.available() > 0 then Some(ttyIn.read()) else None
+
+  private def handleKey(
+    key: Int,
+    ttyIn: FileInputStream,
+    stateRef: Ref[GameState],
+    quitRef: Ref[Boolean]
+  ): Task[Boolean] =
+    if TerminalInput.isQuitKey(key) then
+      quitRef.set(true).as(false)
+    else
+      parseAndApplyInput(key, ttyIn, stateRef)
+
+  private def parseAndApplyInput(
+    key: Int,
+    ttyIn: FileInputStream,
+    stateRef: Ref[GameState]
+  ): Task[Boolean] =
+    for
+      inputOpt <- ZIO.attemptBlocking(parseKeyToInput(key, ttyIn))
+      result <- inputOpt match
+        case None        => ZIO.succeed(true)
+        case Some(input) => applyInput(input, stateRef)
+    yield result
+
+  private def parseKeyToInput(key: Int, ttyIn: FileInputStream): Option[Input] =
+    if key == TerminalInput.EscapeKeyCode then TerminalInput.parseEscapeSequence(ttyIn)
+    else TerminalInput.keyToInput(key)
+
+  private def applyInput(input: Input, stateRef: Ref[GameState]): UIO[Boolean] =
+    for
+      nextShape <- RandomPieceGenerator.nextShape
+      _ <- stateRef.update(s => GameLogic.update(s, input, () => nextShape))
+      newState <- stateRef.get
+      _ <- ConsoleRenderer.render(newState)
+    yield !newState.isGameOver
