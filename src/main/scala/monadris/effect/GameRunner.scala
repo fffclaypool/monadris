@@ -13,6 +13,8 @@ import monadris.logic.*
  */
 object GameRunner:
 
+  private case object GameEnded extends RuntimeException
+
   /**
    * 描画を抽象化するトレイト（依存性注入用）
    */
@@ -132,11 +134,14 @@ object GameRunner:
             state <- stateRef.get
             _ <- (
               if state.isGameOver
-              then renderer.renderGameOver(state) *> ZIO.interrupt
+              then renderer.renderGameOver(state) *> ZIO.fail(GameEnded)
+              else if input == Input.Quit
+              then ZIO.fail(GameEnded)
               else processInput(stateRef, input, randomPiece, renderer)
             )
           yield ()
         }
+        .catchAll { case GameEnded => ZIO.unit }
         .race(tickFiber.join) // どちらかが終了したら終了
 
       finalState <- stateRef.get
