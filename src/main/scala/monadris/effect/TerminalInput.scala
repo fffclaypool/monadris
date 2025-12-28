@@ -3,6 +3,8 @@ package monadris.effect
 import java.io.FileInputStream
 import java.io.InputStream
 
+import zio.*
+
 import monadris.domain.Input
 
 /**
@@ -101,3 +103,28 @@ object TerminalInput:
       case ParseResult.Regular(key) => keyToInput(key)
       case ParseResult.Timeout      => None
       case ParseResult.Unknown      => None
+
+/**
+ * ターミナルのraw/cookedモード制御
+ */
+object TerminalControl:
+
+  /**
+   * ターミナルをrawモードに設定（キー入力を即座に受け取る）
+   */
+  val enableRawMode: Task[Unit] =
+    execShellCommand("stty raw -echo < /dev/tty")
+
+  /**
+   * ターミナルをcookedモードに戻す（通常モード）
+   */
+  val disableRawMode: Task[Unit] =
+    execShellCommand("stty cooked echo < /dev/tty")
+
+  /**
+   * シェルコマンドを実行
+   */
+  private def execShellCommand(cmd: String): Task[Unit] =
+    ZIO.attempt {
+      java.lang.Runtime.getRuntime.exec(Array("/bin/sh", "-c", cmd)).waitFor()
+    }.unit
