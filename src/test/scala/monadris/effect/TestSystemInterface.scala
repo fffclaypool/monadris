@@ -2,6 +2,8 @@ package monadris.effect
 
 import zio.*
 
+import monadris.config.*
+
 /**
  * テスト専用のモック実装
  * 本番コードには含まれない
@@ -49,3 +51,18 @@ object TestServices:
       history <- Ref.make(List.empty[String])
     yield TestCommandService(history)
   }
+
+  // ============================================================
+  // AppConfig テスト実装 - デフォルト値を提供
+  // ============================================================
+
+  val testConfig: AppConfig = AppConfig(
+    grid = GridConfig(width = 10, height = 20),
+    score = ScoreConfig(singleLine = 100, doubleLine = 300, tripleLine = 500, tetris = 800),
+    level = LevelConfig(linesPerLevel = 10),
+    speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50),
+    terminal = TerminalConfig(escapeSequenceWaitMs = 20, escapeSequenceSecondWaitMs = 5, inputPollIntervalMs = 20),
+    timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000)
+  )
+
+  val config: ULayer[AppConfig] = ZLayer.succeed(testConfig)

@@ -118,13 +118,13 @@ object GameSystemSpec extends ZIOSpecDefault:
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Timeout)
-      }.provide(Mocks.tty(Chunk.empty)),
+      }.provide(Mocks.tty(Chunk.empty) ++ Mocks.config),
 
       test("returns Regular for normal key") {
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Regular('h'.toInt))
-      }.provide(Mocks.tty(Chunk('h'.toInt))),
+      }.provide(Mocks.tty(Chunk('h'.toInt)) ++ Mocks.config),
 
       test("returns Arrow for up arrow sequence") {
         // ESC [ A = Up arrow (RotateClockwise)
@@ -132,42 +132,42 @@ object GameSystemSpec extends ZIOSpecDefault:
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.RotateClockwise))
-      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'A'.toInt))),
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'A'.toInt)) ++ Mocks.config),
 
       test("returns Arrow for down arrow sequence") {
         // ESC [ B = Down arrow (MoveDown)
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveDown))
-      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'B'.toInt))),
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'B'.toInt)) ++ Mocks.config),
 
       test("returns Arrow for right arrow sequence") {
         // ESC [ C = Right arrow (MoveRight)
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveRight))
-      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'C'.toInt))),
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'C'.toInt)) ++ Mocks.config),
 
       test("returns Arrow for left arrow sequence") {
         // ESC [ D = Left arrow (MoveLeft)
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveLeft))
-      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'D'.toInt))),
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'D'.toInt)) ++ Mocks.config),
 
       test("returns Unknown for incomplete escape sequence") {
         // ESC alone (no following bytes)
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Unknown)
-      }.provide(Mocks.tty(Chunk(27))),
+      }.provide(Mocks.tty(Chunk(27)) ++ Mocks.config),
 
       test("returns Unknown for invalid escape sequence") {
         // ESC X (not [ followed by arrow)
         for
           result <- TerminalInput.readKeyZIO
         yield assertTrue(result == TerminalInput.ParseResult.Unknown)
-      }.provide(Mocks.tty(Chunk(27, 'X'.toInt)))
+      }.provide(Mocks.tty(Chunk(27, 'X'.toInt)) ++ Mocks.config)
     ),
 
     // ============================================================
@@ -245,7 +245,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         )
       }.provide(Mocks.tty(Chunk(
         'h'.toInt, 'j'.toInt, 27, '['.toInt, 'A'.toInt, 'q'.toInt
-      ))),
+      )) ++ Mocks.config),
 
       test("toInput converts parse results correctly") {
         val arrow = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
@@ -280,17 +280,17 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("parseEscapeSequenceZIO returns None when no bytes available after wait") {
         // Only ESC, but available returns 0 after sleep
         for
-          result <- TerminalInput.parseEscapeSequenceZIO()
+          result <- TerminalInput.parseEscapeSequenceZIO
         yield assertTrue(result.isEmpty)
-      }.provide(Mocks.tty(Chunk.empty)),
+      }.provide(Mocks.tty(Chunk.empty) ++ Mocks.config),
 
       test("parseEscapeSequenceZIO returns None for invalid bracket") {
         // ESC followed by non-bracket
         for
           _ <- TtyService.read() // consume ESC
-          result <- TerminalInput.parseEscapeSequenceZIO()
+          result <- TerminalInput.parseEscapeSequenceZIO
         yield assertTrue(result.isEmpty)
-      }.provide(Mocks.tty(Chunk(27, 'X'.toInt))),
+      }.provide(Mocks.tty(Chunk(27, 'X'.toInt)) ++ Mocks.config),
 
       test("multiple consecutive key reads") {
         val inputs = Chunk('a'.toInt, 'b'.toInt, 'c'.toInt)
@@ -305,35 +305,35 @@ object GameSystemSpec extends ZIOSpecDefault:
           r3 == TerminalInput.ParseResult.Regular('c'.toInt),
           r4 == TerminalInput.ParseResult.Timeout
         )
-      }.provide(Mocks.tty(Chunk('a'.toInt, 'b'.toInt, 'c'.toInt))),
+      }.provide(Mocks.tty(Chunk('a'.toInt, 'b'.toInt, 'c'.toInt)) ++ Mocks.config),
 
       test("space key is parsed as HardDrop") {
         for
           result <- TerminalInput.readKeyZIO
           input = TerminalInput.toInput(result)
         yield assertTrue(input == Some(Input.HardDrop))
-      }.provide(Mocks.tty(Chunk(' '.toInt))),
+      }.provide(Mocks.tty(Chunk(' '.toInt)) ++ Mocks.config),
 
       test("p key is parsed as Pause") {
         for
           result <- TerminalInput.readKeyZIO
           input = TerminalInput.toInput(result)
         yield assertTrue(input == Some(Input.Pause))
-      }.provide(Mocks.tty(Chunk('p'.toInt))),
+      }.provide(Mocks.tty(Chunk('p'.toInt)) ++ Mocks.config),
 
       test("z key is parsed as RotateCounterClockwise") {
         for
           result <- TerminalInput.readKeyZIO
           input = TerminalInput.toInput(result)
         yield assertTrue(input == Some(Input.RotateCounterClockwise))
-      }.provide(Mocks.tty(Chunk('z'.toInt))),
+      }.provide(Mocks.tty(Chunk('z'.toInt)) ++ Mocks.config),
 
       test("unknown key returns None from toInput") {
         for
           result <- TerminalInput.readKeyZIO
           input = TerminalInput.toInput(result)
         yield assertTrue(input.isEmpty)
-      }.provide(Mocks.tty(Chunk('x'.toInt))),
+      }.provide(Mocks.tty(Chunk('x'.toInt)) ++ Mocks.config),
 
       test("isQuitKey returns true for q and Q") {
         assertTrue(
@@ -374,7 +374,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -383,7 +383,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('Q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -400,14 +400,14 @@ object GameSystemSpec extends ZIOSpecDefault:
           finalState.isDefined,
           output.exists(_.contains("Score:"))
         )
-      }.provide(Mocks.tty(Chunk('h'.toInt, 'q'.toInt)) ++ Mocks.console),
+      }.provide(Mocks.tty(Chunk('h'.toInt, 'q'.toInt)) ++ Mocks.console ++ Mocks.config),
 
       test("arrow key input is processed") {
         // ESC [ D (Left arrow) を入力後、q で終了
         val inputs = Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -417,7 +417,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk(' '.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -427,7 +427,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('p'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -437,7 +437,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('k'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -447,7 +447,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('z'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -457,7 +457,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('x'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -467,7 +467,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -477,7 +477,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk(27, '['.toInt, 'A'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -487,7 +487,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk(27, '['.toInt, 'B'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -497,7 +497,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val inputs = Chunk(27, '['.toInt, 'C'.toInt, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -510,14 +510,14 @@ object GameSystemSpec extends ZIOSpecDefault:
           output <- service.buffer.get
           // 複数回の描画が行われているはず（初期描画 + 移動後の描画）
         yield assertTrue(output.count(_.contains("\u001b[H")) >= 1)
-      }.provide(Mocks.tty(Chunk('h'.toInt, 'q'.toInt)) ++ Mocks.console),
+      }.provide(Mocks.tty(Chunk('h'.toInt, 'q'.toInt)) ++ Mocks.console ++ Mocks.config),
 
       test("incomplete escape sequence is handled") {
         // ESC だけを入力（不完全なエスケープシーケンス）後、q で終了
         val inputs = Chunk(27, 'q'.toInt)
         for
           finalState <- GameRunner.interactiveGameLoop(initialState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
       },
@@ -537,7 +537,7 @@ object GameSystemSpec extends ZIOSpecDefault:
 
         for
           finalState <- GameRunner.interactiveGameLoop(dangerousState)
-            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
         yield assertTrue(finalState.map(_.isGameOver).getOrElse(false))
       }
