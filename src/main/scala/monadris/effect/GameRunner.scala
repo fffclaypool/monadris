@@ -209,7 +209,7 @@ object GameRunner:
   /**
    * インタラクティブなゲームループを実行（TtyService + ConsoleService版）
    */
-  def interactiveGameLoopZIO(
+  def interactiveGameLoop(
     initialState: GameState
   ): ZIO[TtyService & ConsoleService, Throwable, GameState] =
     for
@@ -230,7 +230,7 @@ object GameRunner:
   private def tickLoopZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): ZIO[ConsoleService, Throwable, Unit] =
+  ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
     val shouldContinue = checkGameActiveZIO(stateRef, quitRef)
     val processTick = processTickUpdateZIO(stateRef)
 
@@ -251,14 +251,14 @@ object GameRunner:
 
   private def processTickUpdateZIO(
     stateRef: Ref[GameState]
-  ): ZIO[ConsoleService, Throwable, Boolean] =
+  ): ZIO[TtyService & ConsoleService, Throwable, Boolean] =
     for
       nextShape <- RandomPieceGenerator.nextShape
       _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape))
       newState <- stateRef.get
       _ <- ServiceRenderer.render(newState)
       interval = LineClearing.dropInterval(newState.level)
-      _ <- ZIO.sleep(Duration.fromMillis(interval))
+      _ <- TtyService.sleep(interval)
     yield !newState.isGameOver
 
   private def inputLoopZIO(
