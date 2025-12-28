@@ -31,7 +31,6 @@ object GameLogic:
     nextShapeProvider: () => TetrominoShape
   ): GameState =
     if !state.isPlaying then
-      // ポーズ中の場合、ポーズ解除のみ受け付け
       input match
         case Input.Pause if state.status == GameStatus.Paused =>
           state.copy(status = GameStatus.Playing)
@@ -45,6 +44,7 @@ object GameLogic:
         case Input.RotateCounterClockwise => handleRotation(state, clockwise = false)
         case Input.HardDrop             => handleHardDrop(state, nextShapeProvider)
         case Input.Pause                => state.copy(status = GameStatus.Paused)
+        case Input.Quit                 => state
         case Input.Tick                 => handleTick(state, nextShapeProvider)
 
   /**

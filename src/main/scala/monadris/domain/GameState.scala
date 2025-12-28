@@ -19,6 +19,7 @@ enum Input:
   case RotateCounterClockwise
   case HardDrop
   case Pause
+  case Quit
   case Tick  // 時間経過による自動落下
 
 /**
