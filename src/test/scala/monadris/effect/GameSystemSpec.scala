@@ -520,6 +520,26 @@ object GameSystemSpec extends ZIOSpecDefault:
             .provide(Mocks.tty(inputs) ++ Mocks.console)
             .timeout(1.second)
         yield assertTrue(finalState.isDefined)
+      },
+
+      test("logs game over and exits when game over condition is met") {
+        // 1. 即死するように積み上がった盤面を作成（上から2行目まで埋める）
+        val dangerousGrid = (0 until GameConfig.Grid.DefaultWidth).foldLeft(Grid.empty()) { (g, x) =>
+          g.place(Position(x, 2), Cell.Filled(TetrominoShape.I))
+        }
+
+        // 2. 次にブロックがスポーンしたら即衝突する状態
+        val dangerousState = GameState.initial(TetrominoShape.T, TetrominoShape.O)
+          .copy(grid = dangerousGrid)
+
+        // 3. 入力: HardDrop (即座に固定→判定→GameOver)
+        val inputs = Chunk(' '.toInt)
+
+        for
+          finalState <- GameRunner.interactiveGameLoop(dangerousState)
+            .provide(Mocks.tty(inputs) ++ Mocks.console)
+            .timeout(1.second)
+        yield assertTrue(finalState.map(_.isGameOver).getOrElse(false))
       }
     ),
 

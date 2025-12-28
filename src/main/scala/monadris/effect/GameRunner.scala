@@ -287,7 +287,7 @@ object GameRunner:
         case TerminalInput.ParseResult.Timeout =>
           TtyService.sleep(InputPollIntervalMs).as(true)
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
-          quitRef.set(true).as(false)
+          ZIO.logInfo("Quit key pressed") *> quitRef.set(true).as(false)
         case _ =>
           handleParsedInput(parseResult, stateRef)
     yield result
@@ -305,8 +305,13 @@ object GameRunner:
     stateRef: Ref[GameState]
   ): ZIO[ConsoleService, Throwable, Boolean] =
     for
+      _ <- ZIO.logDebug(s"Input received: $input")
       nextShape <- RandomPieceGenerator.nextShape
+      oldState <- stateRef.get
       _ <- stateRef.update(s => GameLogic.update(s, input, () => nextShape))
       newState <- stateRef.get
+      _ <- ZIO.when(newState.isGameOver && !oldState.isGameOver) {
+        ZIO.logInfo(s"Game Over - Score: ${newState.score}, Lines: ${newState.linesCleared}, Level: ${newState.level}")
+      }
       _ <- ServiceRenderer.render(newState)
     yield !newState.isGameOver
