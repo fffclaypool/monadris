@@ -3,6 +3,8 @@ package monadris.effect
 import zio.*
 import java.io.FileInputStream
 
+import monadris.config.AppConfig
+
 /**
  * システムIOを抽象化するサービス定義
  * 本番用(live)実装のみを含む。テスト用実装は src/test に分離。
@@ -85,8 +87,8 @@ object CommandService:
 // 複合環境型
 // ============================================================
 
-type GameEnv = TtyService & ConsoleService & CommandService
+type GameEnv = TtyService & ConsoleService & CommandService & AppConfig
 
 object GameEnv:
-  val live: ZLayer[Any, Nothing, GameEnv] =
-    TtyService.live ++ ConsoleService.live ++ CommandService.live
+  val live: ZLayer[Any, Config.Error, GameEnv] =
+    TtyService.live ++ ConsoleService.live ++ CommandService.live ++ AppConfig.live

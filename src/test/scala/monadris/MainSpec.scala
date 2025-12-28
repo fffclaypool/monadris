@@ -21,7 +21,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program runs and exits with lowercase q") {
@@ -32,7 +33,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program runs and exits with uppercase Q") {
@@ -43,7 +45,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('Q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program shows title screen") {
@@ -60,7 +63,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program shows game over screen") {
@@ -74,7 +78,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program enables and disables raw mode") {
@@ -90,7 +95,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program handles movement before quit") {
@@ -102,7 +108,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program handles arrow keys before quit") {
@@ -115,7 +122,8 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     ),
 
     test("program outputs game ended message") {
@@ -129,6 +137,7 @@ object MainSpec extends ZIOSpecDefault:
     }.provide(
       Mocks.tty(Chunk('q'.toInt)),
       Mocks.console,
-      Mocks.command
+      Mocks.command,
+      Mocks.config
     )
   )

@@ -4,6 +4,7 @@ import zio.*
 import zio.stream.UStream
 import zio.stream.ZStream
 
+import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.logic.*
 
@@ -203,15 +204,12 @@ object GameRunner:
   // インタラクティブゲームループ（サービス依存版）
   // ============================================================
 
-  /** 入力ポーリング待機時間（ミリ秒） */
-  private final val InputPollIntervalMs: Int = 20
-
   /**
    * インタラクティブなゲームループを実行（TtyService + ConsoleService版）
    */
   def interactiveGameLoop(
     initialState: GameState
-  ): ZIO[TtyService & ConsoleService, Throwable, GameState] =
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, GameState] =
     for
       stateRef <- Ref.make(initialState)
       quitRef <- Ref.make(false)
@@ -230,7 +228,7 @@ object GameRunner:
   private def tickLoopZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Unit] =
     val shouldContinue = checkGameActiveZIO(stateRef, quitRef)
     val processTick = processTickUpdateZIO(stateRef)
 
@@ -251,7 +249,7 @@ object GameRunner:
 
   private def processTickUpdateZIO(
     stateRef: Ref[GameState]
-  ): ZIO[TtyService & ConsoleService, Throwable, Boolean] =
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Boolean] =
     for
       nextShape <- RandomPieceGenerator.nextShape
       _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape))
@@ -264,13 +262,13 @@ object GameRunner:
   private def inputLoopZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Unit] =
     processInputLoopZIO(stateRef, quitRef)
 
   private def processInputLoopZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Unit] =
     val step = checkGameActiveZIO(stateRef, quitRef).flatMap {
       case false => ZIO.succeed(false)
       case true  => readAndHandleKeyZIO(stateRef, quitRef)
@@ -280,12 +278,13 @@ object GameRunner:
   private def readAndHandleKeyZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService, Throwable, Boolean] =
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Boolean] =
     for
+      config      <- ZIO.service[AppConfig]
       parseResult <- TerminalInput.readKeyZIO
       result <- parseResult match
         case TerminalInput.ParseResult.Timeout =>
-          TtyService.sleep(InputPollIntervalMs).as(true)
+          TtyService.sleep(config.terminal.inputPollIntervalMs).as(true)
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
           ZIO.logInfo("Quit key pressed") *> quitRef.set(true).as(false)
         case _ =>

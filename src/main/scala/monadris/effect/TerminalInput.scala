@@ -2,6 +2,7 @@ package monadris.effect
 
 import zio.*
 
+import monadris.config.AppConfig
 import monadris.domain.Input
 
 /**
@@ -12,10 +13,6 @@ object TerminalInput:
 
   /** キーコード定数 */
   final val EscapeKeyCode: Int = 27
-
-  /** エスケープシーケンス解析用の待機時間（ミリ秒） */
-  private final val EscapeSequenceWaitMs: Int = 20
-  private final val EscapeSequenceSecondWaitMs: Int = 5
 
   /** エスケープシーケンスの解析結果 */
   enum ParseResult:
@@ -70,26 +67,26 @@ object TerminalInput:
   /**
    * エスケープシーケンスを解析（TtyService版）
    */
-  def parseEscapeSequenceZIO(
-    waitMs: Int = EscapeSequenceWaitMs
-  ): ZIO[TtyService, Throwable, Option[Input]] =
+  def parseEscapeSequenceZIO: ZIO[TtyService & AppConfig, Throwable, Option[Input]] =
     for
-      _         <- TtyService.sleep(waitMs)
+      config    <- ZIO.service[AppConfig]
+      _         <- TtyService.sleep(config.terminal.escapeSequenceWaitMs)
       available <- TtyService.available()
       result    <- if available <= 0 then ZIO.succeed(None)
                    else parseEscapeBody
     yield result
 
-  private def parseEscapeBody: ZIO[TtyService, Throwable, Option[Input]] =
+  private def parseEscapeBody: ZIO[TtyService & AppConfig, Throwable, Option[Input]] =
     for
       second    <- TtyService.read()
       result    <- if second != '[' then ZIO.succeed(None)
                    else parseArrowKey
     yield result
 
-  private def parseArrowKey: ZIO[TtyService, Throwable, Option[Input]] =
+  private def parseArrowKey: ZIO[TtyService & AppConfig, Throwable, Option[Input]] =
     for
-      _         <- TtyService.sleep(EscapeSequenceSecondWaitMs)
+      config    <- ZIO.service[AppConfig]
+      _         <- TtyService.sleep(config.terminal.escapeSequenceSecondWaitMs)
       available <- TtyService.available()
       result    <- if available <= 0 then ZIO.succeed(None)
                    else TtyService.read().map(key => arrowToInput(key))
@@ -98,22 +95,22 @@ object TerminalInput:
   /**
    * TtyServiceから1キーを読み取り（ZIO版）
    */
-  def readKeyZIO: ZIO[TtyService, Throwable, ParseResult] =
+  def readKeyZIO: ZIO[TtyService & AppConfig, Throwable, ParseResult] =
     for
       available <- TtyService.available()
       result    <- if available <= 0 then ZIO.succeed(ParseResult.Timeout)
                    else readKeyBody
     yield result
 
-  private def readKeyBody: ZIO[TtyService, Throwable, ParseResult] =
+  private def readKeyBody: ZIO[TtyService & AppConfig, Throwable, ParseResult] =
     for
       key    <- TtyService.read()
       result <- parseKeyResult(key)
     yield result
 
-  private def parseKeyResult(key: Int): ZIO[TtyService, Throwable, ParseResult] =
+  private def parseKeyResult(key: Int): ZIO[TtyService & AppConfig, Throwable, ParseResult] =
     if key == EscapeKeyCode then
-      parseEscapeSequenceZIO().map {
+      parseEscapeSequenceZIO.map {
         case Some(input) => ParseResult.Arrow(input)
         case None        => ParseResult.Unknown
       }
