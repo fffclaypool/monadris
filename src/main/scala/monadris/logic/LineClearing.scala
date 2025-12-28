@@ -1,6 +1,7 @@
 package monadris.logic
 
 import monadris.domain.*
+import monadris.domain.GameConfig.{Score, Level, Speed}
 
 /**
  * ライン消去とスコア計算を行う純粋関数群
@@ -39,10 +40,10 @@ object LineClearing:
    */
   def calculateScore(linesCleared: Int, level: Int): Int =
     val baseScore = linesCleared match
-      case 1 => 100
-      case 2 => 300
-      case 3 => 500
-      case 4 => 800
+      case 1 => Score.SingleLine
+      case 2 => Score.DoubleLine
+      case 3 => Score.TripleLine
+      case 4 => Score.Tetris
       case _ => 0
     baseScore * level
 
@@ -50,14 +51,12 @@ object LineClearing:
    * レベル計算（10ライン消去ごとにレベルアップ）
    */
   def calculateLevel(totalLinesCleared: Int, startLevel: Int = 1): Int =
-    startLevel + (totalLinesCleared / 10)
+    startLevel + (totalLinesCleared / Level.LinesPerLevel)
 
   /**
    * 落下速度計算（ミリ秒単位）
    * レベルが上がるほど速くなる
    */
   def dropInterval(level: Int): Long =
-    val baseInterval = 1000L
-    val minInterval = 100L
-    val decrease = (level - 1) * 50L
-    Math.max(minInterval, baseInterval - decrease)
+    val decrease = (level - 1) * Speed.DecreasePerLevelMs
+    Math.max(Speed.MinDropIntervalMs, Speed.BaseDropIntervalMs - decrease)

@@ -74,6 +74,9 @@ object Grid:
   /**
    * 空のグリッドを生成
    */
-  def empty(width: Int = 10, height: Int = 20): Grid =
+  def empty(
+    width: Int = GameConfig.Grid.DefaultWidth,
+    height: Int = GameConfig.Grid.DefaultHeight
+  ): Grid =
     val cells = Vector.fill(height)(Vector.fill(width)(Cell.Empty))
     Grid(cells, width, height)

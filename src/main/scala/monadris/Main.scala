@@ -14,6 +14,9 @@ import monadris.logic.*
  */
 object Main extends ZIOAppDefault:
 
+  /** 入力ポーリング待機時間（ミリ秒） */
+  private final val InputPollIntervalMs: Int = 20
+
   override def run: Task[Unit] =
     program.catchAll { error =>
       Console.printLineError(s"Error: $error").orDie
@@ -134,7 +137,7 @@ object Main extends ZIOAppDefault:
     for
       keyOpt <- ZIO.attemptBlocking(readKeyFromTty(ttyIn))
       result <- keyOpt match
-        case None      => ZIO.sleep(20.millis).as(true)
+        case None      => ZIO.sleep(InputPollIntervalMs.millis).as(true)
         case Some(key) => handleKey(key, ttyIn, stateRef, quitRef)
     yield result
 
@@ -165,7 +168,7 @@ object Main extends ZIOAppDefault:
     yield result
 
   private def parseKeyToInput(key: Int, ttyIn: FileInputStream): Option[Input] =
-    if key == 27 then TerminalInput.parseEscapeSequence(ttyIn)
+    if key == TerminalInput.EscapeKeyCode then TerminalInput.parseEscapeSequence(ttyIn)
     else TerminalInput.keyToInput(key)
 
   private def applyInput(input: Input, stateRef: Ref[GameState]): UIO[Boolean] =

@@ -11,6 +11,13 @@ import monadris.domain.Input
  */
 object TerminalInput:
 
+  /** キーコード定数 */
+  final val EscapeKeyCode: Int = 27
+
+  /** エスケープシーケンス解析用の待機時間（ミリ秒） */
+  private final val EscapeSequenceWaitMs: Int = 20
+  private final val EscapeSequenceSecondWaitMs: Int = 5
+
   /** エスケープシーケンスの解析結果 */
   enum ParseResult:
     case Arrow(input: Input)
@@ -59,13 +66,13 @@ object TerminalInput:
    * エスケープシーケンスを解析（InputStream版）
    * 矢印キー: ESC [ A/B/C/D
    */
-  def parseEscapeSequence(in: InputStream, waitMs: Int = 20): Option[Input] =
+  def parseEscapeSequence(in: InputStream, waitMs: Int = EscapeSequenceWaitMs): Option[Input] =
     Thread.sleep(waitMs)
     for
       _      <- Option.when(in.available() > 0)(())
       second =  in.read()
       _      <- Option.when(second == '[')(())
-      _      =  Thread.sleep(5)
+      _      =  Thread.sleep(EscapeSequenceSecondWaitMs)
       _      <- Option.when(in.available() > 0)(())
       key    =  in.read()
       input  <- arrowKeyMap.get(key.toChar)
@@ -78,7 +85,7 @@ object TerminalInput:
     if in.available() <= 0 then Some(ParseResult.Timeout)
     else
       val key = in.read()
-      if key == 27 then
+      if key == EscapeKeyCode then
         parseEscapeSequence(in) match
           case Some(input) => Some(ParseResult.Arrow(input))
           case None        => Some(ParseResult.Unknown)
