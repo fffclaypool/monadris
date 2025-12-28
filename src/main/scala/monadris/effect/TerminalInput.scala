@@ -1,8 +1,5 @@
 package monadris.effect
 
-import java.io.FileInputStream
-import java.io.InputStream
-
 import zio.*
 
 import monadris.domain.Input
@@ -53,49 +50,78 @@ object TerminalInput:
   )
 
   /**
-   * キーコードをInputに変換
+   * キーコードをInputに変換（純粋関数）
    */
   def keyToInput(key: Int): Option[Input] =
     regularKeyMap.get(key.toChar)
 
   /**
-   * 終了キーかどうか判定
+   * 終了キーかどうか判定（純粋関数）
    */
   def isQuitKey(key: Int): Boolean =
     key == 'q' || key == 'Q'
 
   /**
-   * エスケープシーケンスを解析（InputStream版）
-   * 矢印キー: ESC [ A/B/C/D
+   * 矢印キーコードをInputに変換（純粋関数）
    */
-  def parseEscapeSequence(in: InputStream, waitMs: Int = EscapeSequenceWaitMs): Option[Input] =
-    Thread.sleep(waitMs)
+  def arrowToInput(key: Int): Option[Input] =
+    arrowKeyMap.get(key.toChar)
+
+  /**
+   * エスケープシーケンスを解析（TtyService版）
+   */
+  def parseEscapeSequenceZIO(
+    waitMs: Int = EscapeSequenceWaitMs
+  ): ZIO[TtyService, Throwable, Option[Input]] =
     for
-      _      <- Option.when(in.available() > 0)(())
-      second =  in.read()
-      _      <- Option.when(second == '[')(())
-      _      =  Thread.sleep(EscapeSequenceSecondWaitMs)
-      _      <- Option.when(in.available() > 0)(())
-      key    =  in.read()
-      input  <- arrowKeyMap.get(key.toChar)
-    yield input
+      _         <- TtyService.sleep(waitMs)
+      available <- TtyService.available()
+      result    <- if available <= 0 then ZIO.succeed(None)
+                   else parseEscapeBody
+    yield result
+
+  private def parseEscapeBody: ZIO[TtyService, Throwable, Option[Input]] =
+    for
+      second    <- TtyService.read()
+      result    <- if second != '[' then ZIO.succeed(None)
+                   else parseArrowKey
+    yield result
+
+  private def parseArrowKey: ZIO[TtyService, Throwable, Option[Input]] =
+    for
+      _         <- TtyService.sleep(EscapeSequenceSecondWaitMs)
+      available <- TtyService.available()
+      result    <- if available <= 0 then ZIO.succeed(None)
+                   else TtyService.read().map(key => arrowToInput(key))
+    yield result
 
   /**
-   * FileInputStreamから1キーを読み取り、Inputに変換
+   * TtyServiceから1キーを読み取り（ZIO版）
    */
-  def readKey(in: FileInputStream): Option[ParseResult] =
-    if in.available() <= 0 then Some(ParseResult.Timeout)
+  def readKeyZIO: ZIO[TtyService, Throwable, ParseResult] =
+    for
+      available <- TtyService.available()
+      result    <- if available <= 0 then ZIO.succeed(ParseResult.Timeout)
+                   else readKeyBody
+    yield result
+
+  private def readKeyBody: ZIO[TtyService, Throwable, ParseResult] =
+    for
+      key    <- TtyService.read()
+      result <- parseKeyResult(key)
+    yield result
+
+  private def parseKeyResult(key: Int): ZIO[TtyService, Throwable, ParseResult] =
+    if key == EscapeKeyCode then
+      parseEscapeSequenceZIO().map {
+        case Some(input) => ParseResult.Arrow(input)
+        case None        => ParseResult.Unknown
+      }
     else
-      val key = in.read()
-      if key == EscapeKeyCode then
-        parseEscapeSequence(in) match
-          case Some(input) => Some(ParseResult.Arrow(input))
-          case None        => Some(ParseResult.Unknown)
-      else
-        Some(ParseResult.Regular(key))
+      ZIO.succeed(ParseResult.Regular(key))
 
   /**
-   * ParseResultをOption[Input]に変換
+   * ParseResultをOption[Input]に変換（純粋関数）
    */
   def toInput(result: ParseResult): Option[Input] =
     result match
@@ -110,21 +136,13 @@ object TerminalInput:
 object TerminalControl:
 
   /**
-   * ターミナルをrawモードに設定（キー入力を即座に受け取る）
+   * ターミナルをrawモードに設定（CommandService版）
    */
-  val enableRawMode: Task[Unit] =
-    execShellCommand("stty raw -echo < /dev/tty")
+  def enableRawMode: ZIO[CommandService, Throwable, Unit] =
+    CommandService.exec("stty raw -echo < /dev/tty")
 
   /**
-   * ターミナルをcookedモードに戻す（通常モード）
+   * ターミナルをcookedモードに戻す（CommandService版）
    */
-  val disableRawMode: Task[Unit] =
-    execShellCommand("stty cooked echo < /dev/tty")
-
-  /**
-   * シェルコマンドを実行
-   */
-  private def execShellCommand(cmd: String): Task[Unit] =
-    ZIO.attempt {
-      java.lang.Runtime.getRuntime.exec(Array("/bin/sh", "-c", cmd)).waitFor()
-    }.unit
+  def disableRawMode: ZIO[CommandService, Throwable, Unit] =
+    CommandService.exec("stty cooked echo < /dev/tty")

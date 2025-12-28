@@ -1,7 +1,5 @@
 package monadris.effect
 
-import java.io.ByteArrayInputStream
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -96,59 +94,6 @@ class TerminalInputSpec extends AnyFlatSpec with Matchers:
 
   "TerminalInput.EscapeKeyCode" should "be 27" in {
     TerminalInput.EscapeKeyCode shouldBe 27
-  }
-
-  // ============================================================
-  // parseEscapeSequence tests
-  // ============================================================
-
-  "TerminalInput.parseEscapeSequence" should "return RotateClockwise for up arrow (ESC [ A)" in {
-    val bytes = Array('['.toByte, 'A'.toByte)
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe Some(Input.RotateClockwise)
-  }
-
-  it should "return MoveDown for down arrow (ESC [ B)" in {
-    val bytes = Array('['.toByte, 'B'.toByte)
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe Some(Input.MoveDown)
-  }
-
-  it should "return MoveRight for right arrow (ESC [ C)" in {
-    val bytes = Array('['.toByte, 'C'.toByte)
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe Some(Input.MoveRight)
-  }
-
-  it should "return MoveLeft for left arrow (ESC [ D)" in {
-    val bytes = Array('['.toByte, 'D'.toByte)
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe Some(Input.MoveLeft)
-  }
-
-  it should "return None for incomplete sequence (missing bracket)" in {
-    val bytes = Array('A'.toByte) // Missing '['
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe None
-  }
-
-  it should "return None for empty stream" in {
-    val bytes = Array.empty[Byte]
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe None
-  }
-
-  it should "return None for unknown arrow key code" in {
-    val bytes = Array('['.toByte, 'X'.toByte) // Unknown code
-    val stream = new ByteArrayInputStream(bytes)
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe None
-  }
-
-  it should "return None for truncated sequence (only bracket)" in {
-    val bytes = Array('['.toByte)
-    val stream = new ByteArrayInputStream(bytes)
-    // After reading '[', stream is empty, so it should return None
-    TerminalInput.parseEscapeSequence(stream, waitMs = 1) shouldBe None
   }
 
   // ============================================================

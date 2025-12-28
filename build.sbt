@@ -26,4 +26,6 @@ lazy val root = project
     ),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    // Coverage exclusions for untestable IO code (Main entry point)
+    coverageExcludedFiles := ".*Main\\.scala"
   )

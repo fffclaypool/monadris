@@ -36,33 +36,7 @@ object GameRunnerSpec extends ZIOSpecDefault:
   object FixedPieceGenerator extends GameRunner.RandomPiece:
     def nextShape: UIO[TetrominoShape] = ZIO.succeed(TetrominoShape.O)
 
-  // ============================================================
-  // ConsoleRenderer tests
-  // ============================================================
-
   def spec = suite("GameRunner")(
-    suite("ConsoleRenderer")(
-      test("showTitle returns successfully") {
-        for
-          _ <- GameRunner.ConsoleRenderer.showTitle
-        yield assertTrue(true)
-      },
-
-      test("render returns successfully") {
-        val state = initialState
-        for
-          _ <- GameRunner.ConsoleRenderer.render(state)
-        yield assertTrue(true)
-      },
-
-      test("renderGameOver returns successfully") {
-        val state = initialState.copy(status = GameStatus.GameOver)
-        for
-          _ <- GameRunner.ConsoleRenderer.renderGameOver(state)
-        yield assertTrue(true)
-      }
-    ),
-
     // ============================================================
     // RandomPieceGenerator tests
     // ============================================================

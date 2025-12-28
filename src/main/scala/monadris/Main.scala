@@ -19,17 +19,17 @@ object Main extends ZIOAppDefault:
 
   val program: Task[Unit] =
     ZIO.scoped {
-      for
-        _ <- GameRunner.ConsoleRenderer.showTitle
+      (for
+        _ <- GameRunner.ServiceRenderer.showTitle
         _ <- ZIO.sleep(1.second)
         firstShape <- GameRunner.RandomPieceGenerator.nextShape
         nextShape <- GameRunner.RandomPieceGenerator.nextShape
         initialState = GameState.initial(firstShape, nextShape)
         _ <- TerminalControl.enableRawMode
-        finalState <- GameRunner.interactiveGameLoop(initialState)
+        finalState <- GameRunner.interactiveGameLoopZIO(initialState)
           .ensuring(TerminalControl.disableRawMode.ignore)
-        _ <- GameRunner.ConsoleRenderer.renderGameOver(finalState)
-        _ <- Console.printLine("\nGame ended.")
+        _ <- GameRunner.ServiceRenderer.renderGameOver(finalState)
+        _ <- ConsoleService.print("\nGame ended.\r\n")
         _ <- ZIO.sleep(2.seconds)
-      yield ()
+      yield ()).provideLayer(GameEnv.live)
     }

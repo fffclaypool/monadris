@@ -1,7 +1,5 @@
 package monadris.effect
 
-import java.io.FileInputStream
-
 import zio.*
 import zio.stream.UStream
 import zio.stream.ZStream
@@ -36,17 +34,17 @@ object GameRunner:
   trait RandomPiece:
     def nextShape: UIO[TetrominoShape]
 
-  /**
-   * コンソール用の簡易レンダラー
-   */
-  object ConsoleRenderer extends Renderer:
-    // raw modeでは \r\n が必要
-    private val NL = "\r\n"
+  // raw modeでは \r\n が必要
+  private val NL = "\r\n"
 
+  /**
+   * ConsoleService依存のレンダラー（テスト可能版）
+   */
+  object ServiceRenderer:
     /**
      * タイトル画面を表示
      */
-    def showTitle: Task[Unit] =
+    def showTitle: ZIO[ConsoleService, Throwable, Unit] =
       val lines = List(
         "╔════════════════════════════════════╗",
         "║    🎮 Functional Tetris            ║",
@@ -63,32 +61,30 @@ object GameRunner:
         "╚════════════════════════════════════╝",
         ""
       )
-      ZIO.foreachDiscard(lines)(Console.printLine(_))
+      ZIO.foreachDiscard(lines)(line => ConsoleService.print(line + NL))
 
-    def render(state: GameState): UIO[Unit] = ZIO.succeed {
-      // ANSI エスケープでカーソルを先頭に移動して画面クリア
-      print("\u001b[H\u001b[2J\u001b[3J")
+    def render(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
+      for
+        _ <- ConsoleService.print("\u001b[H\u001b[2J\u001b[3J")
+        gridDisplay = renderGrid(state)
+        info = List(
+          s"Score: ${state.score}",
+          s"Level: ${state.level}",
+          s"Lines: ${state.linesCleared}",
+          s"Next: ${state.nextTetromino}",
+          "",
+          "H/L or ←/→: Move  K or ↑: Rotate",
+          "J or ↓: Drop  Space: Hard drop",
+          "P: Pause  Q: Quit"
+        ).mkString(NL)
+        _ <- ConsoleService.print(gridDisplay)
+        _ <- ConsoleService.print(NL)
+        _ <- ConsoleService.print(info)
+        _ <- ConsoleService.print(NL)
+        _ <- ConsoleService.flush()
+      yield ()
 
-      val gridDisplay = renderGrid(state)
-      val info = List(
-        s"Score: ${state.score}",
-        s"Level: ${state.level}",
-        s"Lines: ${state.linesCleared}",
-        s"Next: ${state.nextTetromino}",
-        "",
-        "H/L or ←/→: Move  K or ↑: Rotate",
-        "J or ↓: Drop  Space: Hard drop",
-        "P: Pause  Q: Quit"
-      ).mkString(NL)
-
-      print(gridDisplay)
-      print(NL)
-      print(info)
-      print(NL)
-      java.lang.System.out.flush()
-    }
-
-    def renderGameOver(state: GameState): UIO[Unit] = ZIO.succeed {
+    def renderGameOver(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
       val msg = List(
         "",
         "╔═══════════════════════╗",
@@ -99,10 +95,11 @@ object GameRunner:
         s"║  Level: ${"%6d".format(state.level)}        ║",
         "╚═══════════════════════╝"
       ).mkString(NL)
-      print(msg)
-      print(NL)
-      java.lang.System.out.flush()
-    }
+      for
+        _ <- ConsoleService.print(msg)
+        _ <- ConsoleService.print(NL)
+        _ <- ConsoleService.flush()
+      yield ()
 
     private def renderGrid(state: GameState): String =
       val grid = state.grid
@@ -203,32 +200,39 @@ object GameRunner:
     }
 
   // ============================================================
-  // インタラクティブゲームループ（Main.scalaから移動）
+  // インタラクティブゲームループ（サービス依存版）
   // ============================================================
 
   /** 入力ポーリング待機時間（ミリ秒） */
   private final val InputPollIntervalMs: Int = 20
 
   /**
-   * インタラクティブなゲームループを実行
+   * インタラクティブなゲームループを実行（TtyService + ConsoleService版）
    */
-  def interactiveGameLoop(initialState: GameState): Task[GameState] =
+  def interactiveGameLoopZIO(
+    initialState: GameState
+  ): ZIO[TtyService & ConsoleService, Throwable, GameState] =
     for
       stateRef <- Ref.make(initialState)
       quitRef <- Ref.make(false)
-      _ <- renderCurrentState(stateRef)
-      tickFiber <- tickLoop(stateRef, quitRef).fork
-      _ <- inputLoop(stateRef, quitRef)
+      _ <- renderCurrentStateZIO(stateRef)
+      tickFiber <- tickLoopZIO(stateRef, quitRef).fork
+      _ <- inputLoopZIO(stateRef, quitRef)
       _ <- tickFiber.interrupt
       finalState <- stateRef.get
     yield finalState
 
-  private def renderCurrentState(stateRef: Ref[GameState]): UIO[Unit] =
-    stateRef.get.flatMap(ConsoleRenderer.render)
+  private def renderCurrentStateZIO(
+    stateRef: Ref[GameState]
+  ): ZIO[ConsoleService, Throwable, Unit] =
+    stateRef.get.flatMap(ServiceRenderer.render)
 
-  private def tickLoop(stateRef: Ref[GameState], quitRef: Ref[Boolean]): UIO[Unit] =
-    val shouldContinue = checkGameActive(stateRef, quitRef)
-    val processTick = processTickUpdate(stateRef)
+  private def tickLoopZIO(
+    stateRef: Ref[GameState],
+    quitRef: Ref[Boolean]
+  ): ZIO[ConsoleService, Throwable, Unit] =
+    val shouldContinue = checkGameActiveZIO(stateRef, quitRef)
+    val processTick = processTickUpdateZIO(stateRef)
 
     val tick = shouldContinue.flatMap {
       case false => ZIO.succeed(false)
@@ -236,7 +240,7 @@ object GameRunner:
     }
     tick.repeatWhile(identity).unit
 
-  private def checkGameActive(
+  private def checkGameActiveZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
   ): UIO[Boolean] =
@@ -245,80 +249,64 @@ object GameRunner:
       state <- stateRef.get
     yield !quit && !state.isGameOver
 
-  private def processTickUpdate(stateRef: Ref[GameState]): UIO[Boolean] =
+  private def processTickUpdateZIO(
+    stateRef: Ref[GameState]
+  ): ZIO[ConsoleService, Throwable, Boolean] =
     for
       nextShape <- RandomPieceGenerator.nextShape
       _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape))
       newState <- stateRef.get
-      _ <- ConsoleRenderer.render(newState)
+      _ <- ServiceRenderer.render(newState)
       interval = LineClearing.dropInterval(newState.level)
       _ <- ZIO.sleep(Duration.fromMillis(interval))
     yield !newState.isGameOver
 
-  private def inputLoop(stateRef: Ref[GameState], quitRef: Ref[Boolean]): Task[Unit] =
-    ZIO.acquireReleaseWith(
-      ZIO.attempt(new FileInputStream("/dev/tty"))
-    )(fis => ZIO.succeed(fis.close())) { ttyIn =>
-      processInputLoop(ttyIn, stateRef, quitRef)
-    }
-
-  private def processInputLoop(
-    ttyIn: FileInputStream,
+  private def inputLoopZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): Task[Unit] =
-    val step = checkGameActive(stateRef, quitRef).flatMap {
+  ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
+    processInputLoopZIO(stateRef, quitRef)
+
+  private def processInputLoopZIO(
+    stateRef: Ref[GameState],
+    quitRef: Ref[Boolean]
+  ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
+    val step = checkGameActiveZIO(stateRef, quitRef).flatMap {
       case false => ZIO.succeed(false)
-      case true  => readAndHandleKey(ttyIn, stateRef, quitRef)
+      case true  => readAndHandleKeyZIO(stateRef, quitRef)
     }
     step.repeatWhile(identity).unit
 
-  private def readAndHandleKey(
-    ttyIn: FileInputStream,
+  private def readAndHandleKeyZIO(
     stateRef: Ref[GameState],
     quitRef: Ref[Boolean]
-  ): Task[Boolean] =
+  ): ZIO[TtyService & ConsoleService, Throwable, Boolean] =
     for
-      keyOpt <- ZIO.attemptBlocking(readKeyFromTty(ttyIn))
-      result <- keyOpt match
-        case None      => ZIO.sleep(InputPollIntervalMs.millis).as(true)
-        case Some(key) => handleKey(key, ttyIn, stateRef, quitRef)
+      parseResult <- TerminalInput.readKeyZIO
+      result <- parseResult match
+        case TerminalInput.ParseResult.Timeout =>
+          TtyService.sleep(InputPollIntervalMs).as(true)
+        case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
+          quitRef.set(true).as(false)
+        case _ =>
+          handleParsedInput(parseResult, stateRef)
     yield result
 
-  private def readKeyFromTty(ttyIn: FileInputStream): Option[Int] =
-    if ttyIn.available() > 0 then Some(ttyIn.read()) else None
-
-  private def handleKey(
-    key: Int,
-    ttyIn: FileInputStream,
-    stateRef: Ref[GameState],
-    quitRef: Ref[Boolean]
-  ): Task[Boolean] =
-    if TerminalInput.isQuitKey(key) then
-      quitRef.set(true).as(false)
-    else
-      parseAndApplyInput(key, ttyIn, stateRef)
-
-  private def parseAndApplyInput(
-    key: Int,
-    ttyIn: FileInputStream,
+  private def handleParsedInput(
+    parseResult: TerminalInput.ParseResult,
     stateRef: Ref[GameState]
-  ): Task[Boolean] =
-    for
-      inputOpt <- ZIO.attemptBlocking(parseKeyToInput(key, ttyIn))
-      result <- inputOpt match
-        case None        => ZIO.succeed(true)
-        case Some(input) => applyInput(input, stateRef)
-    yield result
+  ): ZIO[ConsoleService, Throwable, Boolean] =
+    TerminalInput.toInput(parseResult) match
+      case None        => ZIO.succeed(true)
+      case Some(input) => applyInputZIO(input, stateRef)
 
-  private def parseKeyToInput(key: Int, ttyIn: FileInputStream): Option[Input] =
-    if key == TerminalInput.EscapeKeyCode then TerminalInput.parseEscapeSequence(ttyIn)
-    else TerminalInput.keyToInput(key)
-
-  private def applyInput(input: Input, stateRef: Ref[GameState]): UIO[Boolean] =
+  private def applyInputZIO(
+    input: Input,
+    stateRef: Ref[GameState]
+  ): ZIO[ConsoleService, Throwable, Boolean] =
     for
       nextShape <- RandomPieceGenerator.nextShape
       _ <- stateRef.update(s => GameLogic.update(s, input, () => nextShape))
       newState <- stateRef.get
-      _ <- ConsoleRenderer.render(newState)
+      _ <- ServiceRenderer.render(newState)
     yield !newState.isGameOver
