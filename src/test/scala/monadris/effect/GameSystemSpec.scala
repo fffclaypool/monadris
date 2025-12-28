@@ -1,0 +1,366 @@
+package monadris.effect
+
+import zio.*
+import zio.test.*
+import zio.test.Assertion.*
+
+import monadris.domain.*
+import monadris.effect.TestServices as Mocks
+
+/**
+ * IO抽象化レイヤーのテスト
+ * TestServices のモック実装を使用
+ */
+object GameSystemSpec extends ZIOSpecDefault:
+
+  def initialState: GameState =
+    GameState.initial(TetrominoShape.T, TetrominoShape.I)
+
+  def spec = suite("GameSystem Tests")(
+    // ============================================================
+    // TtyService Tests
+    // ============================================================
+
+    suite("TtyService")(
+      test("test implementation returns queued input") {
+        val inputs = Chunk('h'.toInt, 'j'.toInt, 'k'.toInt)
+        for
+          first  <- TtyService.read()
+          second <- TtyService.read()
+          third  <- TtyService.read()
+        yield assertTrue(
+          first == 'h'.toInt,
+          second == 'j'.toInt,
+          third == 'k'.toInt
+        )
+      }.provide(Mocks.tty(Chunk('h'.toInt, 'j'.toInt, 'k'.toInt))),
+
+      test("available returns queue size") {
+        val inputs = Chunk(1, 2, 3)
+        for
+          size1 <- TtyService.available()
+          _     <- TtyService.read()
+          size2 <- TtyService.available()
+        yield assertTrue(size1 == 3, size2 == 2)
+      }.provide(Mocks.tty(Chunk(1, 2, 3))),
+
+      test("sleep completes immediately in test") {
+        for
+          _ <- TtyService.sleep(1000)
+        yield assertTrue(true)
+      }.provide(Mocks.tty(Chunk.empty))
+    ),
+
+    // ============================================================
+    // ConsoleService Tests
+    // ============================================================
+
+    suite("ConsoleService")(
+      test("test implementation accumulates output") {
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleService.print("Hello")
+          _       <- ConsoleService.print("World")
+          output  <- service.buffer.get
+        yield assertTrue(output == List("Hello", "World"))
+      }.provide(Mocks.console),
+
+      test("flush succeeds") {
+        for
+          _ <- ConsoleService.flush()
+        yield assertTrue(true)
+      }.provide(Mocks.console)
+    ),
+
+    // ============================================================
+    // CommandService Tests
+    // ============================================================
+
+    suite("CommandService")(
+      test("test implementation records commands") {
+        for
+          service <- ZIO.service[Mocks.TestCommandService]
+          _       <- CommandService.exec("echo hello")
+          _       <- CommandService.exec("ls -la")
+          history <- service.history.get
+        yield assertTrue(history == List("echo hello", "ls -la"))
+      }.provide(Mocks.command)
+    ),
+
+    // ============================================================
+    // TerminalControl Tests
+    // ============================================================
+
+    suite("TerminalControl")(
+      test("enableRawMode calls correct stty command") {
+        for
+          service <- ZIO.service[Mocks.TestCommandService]
+          _       <- TerminalControl.enableRawMode
+          history <- service.history.get
+        yield assertTrue(history.contains("stty raw -echo < /dev/tty"))
+      }.provide(Mocks.command),
+
+      test("disableRawMode calls correct stty command") {
+        for
+          service <- ZIO.service[Mocks.TestCommandService]
+          _       <- TerminalControl.disableRawMode
+          history <- service.history.get
+        yield assertTrue(history.contains("stty cooked echo < /dev/tty"))
+      }.provide(Mocks.command)
+    ),
+
+    // ============================================================
+    // TerminalInput ZIO版 Tests
+    // ============================================================
+
+    suite("TerminalInput.readKeyZIO")(
+      test("returns Timeout when no input available") {
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Timeout)
+      }.provide(Mocks.tty(Chunk.empty)),
+
+      test("returns Regular for normal key") {
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Regular('h'.toInt))
+      }.provide(Mocks.tty(Chunk('h'.toInt))),
+
+      test("returns Arrow for up arrow sequence") {
+        // ESC [ A = Up arrow (RotateClockwise)
+        val upArrow = Chunk(27, '['.toInt, 'A'.toInt)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.RotateClockwise))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'A'.toInt))),
+
+      test("returns Arrow for down arrow sequence") {
+        // ESC [ B = Down arrow (MoveDown)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveDown))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'B'.toInt))),
+
+      test("returns Arrow for right arrow sequence") {
+        // ESC [ C = Right arrow (MoveRight)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveRight))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'C'.toInt))),
+
+      test("returns Arrow for left arrow sequence") {
+        // ESC [ D = Left arrow (MoveLeft)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveLeft))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'D'.toInt))),
+
+      test("returns Unknown for incomplete escape sequence") {
+        // ESC alone (no following bytes)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Unknown)
+      }.provide(Mocks.tty(Chunk(27))),
+
+      test("returns Unknown for invalid escape sequence") {
+        // ESC X (not [ followed by arrow)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Unknown)
+      }.provide(Mocks.tty(Chunk(27, 'X'.toInt)))
+    ),
+
+    // ============================================================
+    // ServiceRenderer Tests
+    // ============================================================
+
+    suite("ServiceRenderer")(
+      test("render outputs ANSI escape codes") {
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- GameRunner.ServiceRenderer.render(initialState)
+          output  <- service.buffer.get
+        yield assertTrue(output.exists(_.contains("\u001b[H")))
+      }.provide(Mocks.console),
+
+      test("render outputs game info") {
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- GameRunner.ServiceRenderer.render(initialState)
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains("Score:"),
+          combined.contains("Level:"),
+          combined.contains("Lines:")
+        )
+      }.provide(Mocks.console),
+
+      test("renderGameOver outputs GAME OVER message") {
+        val gameOverState = initialState.copy(status = GameStatus.GameOver)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- GameRunner.ServiceRenderer.renderGameOver(gameOverState)
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(combined.contains("GAME OVER"))
+      }.provide(Mocks.console),
+
+      test("showTitle outputs title screen") {
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- GameRunner.ServiceRenderer.showTitle
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains("Functional Tetris"),
+          combined.contains("Controls")
+        )
+      }.provide(Mocks.console)
+    ),
+
+    // ============================================================
+    // Integration Tests
+    // ============================================================
+
+    suite("Integration")(
+      test("input sequence is parsed correctly") {
+        // Simulate: h, j, ESC[A (up arrow), q
+        val inputs = Chunk(
+          'h'.toInt,
+          'j'.toInt,
+          27, '['.toInt, 'A'.toInt,
+          'q'.toInt
+        )
+        for
+          r1 <- TerminalInput.readKeyZIO
+          r2 <- TerminalInput.readKeyZIO
+          r3 <- TerminalInput.readKeyZIO
+          r4 <- TerminalInput.readKeyZIO
+        yield assertTrue(
+          r1 == TerminalInput.ParseResult.Regular('h'.toInt),
+          r2 == TerminalInput.ParseResult.Regular('j'.toInt),
+          r3 == TerminalInput.ParseResult.Arrow(Input.RotateClockwise),
+          r4 == TerminalInput.ParseResult.Regular('q'.toInt)
+        )
+      }.provide(Mocks.tty(Chunk(
+        'h'.toInt, 'j'.toInt, 27, '['.toInt, 'A'.toInt, 'q'.toInt
+      ))),
+
+      test("toInput converts parse results correctly") {
+        val arrow = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
+        val regular = TerminalInput.ParseResult.Regular('h'.toInt)
+        val timeout = TerminalInput.ParseResult.Timeout
+        val unknown = TerminalInput.ParseResult.Unknown
+
+        assertTrue(
+          TerminalInput.toInput(arrow) == Some(Input.MoveLeft),
+          TerminalInput.toInput(regular) == Some(Input.MoveLeft),
+          TerminalInput.toInput(timeout) == None,
+          TerminalInput.toInput(unknown) == None
+        )
+      },
+
+      test("arrowToInput maps arrow keys correctly") {
+        assertTrue(
+          TerminalInput.arrowToInput('A'.toInt) == Some(Input.RotateClockwise),
+          TerminalInput.arrowToInput('B'.toInt) == Some(Input.MoveDown),
+          TerminalInput.arrowToInput('C'.toInt) == Some(Input.MoveRight),
+          TerminalInput.arrowToInput('D'.toInt) == Some(Input.MoveLeft),
+          TerminalInput.arrowToInput('X'.toInt) == None
+        )
+      }
+    ),
+
+    // ============================================================
+    // Additional Branch Coverage Tests
+    // ============================================================
+
+    suite("Additional Coverage")(
+      test("parseEscapeSequenceZIO returns None when no bytes available after wait") {
+        // Only ESC, but available returns 0 after sleep
+        for
+          result <- TerminalInput.parseEscapeSequenceZIO()
+        yield assertTrue(result.isEmpty)
+      }.provide(Mocks.tty(Chunk.empty)),
+
+      test("parseEscapeSequenceZIO returns None for invalid bracket") {
+        // ESC followed by non-bracket
+        for
+          _ <- TtyService.read() // consume ESC
+          result <- TerminalInput.parseEscapeSequenceZIO()
+        yield assertTrue(result.isEmpty)
+      }.provide(Mocks.tty(Chunk(27, 'X'.toInt))),
+
+      test("multiple consecutive key reads") {
+        val inputs = Chunk('a'.toInt, 'b'.toInt, 'c'.toInt)
+        for
+          r1 <- TerminalInput.readKeyZIO
+          r2 <- TerminalInput.readKeyZIO
+          r3 <- TerminalInput.readKeyZIO
+          r4 <- TerminalInput.readKeyZIO // should be timeout
+        yield assertTrue(
+          r1 == TerminalInput.ParseResult.Regular('a'.toInt),
+          r2 == TerminalInput.ParseResult.Regular('b'.toInt),
+          r3 == TerminalInput.ParseResult.Regular('c'.toInt),
+          r4 == TerminalInput.ParseResult.Timeout
+        )
+      }.provide(Mocks.tty(Chunk('a'.toInt, 'b'.toInt, 'c'.toInt))),
+
+      test("space key is parsed as HardDrop") {
+        for
+          result <- TerminalInput.readKeyZIO
+          input = TerminalInput.toInput(result)
+        yield assertTrue(input == Some(Input.HardDrop))
+      }.provide(Mocks.tty(Chunk(' '.toInt))),
+
+      test("p key is parsed as Pause") {
+        for
+          result <- TerminalInput.readKeyZIO
+          input = TerminalInput.toInput(result)
+        yield assertTrue(input == Some(Input.Pause))
+      }.provide(Mocks.tty(Chunk('p'.toInt))),
+
+      test("z key is parsed as RotateCounterClockwise") {
+        for
+          result <- TerminalInput.readKeyZIO
+          input = TerminalInput.toInput(result)
+        yield assertTrue(input == Some(Input.RotateCounterClockwise))
+      }.provide(Mocks.tty(Chunk('z'.toInt))),
+
+      test("unknown key returns None from toInput") {
+        for
+          result <- TerminalInput.readKeyZIO
+          input = TerminalInput.toInput(result)
+        yield assertTrue(input.isEmpty)
+      }.provide(Mocks.tty(Chunk('x'.toInt))),
+
+      test("isQuitKey returns true for q and Q") {
+        assertTrue(
+          TerminalInput.isQuitKey('q'.toInt),
+          TerminalInput.isQuitKey('Q'.toInt),
+          !TerminalInput.isQuitKey('x'.toInt)
+        )
+      },
+
+      test("keyToInput handles all vim keys") {
+        assertTrue(
+          TerminalInput.keyToInput('h'.toInt) == Some(Input.MoveLeft),
+          TerminalInput.keyToInput('H'.toInt) == Some(Input.MoveLeft),
+          TerminalInput.keyToInput('l'.toInt) == Some(Input.MoveRight),
+          TerminalInput.keyToInput('L'.toInt) == Some(Input.MoveRight),
+          TerminalInput.keyToInput('j'.toInt) == Some(Input.MoveDown),
+          TerminalInput.keyToInput('J'.toInt) == Some(Input.MoveDown),
+          TerminalInput.keyToInput('k'.toInt) == Some(Input.RotateClockwise),
+          TerminalInput.keyToInput('K'.toInt) == Some(Input.RotateClockwise),
+          TerminalInput.keyToInput('z'.toInt) == Some(Input.RotateCounterClockwise),
+          TerminalInput.keyToInput('Z'.toInt) == Some(Input.RotateCounterClockwise),
+          TerminalInput.keyToInput('P'.toInt) == Some(Input.Pause)
+        )
+      },
+
+      test("EscapeKeyCode constant is 27") {
+        assertTrue(TerminalInput.EscapeKeyCode == 27)
+      }
+    )
+  )
