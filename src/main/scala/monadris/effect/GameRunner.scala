@@ -41,6 +41,24 @@ object GameRunner:
    * ConsoleService依存のレンダラー（テスト可能版）
    */
   object ServiceRenderer:
+    // ANSI color codes
+    private val ANSI_RESET = "\u001b[0m"
+    private val ANSI_CYAN = "\u001b[36m"
+    private val ANSI_YELLOW = "\u001b[33m"
+    private val ANSI_MAGENTA = "\u001b[35m"
+    private val ANSI_GREEN = "\u001b[32m"
+    private val ANSI_RED = "\u001b[31m"
+    private val ANSI_BLUE = "\u001b[34m"
+    private val ANSI_WHITE = "\u001b[37m"
+
+    private def getColor(shape: TetrominoShape): String = shape match
+      case TetrominoShape.I => ANSI_CYAN
+      case TetrominoShape.O => ANSI_YELLOW
+      case TetrominoShape.T => ANSI_MAGENTA
+      case TetrominoShape.S => ANSI_GREEN
+      case TetrominoShape.Z => ANSI_RED
+      case TetrominoShape.J => ANSI_BLUE
+      case TetrominoShape.L => ANSI_WHITE
     /**
      * タイトル画面を表示
      */
@@ -104,13 +122,16 @@ object GameRunner:
     private def renderGrid(state: GameState): String =
       val grid = state.grid
       val currentBlocks = state.currentTetromino.currentBlocks.toSet
+      val currentColor = getColor(state.currentTetromino.shape)
 
       val rows = for y <- 0 until grid.height yield
         val cells = for x <- 0 until grid.width yield
           val pos = Position(x, y)
-          if currentBlocks.contains(pos) then "█"
+          if currentBlocks.contains(pos) then
+            currentColor + "█" + ANSI_RESET
           else grid.get(pos) match
-            case Some(Cell.Filled(_)) => "▓"
+            case Some(Cell.Filled(shape)) =>
+              getColor(shape) + "▓" + ANSI_RESET
             case _ => "·"
         "│" + cells.mkString + "│"
 
