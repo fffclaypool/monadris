@@ -287,7 +287,7 @@ object GameRunner:
         case TerminalInput.ParseResult.Timeout =>
           TtyService.sleep(InputPollIntervalMs).as(true)
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
-          ZIO.logDebug("Quit key pressed") *> quitRef.set(true).as(false)
+          ZIO.logInfo("Quit key pressed") *> quitRef.set(true).as(false)
         case _ =>
           handleParsedInput(parseResult, stateRef)
     yield result
