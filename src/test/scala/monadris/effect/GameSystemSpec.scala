@@ -4,6 +4,7 @@ import zio.*
 import zio.test.*
 import zio.test.Assertion.*
 
+import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.effect.TestServices as Mocks
 
@@ -608,5 +609,21 @@ object GameSystemSpec extends ZIOSpecDefault:
           combined = output.mkString
         yield assertTrue(combined.contains("Next:"))
       }.provide(Mocks.console)
+    ),
+
+    // ============================================================
+    // AppConfig Tests
+    // ============================================================
+
+    suite("AppConfig")(
+      test("live layer loads configuration from application.conf") {
+        for
+          config <- ZIO.service[AppConfig]
+        yield assertTrue(
+          config.grid.width == 10,
+          config.grid.height == 20,
+          config.terminal.inputPollIntervalMs == 20
+        )
+      }.provide(AppConfig.live)
     )
   )
