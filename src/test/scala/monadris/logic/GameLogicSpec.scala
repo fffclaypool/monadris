@@ -1,6 +1,7 @@
 package monadris.logic
 
 import monadris.domain.*
+import monadris.domain.GameConfig.Grid as GridConfig
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -24,7 +25,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   it should "not move when blocked by wall" in {
     val state = initialState
     // 左端に移動
-    val atLeftWall = (0 until 10).foldLeft(state) { (s, _) =>
+    val atLeftWall = (0 until GridConfig.DefaultWidth).foldLeft(state) { (s, _) =>
       GameLogic.update(s, Input.MoveLeft, nextShapeProvider)
     }
     val originalX = atLeftWall.currentTetromino.position.x
@@ -54,15 +55,15 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
 
   it should "lock tetromino and spawn new one when at bottom" in {
     val state = initialState
-    // 床まで移動
-    val atBottom = (0 until 25).foldLeft(state) { (s, _) =>
+    // 床まで移動（グリッド高さより多く移動を試行）
+    val atBottom = (0 until GridConfig.DefaultHeight + 5).foldLeft(state) { (s, _) =>
       GameLogic.update(s, Input.MoveDown, nextShapeProvider)
     }
 
     // テトリミノが固定され、グリッドに配置されているはず
     val filledCells = for
-      x <- 0 until 10
-      y <- 0 until 20
+      x <- 0 until GridConfig.DefaultWidth
+      y <- 0 until GridConfig.DefaultHeight
       if !atBottom.grid.isEmpty(Position(x, y))
     yield Position(x, y)
 
@@ -138,15 +139,16 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
 
   "GameLogic.update" should "increase score when clearing lines" in {
     // 底の行をほぼ埋める
-    var grid = Grid.empty(10, 20)
+    var grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
-    for x <- 0 until 9 do
-      grid = grid.place(Position(x, 19), filled)
+    val bottomRow = GridConfig.DefaultHeight - 1
+    for x <- 0 until GridConfig.DefaultWidth - 1 do
+      grid = grid.place(Position(x, bottomRow), filled)
 
     // I型を右端に配置して落とすとラインが揃う
     val state = GameState(
       grid = grid,
-      currentTetromino = Tetromino(TetrominoShape.I, Position(9, 15), Rotation.R90),
+      currentTetromino = Tetromino(TetrominoShape.I, Position(GridConfig.DefaultWidth - 1, bottomRow - 4), Rotation.R90),
       nextTetromino = TetrominoShape.O,
       score = 0,
       level = 1,
@@ -163,8 +165,8 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   "GameState.initial" should "create valid initial state" in {
     val state = GameState.initial(TetrominoShape.T, TetrominoShape.I)
 
-    state.grid.width shouldBe 10
-    state.grid.height shouldBe 20
+    state.grid.width shouldBe GridConfig.DefaultWidth
+    state.grid.height shouldBe GridConfig.DefaultHeight
     state.currentTetromino.shape shouldBe TetrominoShape.T
     state.nextTetromino shouldBe TetrominoShape.I
     state.score shouldBe 0
