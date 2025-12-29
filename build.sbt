@@ -18,7 +18,6 @@ lazy val root = project
       "dev.zio" %% "zio-test" % "2.0.19" % Test,
       "dev.zio" %% "zio-test-sbt" % "2.0.19" % Test,
       "dev.zio" %% "zio-test-magnolia" % "2.0.19" % Test,
-      "org.jline" % "jline" % "3.25.0",
       "org.scalatest" %% "scalatest" % "3.2.17" % Test
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
