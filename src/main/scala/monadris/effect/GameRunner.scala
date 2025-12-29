@@ -1,8 +1,6 @@
 package monadris.effect
 
 import zio.*
-import zio.stream.UStream
-import zio.stream.ZStream
 
 import monadris.config.AppConfig
 import monadris.domain.*
@@ -14,20 +12,12 @@ import monadris.logic.*
  */
 object GameRunner:
 
-  private case object GameEnded extends RuntimeException
-
   /**
    * 描画を抽象化するトレイト（依存性注入用）
    */
   trait Renderer:
     def render(state: GameState): UIO[Unit]
     def renderGameOver(state: GameState): UIO[Unit]
-
-  /**
-   * 入力を抽象化するトレイト
-   */
-  trait InputHandler:
-    def nextInput: UIO[Option[Input]]
 
   /**
    * 乱数生成を抽象化
@@ -122,22 +112,26 @@ object GameRunner:
 
     private def renderGrid(state: GameState): String =
       val grid = state.grid
-      val currentBlocks = state.currentTetromino.currentBlocks.toSet
-      val currentColor = getColor(state.currentTetromino.shape)
+      val width = grid.width
+      val fallingBlocks = state.currentTetromino.currentBlocks.toSet
+      val fallingColor  = getColor(state.currentTetromino.shape)
 
-      val rows = for y <- 0 until grid.height yield
-        val cells = for x <- 0 until grid.width yield
-          val pos = Position(x, y)
-          if currentBlocks.contains(pos) then
-            currentColor + "█" + ANSI_RESET
-          else grid.get(pos) match
-            case Some(Cell.Filled(shape)) =>
-              getColor(shape) + "▓" + ANSI_RESET
-            case _ => "·"
-        "│" + cells.mkString + "│"
+      def renderCell(x: Int, y: Int): String =
+        val pos = Position(x, y)
+        if fallingBlocks.contains(pos) then
+          s"$fallingColor█$ANSI_RESET"
+        else grid.get(pos) match
+          case Some(Cell.Filled(shape)) => s"${getColor(shape)}▓$ANSI_RESET"
+          case _                        => "·"
 
-      val top = "┌" + "─" * grid.width + "┐"
-      val bottom = "└" + "─" * grid.width + "┘"
+      val rows = (0 until grid.height).map { y =>
+        val rowContent = (0 until width).map(x => renderCell(x, y)).mkString
+        s"│$rowContent│"
+      }
+      val border = "─" * width
+      val top    = s"┌$border┐"
+      val bottom = s"└$border┘"
+
       (top +: rows :+ bottom).mkString(NL)
 
   /**
@@ -148,78 +142,6 @@ object GameRunner:
 
     def nextShape: UIO[TetrominoShape] =
       Random.nextIntBounded(shapes.size).map(shapes(_))
-
-  /**
-   * ゲームループの構造
-   * 純粋なコアロジックをZIOストリームでラップ
-   */
-  def gameLoop(
-    initialState: GameState,
-    inputStream: UStream[Input],
-    renderer: Renderer,
-    randomPiece: RandomPiece
-  ): UIO[GameState] =
-
-    // Refを使って状態を管理（内部的には可変だが、外部からは不変）
-    for
-      stateRef <- Ref.make(initialState)
-
-      // Tick生成（レベルに応じて間隔が変化）
-      tickFiber <- createTickStream(stateRef)
-        .foreach(_ => processInput(stateRef, Input.Tick, randomPiece, renderer))
-        .fork
-
-      // 入力処理
-      _ <- inputStream
-        .takeWhile(_ => true) // 無限ストリーム
-        .foreach { input =>
-          for
-            state <- stateRef.get
-            _ <- (
-              if state.isGameOver
-              then renderer.renderGameOver(state) *> ZIO.fail(GameEnded)
-              else if input == Input.Quit
-              then ZIO.fail(GameEnded)
-              else processInput(stateRef, input, randomPiece, renderer)
-            )
-          yield ()
-        }
-        .catchAll { case GameEnded => ZIO.unit }
-        .race(tickFiber.join) // どちらかが終了したら終了
-
-      finalState <- stateRef.get
-    yield finalState
-
-  /**
-   * 入力を処理して状態を更新
-   */
-  private def processInput(
-    stateRef: Ref[GameState],
-    input: Input,
-    randomPiece: RandomPiece,
-    renderer: Renderer
-  ): UIO[Unit] =
-    for
-      nextShape <- randomPiece.nextShape
-      _ <- stateRef.update { state =>
-        GameLogic.update(state, input, () => nextShape)
-      }
-      state <- stateRef.get
-      _ <- renderer.render(state)
-    yield ()
-
-  /**
-   * レベルに応じたTick間隔でストリームを生成
-   */
-  private def createTickStream(
-    stateRef: Ref[GameState]
-  ): UStream[Unit] =
-    ZStream.repeatZIOWithSchedule(
-      stateRef.get.map(s => LineClearing.dropInterval(s.level)),
-      Schedule.fixed(100.millis) // 基本間隔
-    ).mapZIO { interval =>
-      ZIO.sleep(Duration.fromMillis(interval - 100)) // 動的間隔調整
-    }
 
   // ============================================================
   // インタラクティブゲームループ（サービス依存版）
