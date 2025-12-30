@@ -1,7 +1,7 @@
 package monadris.logic
 
 import monadris.domain.*
-import monadris.effect.TestServices
+import monadris.infrastructure.TestServices
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -54,10 +54,9 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
   // ============================================================
 
   "Collision.detectCollision" should "detect collision with filled cells" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     // Fill center of grid
-    grid = grid.place(Position(5, 10), filled)
+    val grid = Grid.empty(gridWidth, gridHeight).place(Position(5, 10), filled)
 
     val tetromino = Tetromino(TetrominoShape.O, Position(4, 9), Rotation.R0)
     // O-tetromino covers (4,9), (5,9), (4,10), (5,10) - overlaps with filled cell at (5,10)
@@ -93,11 +92,11 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
   // ============================================================
 
   "Collision.hasLanded" should "return true when touching filled block below" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     // Fill a row
-    for x <- 0 until gridWidth do
-      grid = grid.place(Position(x, 15), filled)
+    val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, 15), filled)
+    }
 
     val tetromino = Tetromino(TetrominoShape.O, Position(4, 13), Rotation.R0)
     // O-tetromino at y=13 would have blocks at y=13,14. Moving down would hit row 15
@@ -115,11 +114,11 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
   // ============================================================
 
   "Collision.hardDropPosition" should "stop at filled blocks" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     // Fill row at y=15
-    for x <- 0 until gridWidth do
-      grid = grid.place(Position(x, 15), filled)
+    val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, 15), filled)
+    }
 
     val tetromino = Tetromino(TetrominoShape.O, Position(4, 5), Rotation.R0)
     val dropped = Collision.hardDropPosition(tetromino, grid)
@@ -200,14 +199,14 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
   // ============================================================
 
   "Collision.isGameOver" should "return true when spawn tetromino position blocked" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     // Fill top rows
-    for
+    val grid = (for {
       x <- 0 until gridWidth
       y <- 0 until 4
-    do
-      grid = grid.place(Position(x, y), filled)
+    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+      g.place(pos, filled)
+    }
 
     val tetromino = Tetromino.spawn(TetrominoShape.T, gridWidth)
     Collision.isGameOver(tetromino, grid) shouldBe true
@@ -220,13 +219,13 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "return true for all shapes when grid is completely full" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
-    for
+    val grid = (for {
       x <- 0 until gridWidth
       y <- 0 until gridHeight
-    do
-      grid = grid.place(Position(x, y), filled)
+    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+      g.place(pos, filled)
+    }
 
     TetrominoShape.values.foreach { shape =>
       val tetromino = Tetromino.spawn(shape, gridWidth)
@@ -401,11 +400,11 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "return true when exactly at landing position" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     // Fill row at y=15
-    for x <- 0 until gridWidth do
-      grid = grid.place(Position(x, 15), filled)
+    val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, 15), filled)
+    }
 
     // O-tetromino just above the filled row
     val tetromino = Tetromino(TetrominoShape.O, Position(4, 13), Rotation.R0)

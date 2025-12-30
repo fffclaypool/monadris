@@ -1,4 +1,4 @@
-package monadris.effect
+package monadris.infrastructure
 
 import zio.*
 import zio.test.*
@@ -6,7 +6,7 @@ import zio.test.Assertion.*
 
 import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.effect.{TestServices as Mocks}
+import monadris.infrastructure.{TestServices as Mocks}
 
 /**
  * IO抽象化レイヤーのテスト
@@ -175,14 +175,14 @@ object GameSystemSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // ServiceRenderer Tests
+    // GameRunner Rendering Tests
     // ============================================================
 
-    suite("ServiceRenderer")(
+    suite("GameRunner Rendering")(
       test("render outputs ANSI escape codes") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.ServiceRenderer.render(initialState)
+          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
           output  <- service.buffer.get
         yield assertTrue(output.exists(_.contains("\u001b[H")))
       }.provide(Mocks.console),
@@ -190,7 +190,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("render outputs game info") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.ServiceRenderer.render(initialState)
+          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
@@ -204,7 +204,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         val gameOverState = initialState.copy(status = GameStatus.GameOver)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.ServiceRenderer.renderGameOver(gameOverState)
+          _       <- GameRunner.renderGameOver(gameOverState)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("GAME OVER"))
@@ -213,7 +213,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("showTitle outputs title screen") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.ServiceRenderer.showTitle
+          _       <- GameRunner.showTitle
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
@@ -567,14 +567,14 @@ object GameSystemSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // ServiceRenderer Grid Rendering Tests
+    // GameRunner Grid Rendering Tests
     // ============================================================
 
-    suite("ServiceRenderer Grid")(
+    suite("GameRunner Grid Rendering")(
       test("renderGrid includes borders") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _ <- GameRunner.ServiceRenderer.render(initialState)
+          _ <- GameRunner.renderGame(initialState, Mocks.testConfig)
           output <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
@@ -589,7 +589,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("renderGrid shows current tetromino") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _ <- GameRunner.ServiceRenderer.render(initialState)
+          _ <- GameRunner.renderGame(initialState, Mocks.testConfig)
           output <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("█"))
@@ -598,7 +598,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("renderGrid shows empty cells") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _ <- GameRunner.ServiceRenderer.render(initialState)
+          _ <- GameRunner.renderGame(initialState, Mocks.testConfig)
           output <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("·"))
@@ -607,7 +607,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("render shows Next piece info") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _ <- GameRunner.ServiceRenderer.render(initialState)
+          _ <- GameRunner.renderGame(initialState, Mocks.testConfig)
           output <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("Next:"))

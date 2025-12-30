@@ -1,4 +1,4 @@
-package monadris.effect
+package monadris.infrastructure
 
 import zio.*
 

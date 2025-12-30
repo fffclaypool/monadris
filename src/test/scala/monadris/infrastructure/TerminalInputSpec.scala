@@ -1,4 +1,4 @@
-package monadris.effect
+package monadris.infrastructure
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

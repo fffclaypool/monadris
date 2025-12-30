@@ -1,7 +1,7 @@
 package monadris.logic
 
 import monadris.domain.*
-import monadris.effect.TestServices
+import monadris.infrastructure.TestServices
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -32,12 +32,12 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear single line and calculate correct score" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
     // Fill bottom row completely
-    for x <- 0 until gridWidth do
-      grid = grid.place(Position(x, gridHeight - 1), filled)
+    val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, gridHeight - 1), filled)
+    }
 
     val result = LineClearing.clearLines(grid, level = 1, scoreConfig)
 
@@ -46,13 +46,15 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear double line and calculate correct score" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
     // Fill bottom 2 rows completely
-    for y <- (gridHeight - 2) until gridHeight do
-      for x <- 0 until gridWidth do
-        grid = grid.place(Position(x, y), filled)
+    val grid = (for {
+      y <- (gridHeight - 2) until gridHeight
+      x <- 0 until gridWidth
+    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+      g.place(pos, filled)
+    }
 
     val result = LineClearing.clearLines(grid, level = 2, scoreConfig)
 
@@ -61,13 +63,15 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear triple line and calculate correct score" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
     // Fill bottom 3 rows completely
-    for y <- (gridHeight - 3) until gridHeight do
-      for x <- 0 until gridWidth do
-        grid = grid.place(Position(x, y), filled)
+    val grid = (for {
+      y <- (gridHeight - 3) until gridHeight
+      x <- 0 until gridWidth
+    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+      g.place(pos, filled)
+    }
 
     val result = LineClearing.clearLines(grid, level = 3, scoreConfig)
 
@@ -76,13 +80,15 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear tetris (4 lines) and calculate correct score" in {
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
     // Fill bottom 4 rows completely
-    for y <- (gridHeight - 4) until gridHeight do
-      for x <- 0 until gridWidth do
-        grid = grid.place(Position(x, y), filled)
+    val grid = (for {
+      y <- (gridHeight - 4) until gridHeight
+      x <- 0 until gridWidth
+    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+      g.place(pos, filled)
+    }
 
     val result = LineClearing.clearLines(grid, level = 5, scoreConfig)
 

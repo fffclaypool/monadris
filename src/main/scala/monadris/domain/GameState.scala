@@ -9,20 +9,6 @@ enum GameStatus:
   case GameOver
 
 /**
- * プレイヤーの入力
- */
-enum Input:
-  case MoveLeft
-  case MoveRight
-  case MoveDown
-  case RotateClockwise
-  case RotateCounterClockwise
-  case HardDrop
-  case Pause
-  case Quit
-  case Tick  // 時間経過による自動落下
-
-/**
  * ゲーム全体の状態を表す不変データ構造
  */
 final case class GameState(
