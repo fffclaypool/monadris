@@ -2,10 +2,16 @@ package monadris.effect
 
 import zio.test.*
 
+import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.logic.*
+import monadris.effect.{TestServices as LocalTestServices}
 
 object GameIntegrationSpec extends ZIOSpecDefault:
+
+  val config: AppConfig = LocalTestServices.testConfig
+  val gridWidth: Int = config.grid.width
+  val gridHeight: Int = config.grid.height
 
   // ============================================================
   // GameLogic integration tests (pure function tests)
@@ -13,8 +19,8 @@ object GameIntegrationSpec extends ZIOSpecDefault:
 
   override def spec = suite("GameIntegrationSpec")(
     test("GameLogic.update handles movement correctly") {
-      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I)
-      val movedState = GameLogic.update(initialState, Input.MoveRight, () => TetrominoShape.O)
+      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+      val movedState = GameLogic.update(initialState, Input.MoveRight, () => TetrominoShape.O, config)
 
       assertTrue(
         movedState.currentTetromino.position.x > initialState.currentTetromino.position.x ||
@@ -23,8 +29,8 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     },
 
     test("GameLogic.update handles rotation correctly") {
-      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I)
-      val rotatedState = GameLogic.update(initialState, Input.RotateClockwise, () => TetrominoShape.O)
+      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+      val rotatedState = GameLogic.update(initialState, Input.RotateClockwise, () => TetrominoShape.O, config)
 
       assertTrue(
         rotatedState.currentTetromino.rotation != initialState.currentTetromino.rotation ||
@@ -33,21 +39,21 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     },
 
     test("GameLogic.update handles hard drop correctly") {
-      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I)
-      val droppedState = GameLogic.update(initialState, Input.HardDrop, () => TetrominoShape.O)
+      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+      val droppedState = GameLogic.update(initialState, Input.HardDrop, () => TetrominoShape.O, config)
 
       assertTrue(droppedState.score >= initialState.score)
     },
 
     test("GameLogic.update handles pause correctly") {
-      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I)
-      val pausedState = GameLogic.update(initialState, Input.Pause, () => TetrominoShape.O)
+      val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+      val pausedState = GameLogic.update(initialState, Input.Pause, () => TetrominoShape.O, config)
 
       assertTrue(pausedState.status == GameStatus.Paused)
     },
 
     test("Line clearing awards points") {
-      var grid = Grid.empty()
+      var grid = Grid.empty(gridWidth, gridHeight)
       val filled = Cell.Filled(TetrominoShape.I)
       for x <- 0 until 9 do
         grid = grid.place(Position(x, 19), filled)
@@ -62,7 +68,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         status = GameStatus.Playing
       )
 
-      val finalState = GameLogic.update(setupState, Input.HardDrop, () => TetrominoShape.O)
+      val finalState = GameLogic.update(setupState, Input.HardDrop, () => TetrominoShape.O, config)
 
       assertTrue(finalState.score > 0 || finalState.linesCleared > 0)
     }

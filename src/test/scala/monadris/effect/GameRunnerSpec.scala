@@ -4,15 +4,19 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
+import monadris.effect.{TestServices as LocalTestServices}
 
 object GameRunnerSpec extends ZIOSpecDefault:
+
+  val gridWidth: Int = LocalTestServices.testConfig.grid.width
+  val gridHeight: Int = LocalTestServices.testConfig.grid.height
 
   // ============================================================
   // Test fixtures
   // ============================================================
 
   def initialState: GameState =
-    GameState.initial(TetrominoShape.T, TetrominoShape.I)
+    GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
   // Mock renderer that tracks render calls
   class MockRenderer extends GameRunner.Renderer:

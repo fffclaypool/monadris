@@ -2,48 +2,50 @@ package monadris.domain
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import GameConfig.Grid as GridConfig
 
 class GridSpec extends AnyFlatSpec with Matchers:
 
+  val DefaultWidth = 10
+  val DefaultHeight = 20
+
   "Grid" should "create empty grid with correct dimensions" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
-    grid.width shouldBe GridConfig.DefaultWidth
-    grid.height shouldBe GridConfig.DefaultHeight
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
+    grid.width shouldBe DefaultWidth
+    grid.height shouldBe DefaultHeight
   }
 
   it should "return Empty for all cells in new grid" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     for
-      x <- 0 until GridConfig.DefaultWidth
-      y <- 0 until GridConfig.DefaultHeight
+      x <- 0 until DefaultWidth
+      y <- 0 until DefaultHeight
     do
       grid.get(Position(x, y)) shouldBe Some(Cell.Empty)
   }
 
   it should "return None for out-of-bounds positions" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     grid.get(Position(-1, 0)) shouldBe None
-    grid.get(Position(GridConfig.DefaultWidth, 0)) shouldBe None
+    grid.get(Position(DefaultWidth, 0)) shouldBe None
     grid.get(Position(0, -1)) shouldBe None
-    grid.get(Position(0, GridConfig.DefaultHeight)) shouldBe None
+    grid.get(Position(0, DefaultHeight)) shouldBe None
   }
 
   it should "correctly identify in-bounds positions" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     grid.isInBounds(Position(0, 0)) shouldBe true
-    grid.isInBounds(Position(GridConfig.DefaultWidth - 1, GridConfig.DefaultHeight - 1)) shouldBe true
+    grid.isInBounds(Position(DefaultWidth - 1, DefaultHeight - 1)) shouldBe true
     grid.isInBounds(Position(-1, 0)) shouldBe false
-    grid.isInBounds(Position(GridConfig.DefaultWidth, 0)) shouldBe false
+    grid.isInBounds(Position(DefaultWidth, 0)) shouldBe false
   }
 
   it should "correctly identify empty positions" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     grid.isEmpty(Position(5, 5)) shouldBe true
   }
 
   it should "place cells correctly" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.T)
     val newGrid = grid.place(Position(5, 5), filled)
 
@@ -54,8 +56,8 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "place tetromino correctly" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
-    val tetromino = Tetromino.spawn(TetrominoShape.T, GridConfig.DefaultWidth)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
+    val tetromino = Tetromino.spawn(TetrominoShape.T, DefaultWidth)
     val newGrid = grid.placeTetromino(tetromino)
 
     tetromino.currentBlocks.foreach { pos =>
@@ -64,12 +66,12 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "detect completed rows" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
-    val bottomRow = GridConfig.DefaultHeight - 1
+    val bottomRow = DefaultHeight - 1
 
     // 最下行を埋める
-    val filledGrid = (0 until GridConfig.DefaultWidth).foldLeft(grid) { (g, x) =>
+    val filledGrid = (0 until DefaultWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
 
@@ -77,13 +79,13 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "detect multiple completed rows" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
-    val bottomRow = GridConfig.DefaultHeight - 1
-    val secondBottomRow = GridConfig.DefaultHeight - 2
+    val bottomRow = DefaultHeight - 1
+    val secondBottomRow = DefaultHeight - 2
 
     // 2行埋める
-    val filledGrid = (0 until GridConfig.DefaultWidth).foldLeft(grid) { (g, x) =>
+    val filledGrid = (0 until DefaultWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, secondBottomRow), filled).place(Position(x, bottomRow), filled)
     }
 
@@ -91,12 +93,12 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear rows and add empty rows at top" in {
-    val grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    val grid = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
-    val bottomRow = GridConfig.DefaultHeight - 1
+    val bottomRow = DefaultHeight - 1
 
     // 最下行を埋める
-    val filledGrid = (0 until GridConfig.DefaultWidth).foldLeft(grid) { (g, x) =>
+    val filledGrid = (0 until DefaultWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
 
