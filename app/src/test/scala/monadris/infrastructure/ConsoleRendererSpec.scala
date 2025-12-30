@@ -499,5 +499,63 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined = output.mkString
         yield assertTrue(combined.contains("Y"))
       }.provide(Mocks.console)
+    ),
+
+    // ============================================================
+    // Direct method coverage tests
+    // ============================================================
+
+    suite("Direct render methods")(
+      test("render with clear outputs clear sequence and buffer") {
+        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+          .drawChar(0, 0, 'X', UiColor.Red)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(buffer)
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains(Ansi.clearScreen),
+          combined.contains("X")
+        )
+      }.provide(Mocks.console),
+
+      test("renderWithoutClear outputs buffer without clear sequence") {
+        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+          .drawChar(0, 0, 'Y', UiColor.Blue)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.renderWithoutClear(buffer)
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          !combined.contains(Ansi.clearScreen),
+          combined.contains("Y")
+        )
+      }.provide(Mocks.console),
+
+      test("render dispatches to full render when previous is None") {
+        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+          .drawChar(0, 0, 'Z')
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(buffer, None)
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains(Ansi.clearScreen),
+          combined.contains("Z")
+        )
+      }.provide(Mocks.console),
+
+      test("computeDiffString returns empty for identical buffers") {
+        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+          .drawChar(0, 0, 'A')
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(buffer, Some(buffer))
+          output  <- service.buffer.get
+        yield assertTrue(output.isEmpty || output.forall(_.isEmpty))
+      }.provide(Mocks.console)
     )
   )
