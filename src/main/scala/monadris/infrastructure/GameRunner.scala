@@ -81,8 +81,9 @@ object GameRunner:
 
   /**
    * ゲームループの状態（GameState + 前回描画バッファ）
+   * テスト用にパッケージプライベート
    */
-  private case class LoopState(
+  private[infrastructure] case class LoopState(
     gameState: GameState,
     previousBuffer: Option[ScreenBuffer]
   )
@@ -160,8 +161,9 @@ object GameRunner:
   /**
    * イベントループ本体
    * Queueからコマンドを取り出し、状態を更新して描画
+   * テスト用にパッケージプライベート
    */
-  private def eventLoop(
+  private[infrastructure] def eventLoop(
     queue: Queue[GameCommand],
     state: LoopState,
     config: AppConfig
