@@ -37,15 +37,6 @@ object ConsoleRenderer:
     case UiColor.Default => ANSI_RESET
 
   /**
-   * ピクセルを ANSI 文字列に変換
-   */
-  private def pixelToString(pixel: Pixel): String =
-    if pixel.color == UiColor.Default then
-      pixel.char.toString
-    else
-      s"${colorToAnsi(pixel.color)}${pixel.char}$ANSI_RESET"
-
-  /**
    * 行を ANSI 文字列に変換（色の切り替えを最適化）
    */
   private def rowToString(row: Vector[Pixel]): String =

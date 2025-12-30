@@ -251,6 +251,43 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("X"))
+      }.provide(Mocks.console),
+
+      test("diff render optimizes same color for consecutive changed pixels") {
+        // Previous: spaces, Current: two consecutive red Xs
+        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+          .drawChar(Position.first, Position.origin, 'X', UiColor.Red)
+          .drawChar(Position.second, Position.origin, 'Y', UiColor.Red)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains("X"),
+          combined.contains("Y"),
+          combined.contains(Ansi.red)
+        )
+      }.provide(Mocks.console),
+
+      test("diff render handles pixels outside previous buffer bounds") {
+        // Previous buffer is 2x2, current is 4x4 with content at (3,3)
+        val prevSize = 2
+        val currSize = 4
+        val outOfBoundsPos = 3
+        val prev = ScreenBuffer.empty(prevSize, prevSize)
+        val curr = ScreenBuffer.empty(currSize, currSize)
+          .drawChar(outOfBoundsPos, outOfBoundsPos, 'Z', UiColor.Green)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains("Z"),
+          combined.contains(Ansi.green)
+        )
       }.provide(Mocks.console)
     ),
 
