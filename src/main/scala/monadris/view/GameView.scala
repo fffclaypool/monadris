@@ -11,7 +11,28 @@ import monadris.domain.*
  */
 object GameView:
 
-  // raw modeでは \r\n が必要だが、ScreenBufferは行単位なので不要
+  // レイアウト定数
+  private object Layout:
+    // 枠線の太さ（1文字分）
+    val BorderThickness = 1
+    // 左右の枠線合計
+    val HorizontalBorder = BorderThickness * 2
+    // 上下の枠線合計
+    val VerticalBorder = BorderThickness * 2
+
+    // 右側の情報パネルの幅
+    val InfoPanelWidth = 30
+    // 情報パネルの左パディング（枠線 + 空白）
+    val InfoPanelLeftPadding = HorizontalBorder + 2
+
+    // 下部の操作説明エリアの高さ
+    val ControlsAreaHeight = 4
+
+    // 画面サイズのフォールバック値
+    val DefaultTitleWidth = 40
+    val DefaultGameOverWidth = 30
+
+  // グリッド描画用の文字定数
   private val FilledBlock = '█'
   private val LockedBlock = '▓'
   private val EmptyCell = '·'
@@ -36,15 +57,13 @@ object GameView:
     val gridHeight = config.grid.height
 
     // グリッド + 枠線 + 情報欄用の幅と高さを計算
-    // 枠線: 左右に1文字ずつ、上下に1行ずつ
-    // 情報欄: 右側に表示（幅30程度）
-    val totalWidth = gridWidth + 2 + 30
-    val totalHeight = gridHeight + 2 + 4  // 操作説明用に追加行
+    val totalWidth = gridWidth + Layout.HorizontalBorder + Layout.InfoPanelWidth
+    val totalHeight = gridHeight + Layout.VerticalBorder + Layout.ControlsAreaHeight
 
     ScreenBuffer.empty(totalWidth, totalHeight)
       .pipe(renderGrid(_, state, gridWidth, gridHeight))
-      .pipe(renderInfo(_, state, gridWidth + 4))
-      .pipe(renderControls(_, gridHeight + 2))
+      .pipe(renderInfo(_, state, gridWidth + Layout.InfoPanelLeftPadding))
+      .pipe(renderControls(_, gridHeight + Layout.VerticalBorder))
 
   /**
    * グリッドと枠線を描画
@@ -125,7 +144,7 @@ object GameView:
       "║    Q          : Quit               ║",
       "╚════════════════════════════════════╝"
     )
-    val width = lines.map(_.length).maxOption.getOrElse(40)
+    val width = lines.map(_.length).maxOption.getOrElse(Layout.DefaultTitleWidth)
     val height = lines.length + 1
 
     lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
@@ -146,7 +165,7 @@ object GameView:
       s"║  Level: ${"%6d".format(state.level)}        ║",
       "╚═══════════════════════╝"
     )
-    val width = lines.map(_.length).maxOption.getOrElse(30)
+    val width = lines.map(_.length).maxOption.getOrElse(Layout.DefaultGameOverWidth)
     val height = lines.length + 1
 
     lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
