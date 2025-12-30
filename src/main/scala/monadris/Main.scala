@@ -5,12 +5,12 @@ import zio.logging.backend.SLF4J
 
 import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.effect.*
+import monadris.infrastructure.*
 
 /**
  * テトリスのメインエントリーポイント
  * ZIOAppを使用してエフェクトを実行
- * 構成と起動のみに集中し、ロジックはeffectパッケージに委譲
+ * 構成と起動のみに集中し、ロジックはinfrastructureパッケージに委譲
  */
 object Main extends ZIOAppDefault:
 
@@ -38,7 +38,7 @@ object Main extends ZIOAppDefault:
     for
       config <- ZIO.service[AppConfig]
       _      <- ZIO.logInfo("Monadris starting...")
-      _      <- GameRunner.ServiceRenderer.showTitle
+      _      <- GameRunner.showTitle
       _      <- TtyService.sleep(config.timing.titleDelayMs)
     yield ()
 
@@ -60,7 +60,7 @@ object Main extends ZIOAppDefault:
     for
       config <- ZIO.service[AppConfig]
       _      <- ZIO.logInfo(s"Game finished - Score: ${finalState.score}, Lines: ${finalState.linesCleared}, Level: ${finalState.level}")
-      _      <- GameRunner.ServiceRenderer.renderGameOver(finalState)
+      _      <- GameRunner.renderGameOver(finalState)
       _      <- ConsoleService.print("\nGame ended.\r\n")
       _      <- TtyService.sleep(config.timing.outroDelayMs)
       _      <- ZIO.logInfo("Monadris shutting down...")

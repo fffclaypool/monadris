@@ -1,11 +1,11 @@
-package monadris.effect
+package monadris.infrastructure
 
 import zio.test.*
 
 import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.logic.*
-import monadris.effect.{TestServices as LocalTestServices}
+import monadris.infrastructure.{TestServices as LocalTestServices}
 
 object GameIntegrationSpec extends ZIOSpecDefault:
 
@@ -53,10 +53,10 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     },
 
     test("Line clearing awards points") {
-      var grid = Grid.empty(gridWidth, gridHeight)
       val filled = Cell.Filled(TetrominoShape.I)
-      for x <- 0 until 9 do
-        grid = grid.place(Position(x, 19), filled)
+      val grid = (0 until 9).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+        g.place(Position(x, 19), filled)
+      }
 
       val setupState = GameState(
         grid = grid,

@@ -3,7 +3,7 @@ package monadris
 import zio.*
 import zio.test.*
 
-import monadris.effect.TestServices as Mocks
+import monadris.infrastructure.TestServices as Mocks
 
 /**
  * Main.program の結合テスト

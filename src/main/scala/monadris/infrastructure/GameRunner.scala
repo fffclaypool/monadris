@@ -1,10 +1,11 @@
-package monadris.effect
+package monadris.infrastructure
 
 import zio.*
 
 import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.logic.*
+import monadris.view.GameView
 
 /**
  * 副作用をZIOで管理するゲーム実行層
@@ -25,115 +26,6 @@ object GameRunner:
   trait RandomPiece:
     def nextShape: UIO[TetrominoShape]
 
-  // raw modeでは \r\n が必要
-  private val NL = "\r\n"
-
-  /**
-   * ConsoleService依存のレンダラー（テスト可能版）
-   */
-  object ServiceRenderer:
-    // ANSI color codes
-    private val ANSI_RESET = "\u001b[0m"
-    private val ANSI_CYAN = "\u001b[36m"
-    private val ANSI_YELLOW = "\u001b[33m"
-    private val ANSI_MAGENTA = "\u001b[35m"
-    private val ANSI_GREEN = "\u001b[32m"
-    private val ANSI_RED = "\u001b[31m"
-    private val ANSI_BLUE = "\u001b[34m"
-    private val ANSI_WHITE = "\u001b[37m"
-
-    private def getColor(shape: TetrominoShape): String = shape match
-      case TetrominoShape.I => ANSI_CYAN
-      case TetrominoShape.O => ANSI_YELLOW
-      case TetrominoShape.T => ANSI_MAGENTA
-      case TetrominoShape.S => ANSI_GREEN
-      case TetrominoShape.Z => ANSI_RED
-      case TetrominoShape.J => ANSI_BLUE
-      case TetrominoShape.L => ANSI_WHITE
-    /**
-     * タイトル画面を表示
-     */
-    def showTitle: ZIO[ConsoleService, Throwable, Unit] =
-      val lines = List(
-        "╔════════════════════════════════════╗",
-        "║    🎮 Functional Tetris            ║",
-        "║    Scala 3 + ZIO                   ║",
-        "╠════════════════════════════════════╣",
-        "║  Controls:                         ║",
-        "║    ← → or H L : Move left/right    ║",
-        "║    ↓ or J     : Soft drop          ║",
-        "║    ↑ or K     : Rotate             ║",
-        "║    Z          : Rotate CCW         ║",
-        "║    Space      : Hard drop          ║",
-        "║    P          : Pause              ║",
-        "║    Q          : Quit               ║",
-        "╚════════════════════════════════════╝",
-        ""
-      )
-      ZIO.foreachDiscard(lines)(line => ConsoleService.print(line + NL))
-
-    def render(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
-      for
-        _ <- ConsoleService.print("\u001b[H\u001b[2J\u001b[3J")
-        gridDisplay = renderGrid(state)
-        info = List(
-          s"Score: ${state.score}",
-          s"Level: ${state.level}",
-          s"Lines: ${state.linesCleared}",
-          s"Next: ${state.nextTetromino}",
-          "",
-          "H/L or ←/→: Move  K or ↑: Rotate",
-          "J or ↓: Drop  Space: Hard drop",
-          "P: Pause  Q: Quit"
-        ).mkString(NL)
-        _ <- ConsoleService.print(gridDisplay)
-        _ <- ConsoleService.print(NL)
-        _ <- ConsoleService.print(info)
-        _ <- ConsoleService.print(NL)
-        _ <- ConsoleService.flush()
-      yield ()
-
-    def renderGameOver(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
-      val msg = List(
-        "",
-        "╔═══════════════════════╗",
-        "║      GAME OVER!       ║",
-        "╠═══════════════════════╣",
-        s"║  Score: ${"%6d".format(state.score)}        ║",
-        s"║  Lines: ${"%6d".format(state.linesCleared)}        ║",
-        s"║  Level: ${"%6d".format(state.level)}        ║",
-        "╚═══════════════════════╝"
-      ).mkString(NL)
-      for
-        _ <- ConsoleService.print(msg)
-        _ <- ConsoleService.print(NL)
-        _ <- ConsoleService.flush()
-      yield ()
-
-    private def renderGrid(state: GameState): String =
-      val grid = state.grid
-      val width = grid.width
-      val fallingBlocks = state.currentTetromino.currentBlocks.toSet
-      val fallingColor  = getColor(state.currentTetromino.shape)
-
-      def renderCell(x: Int, y: Int): String =
-        val pos = Position(x, y)
-        if fallingBlocks.contains(pos) then
-          s"$fallingColor█$ANSI_RESET"
-        else grid.get(pos) match
-          case Some(Cell.Filled(shape)) => s"${getColor(shape)}▓$ANSI_RESET"
-          case _                        => "·"
-
-      val rows = (0 until grid.height).map { y =>
-        val rowContent = (0 until width).map(x => renderCell(x, y)).mkString
-        s"│$rowContent│"
-      }
-      val border = "─" * width
-      val top    = s"┌$border┐"
-      val bottom = s"└$border┘"
-
-      (top +: rows :+ bottom).mkString(NL)
-
   /**
    * ランダムピース生成器
    */
@@ -142,6 +34,27 @@ object GameRunner:
 
     def nextShape: UIO[TetrominoShape] =
       Random.nextIntBounded(shapes.size).map(shapes(_))
+
+  /**
+   * タイトル画面を表示
+   */
+  def showTitle: ZIO[ConsoleService, Throwable, Unit] =
+    val buffer = GameView.titleScreen
+    ConsoleRenderer.renderWithoutClear(buffer)
+
+  /**
+   * ゲーム画面を描画
+   */
+  def renderGame(state: GameState, config: AppConfig): ZIO[ConsoleService, Throwable, Unit] =
+    val buffer = GameView.toScreenBuffer(state, config)
+    ConsoleRenderer.render(buffer)
+
+  /**
+   * ゲームオーバー画面を描画
+   */
+  def renderGameOver(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
+    val buffer = GameView.gameOverScreen(state)
+    ConsoleRenderer.renderWithoutClear(buffer)
 
   // ============================================================
   // インタラクティブゲームループ（サービス依存版）
@@ -154,19 +67,21 @@ object GameRunner:
     initialState: GameState
   ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, GameState] =
     for
+      config   <- ZIO.service[AppConfig]
       stateRef <- Ref.make(initialState)
-      quitRef <- Ref.make(false)
-      _ <- renderCurrentStateZIO(stateRef)
+      quitRef  <- Ref.make(false)
+      _        <- renderCurrentStateZIO(stateRef, config)
       tickFiber <- tickLoopZIO(stateRef, quitRef).fork
-      _ <- inputLoopZIO(stateRef, quitRef)
-      _ <- tickFiber.interrupt
+      _        <- inputLoopZIO(stateRef, quitRef)
+      _        <- tickFiber.interrupt
       finalState <- stateRef.get
     yield finalState
 
   private def renderCurrentStateZIO(
-    stateRef: Ref[GameState]
+    stateRef: Ref[GameState],
+    config: AppConfig
   ): ZIO[ConsoleService, Throwable, Unit] =
-    stateRef.get.flatMap(ServiceRenderer.render)
+    stateRef.get.flatMap(state => renderGame(state, config))
 
   private def tickLoopZIO(
     stateRef: Ref[GameState],
@@ -198,7 +113,7 @@ object GameRunner:
       nextShape <- RandomPieceGenerator.nextShape
       _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape, config))
       newState <- stateRef.get
-      _ <- ServiceRenderer.render(newState)
+      _ <- renderGame(newState, config)
       interval = LineClearing.dropInterval(newState.level, config.speed)
       _ <- TtyService.sleep(interval)
     yield !newState.isGameOver
@@ -258,5 +173,5 @@ object GameRunner:
       _ <- ZIO.when(newState.isGameOver && !oldState.isGameOver) {
         ZIO.logInfo(s"Game Over - Score: ${newState.score}, Lines: ${newState.linesCleared}, Level: ${newState.level}")
       }
-      _ <- ServiceRenderer.render(newState)
+      _ <- renderGame(newState, config)
     yield !newState.isGameOver
