@@ -17,7 +17,7 @@
   - **NO `var`**: Use `val`, recursion, `foldLeft`, or `map`/`flatMap`.
   - **Immutability**: All data structures must be immutable (`case class`, `enum`, `Vector`).
 - **No Magic Numbers**:
-  - Avoid using raw numbers or string literals directly in logic.
+  - Avoid using raw numbers or string literals directly in logic AND tests.
   - Define them as named constants in a `private object` (e.g., `private object Layout`, `object Constants`) or `AppConfig`.
 - **Effect System**: ZIO 2.x
   - Use `ZIO` for all side effects.
