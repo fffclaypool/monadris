@@ -1,15 +1,20 @@
 package monadris.logic
 
+import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.domain.GameConfig.Grid as GridConfig
+import monadris.effect.TestServices
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class GameLogicSpec extends AnyFlatSpec with Matchers:
 
+  val config: AppConfig = TestServices.testConfig
+  val gridWidth = config.grid.width
+  val gridHeight = config.grid.height
+
   def initialState: GameState =
-    GameState.initial(TetrominoShape.T, TetrominoShape.I)
+    GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
   def nextShapeProvider: () => TetrominoShape = () => TetrominoShape.O
 
@@ -17,7 +22,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalX = state.currentTetromino.position.x
 
-    val newState = GameLogic.update(state, Input.MoveLeft, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.MoveLeft, nextShapeProvider, config)
 
     newState.currentTetromino.position.x shouldBe (originalX - 1)
   }
@@ -25,12 +30,12 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   it should "not move when blocked by wall" in {
     val state = initialState
     // 左端に移動
-    val atLeftWall = (0 until GridConfig.DefaultWidth).foldLeft(state) { (s, _) =>
-      GameLogic.update(s, Input.MoveLeft, nextShapeProvider)
+    val atLeftWall = (0 until gridWidth).foldLeft(state) { (s, _) =>
+      GameLogic.update(s, Input.MoveLeft, nextShapeProvider, config)
     }
     val originalX = atLeftWall.currentTetromino.position.x
 
-    val newState = GameLogic.update(atLeftWall, Input.MoveLeft, nextShapeProvider)
+    val newState = GameLogic.update(atLeftWall, Input.MoveLeft, nextShapeProvider, config)
 
     newState.currentTetromino.position.x shouldBe originalX
   }
@@ -39,7 +44,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalX = state.currentTetromino.position.x
 
-    val newState = GameLogic.update(state, Input.MoveRight, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.MoveRight, nextShapeProvider, config)
 
     newState.currentTetromino.position.x shouldBe (originalX + 1)
   }
@@ -48,7 +53,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalY = state.currentTetromino.position.y
 
-    val newState = GameLogic.update(state, Input.MoveDown, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.MoveDown, nextShapeProvider, config)
 
     newState.currentTetromino.position.y shouldBe (originalY + 1)
   }
@@ -56,14 +61,14 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   it should "lock tetromino and spawn new one when at bottom" in {
     val state = initialState
     // 床まで移動（グリッド高さより多く移動を試行）
-    val atBottom = (0 until GridConfig.DefaultHeight + 5).foldLeft(state) { (s, _) =>
-      GameLogic.update(s, Input.MoveDown, nextShapeProvider)
+    val atBottom = (0 until gridHeight + 5).foldLeft(state) { (s, _) =>
+      GameLogic.update(s, Input.MoveDown, nextShapeProvider, config)
     }
 
     // テトリミノが固定され、グリッドに配置されているはず
     val filledCells = for
-      x <- 0 until GridConfig.DefaultWidth
-      y <- 0 until GridConfig.DefaultHeight
+      x <- 0 until gridWidth
+      y <- 0 until gridHeight
       if !atBottom.grid.isEmpty(Position(x, y))
     yield Position(x, y)
 
@@ -74,7 +79,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalRotation = state.currentTetromino.rotation
 
-    val newState = GameLogic.update(state, Input.RotateClockwise, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.RotateClockwise, nextShapeProvider, config)
 
     newState.currentTetromino.rotation shouldBe originalRotation.rotateClockwise
   }
@@ -83,7 +88,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalRotation = state.currentTetromino.rotation
 
-    val newState = GameLogic.update(state, Input.RotateCounterClockwise, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.RotateCounterClockwise, nextShapeProvider, config)
 
     newState.currentTetromino.rotation shouldBe originalRotation.rotateCounterClockwise
   }
@@ -92,7 +97,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalY = state.currentTetromino.position.y
 
-    val newState = GameLogic.update(state, Input.HardDrop, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.HardDrop, nextShapeProvider, config)
 
     // ハードドロップ後は新しいテトリミノが生成される
     // スコアが増加しているはず（ドロップボーナス）
@@ -103,17 +108,17 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     state.status shouldBe GameStatus.Playing
 
-    val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider)
+    val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider, config)
 
     pausedState.status shouldBe GameStatus.Paused
   }
 
   it should "unpause when paused" in {
     val state = initialState
-    val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider)
+    val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider, config)
     pausedState.status shouldBe GameStatus.Paused
 
-    val unpausedState = GameLogic.update(pausedState, Input.Pause, nextShapeProvider)
+    val unpausedState = GameLogic.update(pausedState, Input.Pause, nextShapeProvider, config)
 
     unpausedState.status shouldBe GameStatus.Playing
   }
@@ -122,33 +127,33 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     val state = initialState
     val originalY = state.currentTetromino.position.y
 
-    val newState = GameLogic.update(state, Input.Tick, nextShapeProvider)
+    val newState = GameLogic.update(state, Input.Tick, nextShapeProvider, config)
 
     newState.currentTetromino.position.y shouldBe (originalY + 1)
   }
 
   "GameLogic.update" should "not respond to input when paused (except Pause)" in {
     val state = initialState
-    val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider)
+    val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider, config)
     val originalX = pausedState.currentTetromino.position.x
 
-    val afterMove = GameLogic.update(pausedState, Input.MoveLeft, nextShapeProvider)
+    val afterMove = GameLogic.update(pausedState, Input.MoveLeft, nextShapeProvider, config)
 
     afterMove.currentTetromino.position.x shouldBe originalX
   }
 
   "GameLogic.update" should "increase score when clearing lines" in {
     // 底の行をほぼ埋める
-    var grid = Grid.empty(GridConfig.DefaultWidth, GridConfig.DefaultHeight)
+    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
-    val bottomRow = GridConfig.DefaultHeight - 1
-    for x <- 0 until GridConfig.DefaultWidth - 1 do
+    val bottomRow = gridHeight - 1
+    for x <- 0 until gridWidth - 1 do
       grid = grid.place(Position(x, bottomRow), filled)
 
     // I型を右端に配置して落とすとラインが揃う
     val state = GameState(
       grid = grid,
-      currentTetromino = Tetromino(TetrominoShape.I, Position(GridConfig.DefaultWidth - 1, bottomRow - 4), Rotation.R90),
+      currentTetromino = Tetromino(TetrominoShape.I, Position(gridWidth - 1, bottomRow - 4), Rotation.R90),
       nextTetromino = TetrominoShape.O,
       score = 0,
       level = 1,
@@ -156,17 +161,17 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
       status = GameStatus.Playing
     )
 
-    val dropped = GameLogic.update(state, Input.HardDrop, nextShapeProvider)
+    val dropped = GameLogic.update(state, Input.HardDrop, nextShapeProvider, config)
 
     dropped.linesCleared should be >= 1
     dropped.score should be > 0
   }
 
   "GameState.initial" should "create valid initial state" in {
-    val state = GameState.initial(TetrominoShape.T, TetrominoShape.I)
+    val state = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
-    state.grid.width shouldBe GridConfig.DefaultWidth
-    state.grid.height shouldBe GridConfig.DefaultHeight
+    state.grid.width shouldBe gridWidth
+    state.grid.height shouldBe gridHeight
     state.currentTetromino.shape shouldBe TetrominoShape.T
     state.nextTetromino shouldBe TetrominoShape.I
     state.score shouldBe 0
@@ -176,7 +181,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.restart" should "create fresh game state" in {
-    val state = GameLogic.restart(TetrominoShape.S, TetrominoShape.Z)
+    val state = GameLogic.restart(TetrominoShape.S, TetrominoShape.Z, gridWidth, gridHeight)
 
     state.score shouldBe 0
     state.linesCleared shouldBe 0

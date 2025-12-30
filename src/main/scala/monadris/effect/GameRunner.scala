@@ -194,11 +194,12 @@ object GameRunner:
     stateRef: Ref[GameState]
   ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Boolean] =
     for
+      config <- ZIO.service[AppConfig]
       nextShape <- RandomPieceGenerator.nextShape
-      _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape))
+      _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape, config))
       newState <- stateRef.get
       _ <- ServiceRenderer.render(newState)
-      interval = LineClearing.dropInterval(newState.level)
+      interval = LineClearing.dropInterval(newState.level, config.speed)
       _ <- TtyService.sleep(interval)
     yield !newState.isGameOver
 
@@ -231,26 +232,28 @@ object GameRunner:
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
           ZIO.logInfo("Quit key pressed") *> quitRef.set(true).as(false)
         case _ =>
-          handleParsedInput(parseResult, stateRef)
+          handleParsedInput(parseResult, stateRef, config)
     yield result
 
   private def handleParsedInput(
     parseResult: TerminalInput.ParseResult,
-    stateRef: Ref[GameState]
+    stateRef: Ref[GameState],
+    config: AppConfig
   ): ZIO[ConsoleService, Throwable, Boolean] =
     TerminalInput.toInput(parseResult) match
       case None        => ZIO.succeed(true)
-      case Some(input) => applyInputZIO(input, stateRef)
+      case Some(input) => applyInputZIO(input, stateRef, config)
 
   private def applyInputZIO(
     input: Input,
-    stateRef: Ref[GameState]
+    stateRef: Ref[GameState],
+    config: AppConfig
   ): ZIO[ConsoleService, Throwable, Boolean] =
     for
       _ <- ZIO.logDebug(s"Input received: $input")
       nextShape <- RandomPieceGenerator.nextShape
       oldState <- stateRef.get
-      _ <- stateRef.update(s => GameLogic.update(s, input, () => nextShape))
+      _ <- stateRef.update(s => GameLogic.update(s, input, () => nextShape, config))
       newState <- stateRef.get
       _ <- ZIO.when(newState.isGameOver && !oldState.isGameOver) {
         ZIO.logInfo(s"Game Over - Score: ${newState.score}, Lines: ${newState.linesCleared}, Level: ${newState.level}")
