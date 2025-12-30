@@ -6,7 +6,7 @@ import zio.test.Assertion.*
 
 import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.effect.TestServices as Mocks
+import monadris.effect.{TestServices as Mocks}
 
 /**
  * IO抽象化レイヤーのテスト
@@ -14,8 +14,11 @@ import monadris.effect.TestServices as Mocks
  */
 object GameSystemSpec extends ZIOSpecDefault:
 
+  val gridWidth: Int = Mocks.testConfig.grid.width
+  val gridHeight: Int = Mocks.testConfig.grid.height
+
   def initialState: GameState =
-    GameState.initial(TetrominoShape.T, TetrominoShape.I)
+    GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
   def spec = suite("GameSystem Tests")(
     // ============================================================
@@ -525,12 +528,12 @@ object GameSystemSpec extends ZIOSpecDefault:
 
       test("logs game over and exits when game over condition is met") {
         // 1. 即死するように積み上がった盤面を作成（上から2行目まで埋める）
-        val dangerousGrid = (0 until GameConfig.Grid.DefaultWidth).foldLeft(Grid.empty()) { (g, x) =>
+        val dangerousGrid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
           g.place(Position(x, 2), Cell.Filled(TetrominoShape.I))
         }
 
         // 2. 次にブロックがスポーンしたら即衝突する状態
-        val dangerousState = GameState.initial(TetrominoShape.T, TetrominoShape.O)
+        val dangerousState = GameState.initial(TetrominoShape.T, TetrominoShape.O, gridWidth, gridHeight)
           .copy(grid = dangerousGrid)
 
         // 3. 入力: HardDrop (即座に固定→判定→GameOver)

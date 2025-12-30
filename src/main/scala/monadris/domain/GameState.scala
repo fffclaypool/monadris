@@ -44,8 +44,8 @@ object GameState:
   def initial(
     firstShape: TetrominoShape,
     nextShape: TetrominoShape,
-    gridWidth: Int = GameConfig.Grid.DefaultWidth,
-    gridHeight: Int = GameConfig.Grid.DefaultHeight
+    gridWidth: Int,
+    gridHeight: Int
   ): GameState =
     GameState(
       grid = Grid.empty(gridWidth, gridHeight),

@@ -1,5 +1,6 @@
 package monadris.logic
 
+import monadris.config.AppConfig
 import monadris.domain.*
 
 /**
@@ -24,11 +25,13 @@ object GameLogic:
    * @param state 現在のゲーム状態
    * @param input プレイヤーの入力
    * @param nextShapeProvider 次のテトリミノの形状を提供する関数（外部から注入）
+   * @param config アプリケーション設定
    */
   def update(
     state: GameState,
     input: Input,
-    nextShapeProvider: () => TetrominoShape
+    nextShapeProvider: () => TetrominoShape,
+    config: AppConfig
   ): GameState =
     if !state.isPlaying then
       input match
@@ -39,13 +42,13 @@ object GameLogic:
       input match
         case Input.MoveLeft             => handleMove(state, _.moveLeft)
         case Input.MoveRight            => handleMove(state, _.moveRight)
-        case Input.MoveDown             => handleMoveDown(state, nextShapeProvider)
+        case Input.MoveDown             => handleMoveDown(state, nextShapeProvider, config)
         case Input.RotateClockwise      => handleRotation(state, clockwise = true)
         case Input.RotateCounterClockwise => handleRotation(state, clockwise = false)
-        case Input.HardDrop             => handleHardDrop(state, nextShapeProvider)
+        case Input.HardDrop             => handleHardDrop(state, nextShapeProvider, config)
         case Input.Pause                => state.copy(status = GameStatus.Paused)
         case Input.Quit                 => state
-        case Input.Tick                 => handleTick(state, nextShapeProvider)
+        case Input.Tick                 => handleTick(state, nextShapeProvider, config)
 
   /**
    * 左右移動の処理
@@ -65,14 +68,15 @@ object GameLogic:
    */
   private def handleMoveDown(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape
+    nextShapeProvider: () => TetrominoShape,
+    config: AppConfig
   ): GameState =
     val movedTetromino = state.currentTetromino.moveDown
     if Collision.isValidPosition(movedTetromino, state.grid) then
       state.copy(currentTetromino = movedTetromino)
     else
       // 着地 -> 固定処理
-      lockTetromino(state, nextShapeProvider)
+      lockTetromino(state, nextShapeProvider, config)
 
   /**
    * 回転処理（ウォールキック対応）
@@ -87,7 +91,8 @@ object GameLogic:
    */
   private def handleHardDrop(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape
+    nextShapeProvider: () => TetrominoShape,
+    config: AppConfig
   ): GameState =
     val droppedTetromino = Collision.hardDropPosition(state.currentTetromino, state.grid)
     // ドロップした距離に応じてボーナススコア
@@ -98,33 +103,35 @@ object GameLogic:
       currentTetromino = droppedTetromino,
       score = state.score + bonusScore
     )
-    lockTetromino(newState, nextShapeProvider)
+    lockTetromino(newState, nextShapeProvider, config)
 
   /**
    * Tick処理（時間経過による自動落下）
    */
   private def handleTick(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape
+    nextShapeProvider: () => TetrominoShape,
+    config: AppConfig
   ): GameState =
-    handleMoveDown(state, nextShapeProvider)
+    handleMoveDown(state, nextShapeProvider, config)
 
   /**
    * テトリミノを盤面に固定し、次のテトリミノを生成
    */
   private def lockTetromino(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape
+    nextShapeProvider: () => TetrominoShape,
+    config: AppConfig
   ): GameState =
     // テトリミノを盤面に固定
     val newGrid = state.grid.placeTetromino(state.currentTetromino)
 
     // ライン消去
-    val clearResult = LineClearing.clearLines(newGrid, state.level)
+    val clearResult = LineClearing.clearLines(newGrid, state.level, config.score)
 
     // 総ライン数とレベルの更新
     val newLinesCleared = state.linesCleared + clearResult.linesCleared
-    val newLevel = LineClearing.calculateLevel(newLinesCleared)
+    val newLevel = LineClearing.calculateLevel(newLinesCleared, config.level)
 
     // 次のテトリミノを生成
     val nextTetromino = Tetromino.spawn(state.nextTetromino, state.grid.width)
@@ -155,7 +162,7 @@ object GameLogic:
   def restart(
     firstShape: TetrominoShape,
     nextShape: TetrominoShape,
-    gridWidth: Int = 10,
-    gridHeight: Int = 20
+    gridWidth: Int,
+    gridHeight: Int
   ): GameState =
     GameState.initial(firstShape, nextShape, gridWidth, gridHeight)

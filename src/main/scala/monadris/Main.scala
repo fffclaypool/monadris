@@ -42,11 +42,12 @@ object Main extends ZIOAppDefault:
       _      <- TtyService.sleep(config.timing.titleDelayMs)
     yield ()
 
-  private val initializeGame: UIO[GameState] =
+  private val initializeGame: ZIO[AppConfig, Nothing, GameState] =
     for
+      config     <- ZIO.service[AppConfig]
       firstShape <- GameRunner.RandomPieceGenerator.nextShape
       nextShape  <- GameRunner.RandomPieceGenerator.nextShape
-    yield GameState.initial(firstShape, nextShape)
+    yield GameState.initial(firstShape, nextShape, config.grid.width, config.grid.height)
 
   private def runGameSession(initialState: GameState): ZIO[GameEnv, Throwable, GameState] =
     for
