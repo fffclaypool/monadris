@@ -375,5 +375,129 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.white))
       }
+    ),
+
+    // ============================================================
+    // Additional edge case tests for computeDiffString
+    // ============================================================
+
+    suite("computeDiffString edge cases")(
+      test("diff render handles char change at same position") {
+        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+          .drawChar(Position.first, Position.origin, 'A', UiColor.Default)
+        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+          .drawChar(Position.first, Position.origin, 'B', UiColor.Default)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains("B"),
+          !combined.contains(Ansi.clearScreen)
+        )
+      }.provide(Mocks.console),
+
+      test("diff render handles color change without char change") {
+        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+          .drawChar(Position.first, Position.origin, 'X', UiColor.Red)
+        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+          .drawChar(Position.first, Position.origin, 'X', UiColor.Green)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains(Ansi.green),
+          combined.contains("X")
+        )
+      }.provide(Mocks.console),
+
+      test("diff render handles multiple scattered changes") {
+        val prevSize = 5
+        val prev = ScreenBuffer.empty(prevSize, prevSize)
+        val curr = ScreenBuffer.empty(prevSize, prevSize)
+          .drawChar(0, 0, 'A', UiColor.Red)
+          .drawChar(2, 2, 'B', UiColor.Blue)
+          .drawChar(4, 4, 'C', UiColor.Green)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains("A"),
+          combined.contains("B"),
+          combined.contains("C")
+        )
+      }.provide(Mocks.console),
+
+      test("diff render resets color at end if last pixel was colored") {
+        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+          .drawChar(Position.third, Position.origin, 'X', UiColor.Cyan)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          combined.contains(Ansi.cyan),
+          combined.contains(Ansi.reset)
+        )
+      }.provide(Mocks.console),
+
+      test("diff render preserves same color across consecutive changes") {
+        val prev = ScreenBuffer.empty(BufferSize.medium, BufferSize.single)
+        val curr = ScreenBuffer.empty(BufferSize.medium, BufferSize.single)
+          .drawChar(Position.first, Position.origin, 'A', UiColor.Red)
+          .drawChar(Position.second, Position.origin, 'B', UiColor.Red)
+          .drawChar(Position.third, Position.origin, 'C', UiColor.Red)
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+          // Count occurrences of red color code - should be minimal
+          redCount = combined.sliding(Ansi.red.length).count(_ == Ansi.red)
+        yield assertTrue(
+          combined.contains("A"),
+          combined.contains("B"),
+          combined.contains("C"),
+          redCount >= 1 // At least one red code should be present
+        )
+      }.provide(Mocks.console),
+
+      test("diff render handles expanding buffer size") {
+        val smallSize = 2
+        val largeSize = 5
+        val prev = ScreenBuffer.empty(smallSize, smallSize)
+          .drawChar(0, 0, 'X')
+        val curr = ScreenBuffer.empty(largeSize, largeSize)
+          .drawChar(0, 0, 'X')  // Same as before
+          .drawChar(3, 3, 'Y')  // New position beyond prev bounds
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(combined.contains("Y"))
+      }.provide(Mocks.console),
+
+      test("diff render handles shrinking buffer size") {
+        val largeSize = 5
+        val smallSize = 2
+        val prev = ScreenBuffer.empty(largeSize, largeSize)
+          .drawChar(4, 4, 'X')
+        val curr = ScreenBuffer.empty(smallSize, smallSize)
+          .drawChar(0, 0, 'Y')
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          _       <- ConsoleRenderer.render(curr, Some(prev))
+          output  <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(combined.contains("Y"))
+      }.provide(Mocks.console)
     )
   )
