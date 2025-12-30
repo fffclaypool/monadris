@@ -2,7 +2,7 @@ package monadris.logic
 
 import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.effect.TestServices
+import monadris.infrastructure.TestServices
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -144,11 +144,11 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
 
   "GameLogic.update" should "increase score when clearing lines" in {
     // 底の行をほぼ埋める
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
-    for x <- 0 until gridWidth - 1 do
-      grid = grid.place(Position(x, bottomRow), filled)
+    val grid = (0 until gridWidth - 1).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, bottomRow), filled)
+    }
 
     // I型を右端に配置して落とすとラインが揃う
     val state = GameState(

@@ -5,7 +5,7 @@ import zio.test.*
 import zio.test.Assertion.*
 
 import monadris.domain.*
-import monadris.effect.TestServices
+import monadris.infrastructure.TestServices
 import monadris.logic.*
 
 /**

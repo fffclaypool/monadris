@@ -193,12 +193,12 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     val filled = Cell.Filled(TetrominoShape.I)
 
     // Fill all rows
-    var filledGrid = grid
-    for
+    val filledGrid = (for {
       y <- 0 until DefaultHeight
       x <- 0 until DefaultWidth
-    do
-      filledGrid = filledGrid.place(Position(x, y), filled)
+    } yield Position(x, y)).foldLeft(grid) { (g, pos) =>
+      g.place(pos, filled)
+    }
 
     val allRows = (0 until DefaultHeight).toList
     val clearedGrid = filledGrid.clearRows(allRows)

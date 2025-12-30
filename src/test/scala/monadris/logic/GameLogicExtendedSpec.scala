@@ -2,7 +2,7 @@ package monadris.logic
 
 import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.effect.TestServices
+import monadris.infrastructure.TestServices
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -15,6 +15,15 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
   val config: AppConfig = TestServices.testConfig
   val gridWidth = config.grid.width
   val gridHeight = config.grid.height
+
+  // Iteration limits for tests that need to simulate multiple moves
+  val maxIterations: Int = gridHeight * 2  // Enough iterations to reach bottom from any position
+  val takeIterations: Int = maxIterations + 1  // +1 to ensure we can check the final state
+
+  // Score and level constants
+  val initialScore: Int = 0
+  val initialLevel: Int = 1
+  val initialLinesCleared: Int = 0
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
@@ -37,14 +46,13 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
 
   it should "transition to GameOver when spawn position is blocked" in {
     // Create a grid where spawn position is already blocked
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
     // Fill the center spawn area where T-tetromino will spawn
     // T-tetromino spawns around center, blocks at approximately (3,0), (4,0), (5,0), (4,1)
-    for x <- 3 until 6 do
-      grid = grid.place(Position(x, 0), filled)
-    grid = grid.place(Position(4, 1), filled)
+    val grid = (3 until 6).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, 0), filled)
+    }.place(Position(4, 1), filled)
 
     // Current piece at corner (no overlap with spawn area)
     // O-tetromino at position (0, 0) has blocks at (0,0), (1,0), (0,1), (1,1)
@@ -167,11 +175,11 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
 
   it should "increase level after clearing enough lines" in {
     // Create a state with lines close to level up
-    var grid = Grid.empty(gridWidth, gridHeight)
     val filled = Cell.Filled(TetrominoShape.I)
     // Fill 9 cells in bottom row (one away from complete)
-    for x <- 0 until 9 do
-      grid = grid.place(Position(x, gridHeight - 1), filled)
+    val grid = (0 until 9).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, gridHeight - 1), filled)
+    }
 
     val state = GameState(
       grid = grid,
@@ -196,20 +204,21 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
   it should "lock piece and spawn new one when soft dropping at bottom" in {
     val state = initialState
 
-    // Move down until at bottom
-    var currentState = state
-    var iterations = 0
-    while !currentState.isGameOver && iterations < 50 do
-      val nextState = GameLogic.update(currentState, Input.MoveDown, nextShapeProvider, config)
-      if nextState.currentTetromino.shape != currentState.currentTetromino.shape then
-        // A new piece was spawned
-        iterations = 100 // Exit loop
-      else
-        currentState = nextState
-        iterations += 1
+    // Move down until piece changes or game is over
+    val states = Iterator.iterate((state, 0)) { case (s, i) =>
+      val nextState = GameLogic.update(s, Input.MoveDown, nextShapeProvider, config)
+      (nextState, i + 1)
+    }
+
+    val (finalState, iterations) = states
+      .take(takeIterations)
+      .dropWhile { case (s, i) =>
+        !s.isGameOver && i < maxIterations && s.currentTetromino.shape == state.currentTetromino.shape
+      }
+      .next()
 
     // Either game is over or a new piece was spawned
-    (currentState.isGameOver || iterations >= 50) shouldBe true
+    (finalState.isGameOver || iterations >= maxIterations || finalState.currentTetromino.shape != state.currentTetromino.shape) shouldBe true
   }
 
   // ============================================================
@@ -233,9 +242,9 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
 
     state.currentTetromino.shape shouldBe TetrominoShape.S
     state.nextTetromino shouldBe TetrominoShape.Z
-    state.score shouldBe 0
-    state.level shouldBe 1
-    state.linesCleared shouldBe 0
+    state.score shouldBe initialScore
+    state.level shouldBe initialLevel
+    state.linesCleared shouldBe initialLinesCleared
     state.status shouldBe GameStatus.Playing
   }
 
