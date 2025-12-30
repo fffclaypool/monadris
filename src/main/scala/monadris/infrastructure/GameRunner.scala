@@ -5,13 +5,21 @@ import zio.*
 import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.logic.*
-import monadris.view.GameView
+import monadris.view.{GameView, ScreenBuffer}
 
 /**
  * 副作用をZIOで管理するゲーム実行層
  * コアロジックは純粋関数のまま、入出力のみをエフェクトとして扱う
  */
 object GameRunner:
+
+  /**
+   * イベントループで扱うコマンド
+   */
+  enum GameCommand:
+    case UserAction(input: Input) // ユーザー操作
+    case TimeTick                 // 時間経過
+    case Quit                     // 終了
 
   /**
    * 描画を抽象化するトレイト（依存性注入用）
@@ -43,11 +51,15 @@ object GameRunner:
     ConsoleRenderer.renderWithoutClear(buffer)
 
   /**
-   * ゲーム画面を描画
+   * ゲーム画面を描画（差分描画対応）
    */
-  def renderGame(state: GameState, config: AppConfig): ZIO[ConsoleService, Throwable, Unit] =
+  def renderGame(
+    state: GameState,
+    config: AppConfig,
+    previousBuffer: Option[ScreenBuffer] = None
+  ): ZIO[ConsoleService, Throwable, ScreenBuffer] =
     val buffer = GameView.toScreenBuffer(state, config)
-    ConsoleRenderer.render(buffer)
+    ConsoleRenderer.render(buffer, previousBuffer).as(buffer)
 
   /**
    * ゲームオーバー画面を描画
@@ -57,121 +69,138 @@ object GameRunner:
     ConsoleRenderer.renderWithoutClear(buffer)
 
   // ============================================================
-  // インタラクティブゲームループ（サービス依存版）
+  // イベントループ定数
+  // ============================================================
+
+  private object EventLoop:
+    val CommandQueueCapacity = 100
+
+  // ============================================================
+  // イベント駆動型ゲームループ（Queue版）
   // ============================================================
 
   /**
-   * インタラクティブなゲームループを実行（TtyService + ConsoleService版）
+   * ゲームループの状態（GameState + 前回描画バッファ）
+   */
+  private case class LoopState(
+    gameState: GameState,
+    previousBuffer: Option[ScreenBuffer]
+  )
+
+  /**
+   * イベント駆動型のゲームループを実行
+   * Queueを使って処理を直列化し、競合状態を解消
    */
   def interactiveGameLoop(
     initialState: GameState
   ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, GameState] =
     for
-      config   <- ZIO.service[AppConfig]
-      stateRef <- Ref.make(initialState)
-      quitRef  <- Ref.make(false)
-      _        <- renderCurrentStateZIO(stateRef, config)
-      tickFiber <- tickLoopZIO(stateRef, quitRef).fork
-      _        <- inputLoopZIO(stateRef, quitRef)
-      _        <- tickFiber.interrupt
-      finalState <- stateRef.get
-    yield finalState
+      config       <- ZIO.service[AppConfig]
+      commandQueue <- Queue.bounded[GameCommand](EventLoop.CommandQueueCapacity)
 
-  private def renderCurrentStateZIO(
-    stateRef: Ref[GameState],
-    config: AppConfig
-  ): ZIO[ConsoleService, Throwable, Unit] =
-    stateRef.get.flatMap(state => renderGame(state, config))
+      // 初回描画（全描画）
+      initialBuffer <- renderGame(initialState, config, None)
 
-  private def tickLoopZIO(
-    stateRef: Ref[GameState],
-    quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Unit] =
-    val shouldContinue = checkGameActiveZIO(stateRef, quitRef)
-    val processTick = processTickUpdateZIO(stateRef)
+      // Input Fiber: キー入力を読み取り、コマンドをQueueに追加
+      inputFiber <- inputProducer(commandQueue, config.terminal.inputPollIntervalMs).fork
 
-    val tick = shouldContinue.flatMap {
-      case false => ZIO.succeed(false)
-      case true  => processTick
-    }
-    tick.repeatWhile(identity).unit
+      // Tick Fiber: 一定間隔でTickコマンドをQueueに追加
+      initialInterval = LineClearing.dropInterval(initialState.level, config.speed).toInt
+      tickFiber <- tickProducer(commandQueue, initialInterval).fork
 
-  private def checkGameActiveZIO(
-    stateRef: Ref[GameState],
-    quitRef: Ref[Boolean]
-  ): UIO[Boolean] =
-    for
-      quit <- quitRef.get
-      state <- stateRef.get
-    yield !quit && !state.isGameOver
+      // Main Loop: Queueからコマンドを取り出して処理
+      finalLoopState <- eventLoop(
+        commandQueue,
+        LoopState(initialState, Some(initialBuffer)),
+        config
+      )
 
-  private def processTickUpdateZIO(
-    stateRef: Ref[GameState]
-  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Boolean] =
-    for
-      config <- ZIO.service[AppConfig]
-      nextShape <- RandomPieceGenerator.nextShape
-      _ <- stateRef.update(s => GameLogic.update(s, Input.Tick, () => nextShape, config))
-      newState <- stateRef.get
-      _ <- renderGame(newState, config)
-      interval = LineClearing.dropInterval(newState.level, config.speed)
-      _ <- TtyService.sleep(interval)
-    yield !newState.isGameOver
+      // Fiberを停止
+      _ <- inputFiber.interrupt
+      _ <- tickFiber.interrupt
+    yield finalLoopState.gameState
 
-  private def inputLoopZIO(
-    stateRef: Ref[GameState],
-    quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Unit] =
-    processInputLoopZIO(stateRef, quitRef)
-
-  private def processInputLoopZIO(
-    stateRef: Ref[GameState],
-    quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Unit] =
-    val step = checkGameActiveZIO(stateRef, quitRef).flatMap {
-      case false => ZIO.succeed(false)
-      case true  => readAndHandleKeyZIO(stateRef, quitRef)
-    }
-    step.repeatWhile(identity).unit
-
-  private def readAndHandleKeyZIO(
-    stateRef: Ref[GameState],
-    quitRef: Ref[Boolean]
-  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, Boolean] =
-    for
-      config      <- ZIO.service[AppConfig]
+  /**
+   * Input Producer: キー入力を読み取り、コマンドをQueueに追加
+   */
+  private def inputProducer(
+    queue: Queue[GameCommand],
+    pollIntervalMs: Int
+  ): ZIO[TtyService & AppConfig, Throwable, Unit] =
+    val readAndOffer = for
       parseResult <- TerminalInput.readKeyZIO
-      result <- parseResult match
+      _ <- parseResult match
         case TerminalInput.ParseResult.Timeout =>
-          TtyService.sleep(config.terminal.inputPollIntervalMs).as(true)
+          TtyService.sleep(pollIntervalMs)
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
-          ZIO.logInfo("Quit key pressed") *> quitRef.set(true).as(false)
+          ZIO.logInfo("Quit key pressed") *> queue.offer(GameCommand.Quit)
         case _ =>
-          handleParsedInput(parseResult, stateRef, config)
-    yield result
+          TerminalInput.toInput(parseResult) match
+            case Some(input) => queue.offer(GameCommand.UserAction(input))
+            case None        => ZIO.unit
+    yield ()
 
-  private def handleParsedInput(
-    parseResult: TerminalInput.ParseResult,
-    stateRef: Ref[GameState],
+    readAndOffer.forever
+
+  /**
+   * Tick Producer: 一定間隔でTickコマンドをQueueに追加
+   * Note: 現在は固定間隔。レベル変化への追従は将来の拡張として検討
+   */
+  private def tickProducer(
+    queue: Queue[GameCommand],
+    intervalMs: Int
+  ): ZIO[TtyService, Throwable, Unit] =
+    val tickAndSleep = for
+      _ <- TtyService.sleep(intervalMs)
+      _ <- queue.offer(GameCommand.TimeTick)
+    yield ()
+
+    tickAndSleep.forever
+
+  /**
+   * イベントループ本体
+   * Queueからコマンドを取り出し、状態を更新して描画
+   */
+  private def eventLoop(
+    queue: Queue[GameCommand],
+    state: LoopState,
     config: AppConfig
-  ): ZIO[ConsoleService, Throwable, Boolean] =
-    TerminalInput.toInput(parseResult) match
-      case None        => ZIO.succeed(true)
-      case Some(input) => applyInputZIO(input, stateRef, config)
+  ): ZIO[ConsoleService, Throwable, LoopState] =
+    queue.take.flatMap {
+      case GameCommand.Quit =>
+        ZIO.succeed(state)
 
-  private def applyInputZIO(
+      case GameCommand.UserAction(input) =>
+        processCommand(input, state, config).flatMap { newState =>
+          if newState.gameState.isGameOver then
+            ZIO.succeed(newState)
+          else
+            eventLoop(queue, newState, config)
+        }
+
+      case GameCommand.TimeTick =>
+        processCommand(Input.Tick, state, config).flatMap { newState =>
+          if newState.gameState.isGameOver then
+            ZIO.succeed(newState)
+          else
+            eventLoop(queue, newState, config)
+        }
+    }
+
+  /**
+   * コマンド処理: 状態更新 + 差分描画
+   */
+  private def processCommand(
     input: Input,
-    stateRef: Ref[GameState],
+    state: LoopState,
     config: AppConfig
-  ): ZIO[ConsoleService, Throwable, Boolean] =
+  ): ZIO[ConsoleService, Throwable, LoopState] =
     for
-      _ <- ZIO.logDebug(s"Input received: $input")
       nextShape <- RandomPieceGenerator.nextShape
-      oldState <- stateRef.get
-      _ <- stateRef.update(s => GameLogic.update(s, input, () => nextShape, config))
-      newState <- stateRef.get
-      _ <- ZIO.when(newState.isGameOver && !oldState.isGameOver) {
-        ZIO.logInfo(s"Game Over - Score: ${newState.score}, Lines: ${newState.linesCleared}, Level: ${newState.level}")
+      oldGameState = state.gameState
+      newGameState = GameLogic.update(oldGameState, input, () => nextShape, config)
+      _ <- ZIO.when(newGameState.isGameOver && !oldGameState.isGameOver) {
+        ZIO.logInfo(s"Game Over - Score: ${newGameState.score}, Lines: ${newGameState.linesCleared}, Level: ${newGameState.level}")
       }
-      _ <- renderGame(newState, config)
-    yield !newState.isGameOver
+      newBuffer <- renderGame(newGameState, config, state.previousBuffer)
+    yield LoopState(newGameState, Some(newBuffer))

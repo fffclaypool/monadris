@@ -17,6 +17,18 @@ object GameSystemSpec extends ZIOSpecDefault:
   val gridWidth: Int = Mocks.testConfig.grid.width
   val gridHeight: Int = Mocks.testConfig.grid.height
 
+  // ============================================================
+  // Test constants
+  // ============================================================
+
+  private val minimumBufferDimension = 0
+  private val shapeSampleCount = 20
+  private val minimumUniqueShapes = 1
+
+  // ANSI escape sequences for assertions
+  private object Ansi:
+    val clearScreen = "\u001b[2J"
+
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
@@ -560,9 +572,9 @@ object GameSystemSpec extends ZIOSpecDefault:
 
       test("nextShape returns different shapes over time") {
         for
-          shapes <- ZIO.collectAll(List.fill(20)(GameRunner.RandomPieceGenerator.nextShape))
+          shapes <- ZIO.collectAll(List.fill(shapeSampleCount)(GameRunner.RandomPieceGenerator.nextShape))
           uniqueShapes = shapes.toSet
-        yield assertTrue(uniqueShapes.size > 1)
+        yield assertTrue(uniqueShapes.size > minimumUniqueShapes)
       }
     ),
 
@@ -611,6 +623,28 @@ object GameSystemSpec extends ZIOSpecDefault:
           output <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("Next:"))
+      }.provide(Mocks.console),
+
+      test("renderGame returns ScreenBuffer") {
+        for
+          buffer <- GameRunner.renderGame(initialState, Mocks.testConfig)
+        yield assertTrue(
+          buffer.width > minimumBufferDimension,
+          buffer.height > minimumBufferDimension
+        )
+      }.provide(Mocks.console),
+
+      test("renderGame with previous buffer uses differential rendering") {
+        for
+          service <- ZIO.service[Mocks.TestConsoleService]
+          firstBuffer <- GameRunner.renderGame(initialState, Mocks.testConfig, None)
+          _ <- service.buffer.set(List.empty) // clear buffer
+          _ <- GameRunner.renderGame(initialState, Mocks.testConfig, Some(firstBuffer))
+          output <- service.buffer.get
+        yield assertTrue(
+          // Same state = no changes = no output (or minimal output)
+          output.forall(!_.contains(Ansi.clearScreen))
+        )
       }.provide(Mocks.console)
     ),
 

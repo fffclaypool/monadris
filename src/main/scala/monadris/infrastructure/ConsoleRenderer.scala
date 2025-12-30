@@ -80,6 +80,71 @@ object ConsoleRenderer:
     yield ()
 
   /**
+   * 差分描画対応のrender
+   * previousがNoneの場合は全描画、Someの場合は差分のみ描画
+   */
+  def render(current: ScreenBuffer, previous: Option[ScreenBuffer]): ZIO[ConsoleService, Throwable, Unit] =
+    previous match
+      case None => render(current)
+      case Some(prev) => renderDiff(current, prev)
+
+  /**
+   * 2つのバッファの差分を計算し、変更点のみを描画
+   */
+  private def renderDiff(current: ScreenBuffer, previous: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
+    val diffString = computeDiffString(current, previous)
+    if diffString.isEmpty then
+      ZIO.unit
+    else
+      for
+        _ <- ConsoleService.print(diffString)
+        _ <- ConsoleService.flush()
+      yield ()
+
+  /**
+   * 2つのバッファの差分を ANSI エスケープシーケンス付き文字列に変換
+   * 変更があった座標のみカーソル移動 + 描画
+   */
+  private def computeDiffString(current: ScreenBuffer, previous: ScreenBuffer): String =
+    val coordinates = for
+      y <- 0 until current.height
+      x <- 0 until current.width
+    yield (x, y)
+
+    val (sb, lastColor) = coordinates.foldLeft((new StringBuilder, UiColor.Default)) {
+      case ((accSb, accColor), (x, y)) =>
+        val currentPixel = current.pixels(y)(x)
+        val prevPixel =
+          if y < previous.height && x < previous.width then
+            previous.pixels(y)(x)
+          else
+            Pixel(' ', UiColor.Default)
+
+        if currentPixel != prevPixel then
+          // カーソル移動（1-based座標）
+          accSb.append(s"\u001b[${y + 1};${x + 1}H")
+
+          // 色の変更が必要な場合のみ色コードを出力
+          val newColor =
+            if currentPixel.color != accColor then
+              accSb.append(colorToAnsi(currentPixel.color))
+              currentPixel.color
+            else
+              accColor
+
+          accSb.append(currentPixel.char)
+          (accSb, newColor)
+        else
+          (accSb, accColor)
+    }
+
+    // 最後に色をリセット
+    if lastColor != UiColor.Default then
+      sb.append(ANSI_RESET)
+
+    sb.toString
+
+  /**
    * バッファのみ描画（画面クリアなし）
    */
   def renderWithoutClear(buffer: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
