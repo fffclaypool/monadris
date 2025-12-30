@@ -830,5 +830,83 @@ object GameSystemSpec extends ZIOSpecDefault:
           result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(Mocks.console)
+    ),
+
+    // ============================================================
+    // TerminalInput Internal Method Coverage
+    // ============================================================
+
+    suite("TerminalInput Internal Coverage")(
+      test("parseEscapeSequenceZIO covers all for-comprehension steps") {
+        // This test ensures all lines in the for-comprehension are executed
+        // ESC followed by valid arrow sequence
+        val validArrow = Chunk(27, '['.toInt, 'A'.toInt)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.RotateClockwise))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'A'.toInt)) ++ Mocks.config),
+
+      test("parseEscapeBody executes when available > 0") {
+        // ESC followed by '[' and arrow key
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveDown))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'B'.toInt)) ++ Mocks.config),
+
+      test("parseArrowKey executes read and maps to input") {
+        // ESC [ C sequence for MoveRight
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Arrow(Input.MoveRight))
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'C'.toInt)) ++ Mocks.config),
+
+      test("readKeyBody reads key and parses result") {
+        // Regular key 'j' for MoveDown
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Regular('j'.toInt))
+      }.provide(Mocks.tty(Chunk('j'.toInt)) ++ Mocks.config),
+
+      test("parseEscapeSequenceZIO returns None when available is 0 after sleep") {
+        // Only ESC, no following bytes
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Unknown)
+      }.provide(Mocks.tty(Chunk(27)) ++ Mocks.config),
+
+      test("parseArrowKey returns None for unknown arrow code") {
+        // ESC [ F (not a valid arrow)
+        for
+          result <- TerminalInput.readKeyZIO
+          input = TerminalInput.toInput(result)
+        yield assertTrue(input.isEmpty)
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'F'.toInt)) ++ Mocks.config),
+
+      test("multiple escape sequences in succession") {
+        // Two arrow key sequences
+        val inputs = Chunk(
+          27, '['.toInt, 'A'.toInt,  // Up arrow
+          27, '['.toInt, 'D'.toInt   // Left arrow
+        )
+        for
+          r1 <- TerminalInput.readKeyZIO
+          r2 <- TerminalInput.readKeyZIO
+        yield assertTrue(
+          r1 == TerminalInput.ParseResult.Arrow(Input.RotateClockwise),
+          r2 == TerminalInput.ParseResult.Arrow(Input.MoveLeft)
+        )
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'A'.toInt, 27, '['.toInt, 'D'.toInt)) ++ Mocks.config),
+
+      test("mixed regular and escape sequence input") {
+        // 'h', then ESC [ B
+        val inputs = Chunk('h'.toInt, 27, '['.toInt, 'B'.toInt)
+        for
+          r1 <- TerminalInput.readKeyZIO
+          r2 <- TerminalInput.readKeyZIO
+        yield assertTrue(
+          r1 == TerminalInput.ParseResult.Regular('h'.toInt),
+          r2 == TerminalInput.ParseResult.Arrow(Input.MoveDown)
+        )
+      }.provide(Mocks.tty(Chunk('h'.toInt, 27, '['.toInt, 'B'.toInt)) ++ Mocks.config)
     )
   )
