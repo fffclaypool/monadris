@@ -2,43 +2,131 @@
 
 ![CI](https://github.com/fffclaypool/monadris/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/fffclaypool/monadris/graph/badge.svg)](https://codecov.io/gh/fffclaypool/monadris)
-
 ![Scala](https://img.shields.io/badge/scala-3.3.1-dc322f.svg)
 ![ZIO](https://img.shields.io/badge/ZIO-2.0-1a237e.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Last Commit](https://img.shields.io/github/last-commit/fffclaypool/monadris)
 
-A functional Tetris implementation in Scala 3 + ZIO.
+A strictly functional Tetris implementation in Scala 3 + ZIO.
+**Zero variables (`var`), zero exceptions, and zero side effects in the core domain.**
 
 ## Features
 
-- **Immutability**: All data structures are immutable (`case class` / `enum`).
-- **Pure Functions**: Core logic follows `(State, Input) => State` signature.
-- **3-Layer Architecture**: Strict separation between Domain/Logic, View, and Infrastructure.
-- **Event-Driven**: Game loop utilizes `ZIO Queue` for thread-safe, non-blocking event handling.
-- **Effect Separation**: Rendering, input, and time are wrapped in ZIO, completely isolated from core logic.
+- **Zero Mutation**: `var`, `null`, `throw`, and `return` are forbidden at compile time via **WartRemover** (in `core`).
+- **Physical Separation**: Multi-project architecture strictly isolates pure `core` logic from impure `app` infrastructure.
+- **Pure Functions**: Game logic is modeled strictly as `(State, Input) => State`.
+- **Event-Driven**: Utilizing **ZIO Queue** for non-blocking, thread-safe event handling.
+- **Effect Isolation**: Rendering, input, and time are wrapped in ZIO effects.
 - **Configurable**: Game settings are loaded from HOCON configuration files.
 
 ## Architecture
 
-The application follows a strict unidirectional data flow:
+### 1. Data Flow
+The internal state management follows a strict unidirectional data flow pattern (The Elm Architecture)
+
+```mermaid
+graph LR
+    %% Styles
+    classDef infra fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px,color:#0d47a1,rx:5,ry:5;
+    classDef core fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#1b5e20,rx:5,ry:5;
+    classDef view fill:#fff3e0,stroke:#fb8c00,stroke-width:2px,color:#e65100,rx:5,ry:5;
+    classDef terminal fill:#263238,stroke:#000000,stroke-width:2px,color:#ffffff,rx:10,ry:10;
+
+    Input["Input / Ticker"]:::infra
+    Queue["ZIO Queue"]:::infra
+    Loop["Game Loop"]:::infra
+    Renderer["Console Renderer"]:::infra
+
+    Logic["Game Logic"]:::core
+    State["Domain State"]:::core
+
+    View["Game View"]:::view
+
+    Terminal(("Terminal Output")):::terminal
+
+    Input -->|Command| Queue
+    Queue -->|Event| Loop
+    Loop -->|Action| Logic
+    Logic -->|Update| State
+    State -->|Data| View
+    View -->|ViewModel| Renderer
+    Renderer -->|ANSI| Terminal
+```
+
+### 2. Module Separation
+The project is physically split into two SBT modules to prevent architectural erosion.
 
 ```mermaid
 graph TD
-    Input[Input / Ticker] -->|Command| Queue[ZIO Queue]
-    Queue -->|Event| Loop[Game Loop]
-    Loop -->|Action| Logic[Game Logic]
-    Logic -->|Update| State[Domain State]
-    State -->|Data| View[Game View]
-    View -->|ViewModel| Renderer[Console Renderer]
-    Renderer -->|ANSI| Terminal[Terminal Output]
+    %% Styles
+    classDef pure fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef impure fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1;
+    classDef boundary fill:none,stroke:#90a4ae,stroke-width:2px,stroke-dasharray: 5 5;
+
+    subgraph AppProject ["App Project (Impure / ZIO)"]
+        direction TB
+        Main["Main / ZIO App"]:::impure
+        Infra["Infrastructure"]:::impure
+        ConfigLoader["Config Loader"]:::impure
+    end
+
+    subgraph Boundary ["🚧 Physical Barrier (SBT Module)"]
+        direction TB
+        subgraph CoreProject ["Core Project (Pure Scala)"]
+            Logic["Game Logic"]:::pure
+            Domain["Domain Models"]:::pure
+            View["View Logic"]:::pure
+        end
+    end
+
+    Main --> Infra
+    Infra --> Logic
+    Infra --> View
+    Logic --> Domain
+    View --> Domain
+    ConfigLoader --> Domain
 ```
 
-### Layers
+| Layer | Project | ZIO Dependency | Description |
+|-------|---------|----------------|-------------|
+| **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`) |
+| **Logic** | `core` | **No** | Pure state transitions (`GameLogic`) |
+| **View** | `core` | **No** | Pure transformation (`State => ScreenBuffer`) |
+| **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Loop |
 
-1. **Domain & Logic (Pure)**: Defines the game rules and state transitions. No side effects.
-2. **View (Pure)**: Transforms `GameState` into `ScreenBuffer` (ViewModel). No ANSI codes, just abstract colors and chars.
-3. **Infrastructure (Impure)**: Handles ZIO effects, Console I/O, Queues, and the main loop.
+### 3. Runtime Event Loop
+How ZIO handles concurrent inputs and serializes them into the game loop.
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 Player
+    participant Input as ⚡ Input Fiber
+    participant Timer as ⏰ Timer Fiber
+    participant Queue as 📥 ZIO Queue
+    participant GameLoop as 🔄 Game Loop
+    participant Core as 🧠 Pure Core
+    participant Screen as 🖥️ Terminal
+
+    Note over Input, Timer: Running in Parallel (ZIO Fibers)
+
+    par Parallel Inputs
+        User->>Input: Press Key
+        Input->>Queue: Offer(UserAction)
+    and
+        Timer->>Timer: Sleep(100ms)
+        Timer->>Queue: Offer(TimeTick)
+    end
+
+    Note over Queue, GameLoop: Serialize Concurrent Events
+
+    loop Every Event
+        Queue->>GameLoop: Take(Command)
+        GameLoop->>Core: update(State, Command)
+        Core-->>GameLoop: New State
+        GameLoop->>Core: view(New State)
+        Core-->>GameLoop: ScreenBuffer
+        GameLoop->>Screen: Render(ANSI Codes)
+    end
+```
 
 ## Requirements
 
@@ -48,14 +136,11 @@ graph TD
 
 ## Build & Run
 
-**Note:** Please use the provided shell script to run the game. Running directly with `sbt run` may cause display glitches due to terminal mode handling.
+**Note:** Please use the provided shell script. Running directly with `sbt run` may cause display glitches due to terminal mode handling.
 
 ```bash
 # Compile
 sbt compile
-
-# Run tests
-sbt test
 
 # Run game
 sh run.sh
@@ -76,40 +161,40 @@ sh run.sh
 ## Project Structure
 
 ```text
-src/main/scala/monadris/
-├── config/           # Application configuration
-│   └── AppConfig.scala
-├── domain/           # Immutable data models
-│   ├── GameState.scala
-│   ├── Grid.scala
-│   ├── Tetromino.scala
-│   └── Input.scala
-├── logic/            # Pure game rules
-│   ├── GameLogic.scala
-│   ├── Collision.scala
-│   └── LineClearing.scala
-├── view/             # Presentation logic
-│   ├── GameView.scala
-│   └── ViewModel.scala
-├── infrastructure/   # ZIO effect layer (I/O, Loop)
-│   ├── GameRunner.scala
-│   ├── ConsoleRenderer.scala
-│   ├── TerminalInput.scala
-│   └── SystemInterface.scala
-└── Main.scala
+monadris/
+├── core/                       # Pure logic (ZIO-independent / WartRemover enforced)
+│   └── src/main/scala/monadris/
+│       ├── domain/             # Immutable data models
+│       │   ├── config/         # Pure config definition
+│       │   ├── GameState.scala
+│       │   └── ...
+│       ├── logic/              # Pure game rules
+│       └── view/               # Presentation logic
+├── app/                        # Impure layer (ZIO-dependent)
+│   └── src/main/scala/monadris/
+│       ├── config/             # ZIO Config loading
+│       ├── infrastructure/     # ZIO effect implementation
+│       └── Main.scala
+└── build.sbt
 ```
 
 ## Testing
 
+This project uses **ZIO Test**.
+Heavy tests (memory leak checks) are tagged with `heavy` and excluded by default.
+
 ```bash
-sbt test
+# Run standard unit tests (Fast)
+sbt "testOnly * -- -l heavy"
+
+# Run stress tests only (Slow: 100,000 iterations)
+sbt "testOnly * -- -n heavy"
 ```
 
-Comprehensive tests covering:
-- **Domain**: Invariants of Grid and Tetrominoes.
-- **Logic**: State transitions, collision detection, and line clearing.
+### Test Coverage
+- **Domain & Logic**: Invariants, state transitions, collision detection.
 - **View**: Layout generation and ViewModel construction.
-- **Infrastructure**: Input parsing and loop integration (using ZIO Test environment).
+- **Stress Testing**: Validates memory safety and stack safety by running 100,000 game frames in a simulated environment (`StressTest.scala`).
 
 ## License
 

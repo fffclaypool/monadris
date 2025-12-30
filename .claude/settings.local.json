@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sbt compile:*)",
+      "Bash(cat:*)",
+      "Bash(sbt clean:*)",
+      "Bash(sbt \"testOnly monadris.PropertyBasedSpec monadris.logic.GameLogicExtendedSpec\")",
+      "Bash(sbt \"testOnly monadris.logic.GameLogicExtendedSpec\")",
+      "Bash(sbt coverage:*)",
+      "Bash(find:*)",
+      "Bash(sbt:*)"
+    ]
+  }
+}

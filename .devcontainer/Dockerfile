@@ -1,7 +1,12 @@
 FROM mcr.microsoft.com/devcontainers/java:1-21-bullseye
 
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
+RUN apt-get update && apt-get install -y gnupg2 && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://repo.charm.sh/apt/gpg.key | gpg --dearmor -o /etc/apt/keyrings/charm.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | tee /etc/apt/sources.list.d/charm.list && \
+    apt-get update && \
+    apt-get install -y nodejs vhs ffmpeg chromium && \
     npm install -g @anthropic-ai/claude-code repomix && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
