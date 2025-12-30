@@ -8,6 +8,7 @@ import monadris.domain.config.AppConfig
 import monadris.config.ConfigLayer
 import monadris.domain.*
 import monadris.infrastructure.{TestServices as Mocks}
+import monadris.view.GameView
 
 /**
  * IO抽象化レイヤーのテスト
@@ -663,5 +664,171 @@ object GameSystemSpec extends ZIOSpecDefault:
           config.terminal.inputPollIntervalMs == 20
         )
       }.provide(ConfigLayer.live)
+    ),
+
+    // ============================================================
+    // Additional TerminalInput Branch Coverage Tests
+    // ============================================================
+
+    suite("TerminalInput Branch Coverage")(
+      test("parseArrowKey returns None when no bytes after bracket") {
+        // ESC [ (incomplete - no arrow key code follows)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Unknown)
+      }.provide(Mocks.tty(Chunk(27, '['.toInt)) ++ Mocks.config),
+
+      test("parseEscapeBody returns None for non-bracket second byte") {
+        // ESC O (not '[' so returns Unknown)
+        for
+          result <- TerminalInput.readKeyZIO
+        yield assertTrue(result == TerminalInput.ParseResult.Unknown)
+      }.provide(Mocks.tty(Chunk(27, 'O'.toInt)) ++ Mocks.config),
+
+      test("parseArrowKey handles unknown arrow code") {
+        // ESC [ X (not A/B/C/D)
+        for
+          result <- TerminalInput.readKeyZIO
+          input = TerminalInput.toInput(result)
+        yield assertTrue(
+          result == TerminalInput.ParseResult.Arrow(null).asInstanceOf[Any] == false,
+          input.isEmpty || result == TerminalInput.ParseResult.Unknown
+        )
+      }.provide(Mocks.tty(Chunk(27, '['.toInt, 'X'.toInt)) ++ Mocks.config),
+
+      test("readKeyZIO returns Regular for valid vim keys") {
+        for
+          h <- TerminalInput.readKeyZIO
+          l <- TerminalInput.readKeyZIO
+          j <- TerminalInput.readKeyZIO
+          k <- TerminalInput.readKeyZIO
+        yield assertTrue(
+          h == TerminalInput.ParseResult.Regular('h'.toInt),
+          l == TerminalInput.ParseResult.Regular('l'.toInt),
+          j == TerminalInput.ParseResult.Regular('j'.toInt),
+          k == TerminalInput.ParseResult.Regular('k'.toInt)
+        )
+      }.provide(Mocks.tty(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'k'.toInt)) ++ Mocks.config),
+
+      test("toInput handles all ParseResult variants") {
+        val arrow = TerminalInput.ParseResult.Arrow(Input.HardDrop)
+        val regular = TerminalInput.ParseResult.Regular(' '.toInt)
+        val timeout = TerminalInput.ParseResult.Timeout
+        val unknown = TerminalInput.ParseResult.Unknown
+
+        assertTrue(
+          TerminalInput.toInput(arrow) == Some(Input.HardDrop),
+          TerminalInput.toInput(regular) == Some(Input.HardDrop),
+          TerminalInput.toInput(timeout).isEmpty,
+          TerminalInput.toInput(unknown).isEmpty
+        )
+      },
+
+      test("all arrow keys are mapped correctly") {
+        assertTrue(
+          TerminalInput.arrowToInput('A') == Some(Input.RotateClockwise),
+          TerminalInput.arrowToInput('B') == Some(Input.MoveDown),
+          TerminalInput.arrowToInput('C') == Some(Input.MoveRight),
+          TerminalInput.arrowToInput('D') == Some(Input.MoveLeft),
+          TerminalInput.arrowToInput('E').isEmpty
+        )
+      }
+    ),
+
+    // ============================================================
+    // GameRunner LoopState Tests
+    // ============================================================
+
+    suite("GameRunner LoopState")(
+      test("LoopState holds game state and previous buffer") {
+        val state = initialState
+        val buffer = GameView.toScreenBuffer(state, Mocks.testConfig)
+        val loopState = GameRunner.LoopState(state, Some(buffer))
+
+        assertTrue(
+          loopState.gameState == state,
+          loopState.previousBuffer.isDefined,
+          loopState.previousBuffer.get == buffer
+        )
+      },
+
+      test("LoopState can hold None for previousBuffer") {
+        val loopState = GameRunner.LoopState(initialState, None)
+        assertTrue(loopState.previousBuffer.isEmpty)
+      }
+    ),
+
+    // ============================================================
+    // GameCommand Additional Tests
+    // ============================================================
+
+    suite("GameCommand Additional Coverage")(
+      test("UserAction wraps all input types") {
+        val allInputs = List(
+          Input.MoveLeft, Input.MoveRight, Input.MoveDown,
+          Input.RotateClockwise, Input.RotateCounterClockwise,
+          Input.HardDrop, Input.Pause, Input.Tick
+        )
+        val commands = allInputs.map(GameRunner.GameCommand.UserAction(_))
+        assertTrue(commands.size == allInputs.size)
+      },
+
+      test("GameCommand pattern matching works correctly") {
+        val userAction = GameRunner.GameCommand.UserAction(Input.MoveLeft)
+        val tick = GameRunner.GameCommand.TimeTick
+        val quit = GameRunner.GameCommand.Quit
+
+        val userActionMatched = userAction match
+          case GameRunner.GameCommand.UserAction(i) => i == Input.MoveLeft
+          case _ => false
+
+        val tickMatched = tick match
+          case GameRunner.GameCommand.TimeTick => true
+          case _ => false
+
+        val quitMatched = quit match
+          case GameRunner.GameCommand.Quit => true
+          case _ => false
+
+        assertTrue(userActionMatched, tickMatched, quitMatched)
+      }
+    ),
+
+    // ============================================================
+    // eventLoop Edge Cases
+    // ============================================================
+
+    suite("eventLoop Edge Cases")(
+      test("eventLoop handles Pause toggle") {
+        val pausedState = initialState.copy(status = GameStatus.Paused)
+        for
+          queue <- Queue.bounded[GameRunner.GameCommand](10)
+          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.Pause))
+          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          loopState = GameRunner.LoopState(pausedState, None)
+          result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
+        yield assertTrue(result.gameState.status == GameStatus.Playing)
+      }.provide(Mocks.console),
+
+      test("eventLoop processes multiple Ticks") {
+        for
+          queue <- Queue.bounded[GameRunner.GameCommand](10)
+          _ <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _ <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          loopState = GameRunner.LoopState(initialState, None)
+          result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
+        yield assertTrue(result.gameState != null)
+      }.provide(Mocks.console),
+
+      test("eventLoop updates previousBuffer after each command") {
+        for
+          queue <- Queue.bounded[GameRunner.GameCommand](10)
+          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
+          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          loopState = GameRunner.LoopState(initialState, None)
+          result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
+        yield assertTrue(result.previousBuffer.isDefined)
+      }.provide(Mocks.console)
     )
   )

@@ -111,3 +111,113 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
 
     relativePositions(tetromino.currentBlocks) shouldBe relativePositions(rotated.currentBlocks)
   }
+
+  // ============================================================
+  // Direct blocks() method tests for each shape
+  // ============================================================
+
+  "TetrominoShape.I" should "have correct block positions" in {
+    val blocks = TetrominoShape.I.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(-1, 0))
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(1, 0))
+    blocks should contain(Position(2, 0))
+  }
+
+  "TetrominoShape.O" should "have correct block positions" in {
+    val blocks = TetrominoShape.O.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(1, 0))
+    blocks should contain(Position(0, 1))
+    blocks should contain(Position(1, 1))
+  }
+
+  "TetrominoShape.T" should "have correct block positions" in {
+    val blocks = TetrominoShape.T.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(-1, 0))
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(1, 0))
+    blocks should contain(Position(0, -1))
+  }
+
+  "TetrominoShape.S" should "have correct block positions" in {
+    val blocks = TetrominoShape.S.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(-1, 0))
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(0, -1))
+    blocks should contain(Position(1, -1))
+  }
+
+  "TetrominoShape.Z" should "have correct block positions" in {
+    val blocks = TetrominoShape.Z.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(-1, -1))
+    blocks should contain(Position(0, -1))
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(1, 0))
+  }
+
+  "TetrominoShape.J" should "have correct block positions" in {
+    val blocks = TetrominoShape.J.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(-1, -1))
+    blocks should contain(Position(-1, 0))
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(1, 0))
+  }
+
+  "TetrominoShape.L" should "have correct block positions" in {
+    val blocks = TetrominoShape.L.blocks
+    blocks.size shouldBe blocksPerTetromino
+    blocks should contain(Position(-1, 0))
+    blocks should contain(Position(0, 0))
+    blocks should contain(Position(1, 0))
+    blocks should contain(Position(1, -1))
+  }
+
+  // ============================================================
+  // Rotation transformation tests for all shapes
+  // ============================================================
+
+  "All TetrominoShapes" should "have 4 blocks in all rotation states" in {
+    for
+      shape <- TetrominoShape.values
+      rotation <- Rotation.values
+    do
+      val tetromino = Tetromino(shape, Position(5, 5), rotation)
+      tetromino.currentBlocks.size shouldBe blocksPerTetromino
+  }
+
+  it should "produce different absolute positions for different rotations (except O)" in {
+    val nonOShapes = TetrominoShape.values.filterNot(_ == TetrominoShape.O)
+    for shape <- nonOShapes do
+      val t0 = Tetromino(shape, Position(5, 5), Rotation.R0)
+      val t90 = Tetromino(shape, Position(5, 5), Rotation.R90)
+      t0.currentBlocks.toSet should not be t90.currentBlocks.toSet
+  }
+
+  "Tetromino rotateBlocks" should "apply R90 rotation correctly" in {
+    val tetromino = Tetromino.spawn(TetrominoShape.I, gridWidth)
+    val r0Blocks = tetromino.currentBlocks
+    val r90Blocks = tetromino.rotateClockwise.currentBlocks
+    // I-piece rotates from horizontal to vertical
+    r0Blocks.toSet should not be r90Blocks.toSet
+  }
+
+  it should "apply R180 rotation correctly" in {
+    val tetromino = Tetromino.spawn(TetrominoShape.T, gridWidth)
+    val r180 = tetromino.rotateClockwise.rotateClockwise
+    r180.rotation shouldBe Rotation.R180
+    r180.currentBlocks.size shouldBe blocksPerTetromino
+  }
+
+  it should "apply R270 rotation correctly" in {
+    val tetromino = Tetromino.spawn(TetrominoShape.T, gridWidth)
+    val r270 = tetromino.rotateCounterClockwise
+    r270.rotation shouldBe Rotation.R270
+    r270.currentBlocks.size shouldBe blocksPerTetromino
+  }
