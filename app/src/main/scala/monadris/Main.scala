@@ -3,8 +3,8 @@ package monadris
 import zio.*
 import zio.logging.backend.SLF4J
 
-import monadris.domain.config.AppConfig
 import monadris.domain.*
+import monadris.domain.config.AppConfig
 import monadris.infrastructure.*
 
 /**
@@ -51,17 +51,20 @@ object Main extends ZIOAppDefault:
 
   private def runGameSession(initialState: GameState): ZIO[GameEnv, Throwable, GameState] =
     for
-      _          <- TerminalControl.enableRawMode
-      finalState <- GameRunner.interactiveGameLoop(initialState)
+      _ <- TerminalControl.enableRawMode
+      finalState <- GameRunner
+        .interactiveGameLoop(initialState)
         .ensuring(TerminalControl.disableRawMode.ignore)
     yield finalState
 
   private def showOutro(finalState: GameState): ZIO[GameEnv, Throwable, Unit] =
     for
       config <- ZIO.service[AppConfig]
-      _      <- ZIO.logInfo(s"Game finished - Score: ${finalState.score}, Lines: ${finalState.linesCleared}, Level: ${finalState.level}")
-      _      <- GameRunner.renderGameOver(finalState)
-      _      <- ConsoleService.print("\nGame ended.\r\n")
-      _      <- TtyService.sleep(config.timing.outroDelayMs)
-      _      <- ZIO.logInfo("Monadris shutting down...")
+      _ <- ZIO.logInfo(
+        s"Game finished - Score: ${finalState.score}, Lines: ${finalState.linesCleared}, Level: ${finalState.level}"
+      )
+      _ <- GameRunner.renderGameOver(finalState)
+      _ <- ConsoleService.print("\nGame ended.\r\n")
+      _ <- TtyService.sleep(config.timing.outroDelayMs)
+      _ <- ZIO.logInfo("Monadris shutting down...")
     yield ()

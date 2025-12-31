@@ -1,12 +1,16 @@
-val scala3Version = "3.3.1"
+val scala3Version = "3.3.5"
 
 val commonSettings = Seq(
-  version := "0.1.0",
+  version      := "0.1.0",
   scalaVersion := scala3Version,
   scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:imports", "-Xfatal-warnings"),
   libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.17" % Test,
-  semanticdbEnabled := true,
-  semanticdbVersion := scalafixSemanticdb.revision
+  semanticdbEnabled                      := true,
+  semanticdbVersion                      := scalafixSemanticdb.revision,
+  scalafixOnCompile                      := true,
+  wartremoverCrossVersion                := CrossVersion.binary,
+  scalafixConfig                         := Some(file(".scalafix.conf")),
+  Test / scalafixConfig                  := Some(file(".scalafix-test.conf"))
 )
 
 // 純粋なコアロジック
@@ -33,31 +37,31 @@ lazy val app = project
   .settings(
     name := "monadris-app",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.0.19",
-      "dev.zio" %% "zio-streams" % "2.0.19",
-      "dev.zio" %% "zio-logging" % "2.1.15",
-      "dev.zio" %% "zio-logging-slf4j" % "2.1.15",
-      "dev.zio" %% "zio-config" % "4.0.0-RC16",
-      "dev.zio" %% "zio-config-typesafe" % "4.0.0-RC16",
-      "dev.zio" %% "zio-config-magnolia" % "4.0.0-RC16",
-      "ch.qos.logback" % "logback-classic" % "1.4.14",
-      "dev.zio" %% "zio-test" % "2.0.19" % Test,
-      "dev.zio" %% "zio-test-sbt" % "2.0.19" % Test,
-      "dev.zio" %% "zio-test-magnolia" % "2.0.19" % Test
+      "dev.zio"       %% "zio"                 % "2.0.19",
+      "dev.zio"       %% "zio-streams"         % "2.0.19",
+      "dev.zio"       %% "zio-logging"         % "2.1.15",
+      "dev.zio"       %% "zio-logging-slf4j"   % "2.1.15",
+      "dev.zio"       %% "zio-config"          % "4.0.0-RC16",
+      "dev.zio"       %% "zio-config-typesafe" % "4.0.0-RC16",
+      "dev.zio"       %% "zio-config-magnolia" % "4.0.0-RC16",
+      "ch.qos.logback" % "logback-classic"     % "1.4.14",
+      "dev.zio"       %% "zio-test"            % "2.0.19" % Test,
+      "dev.zio"       %% "zio-test-sbt"        % "2.0.19" % Test,
+      "dev.zio"       %% "zio-test-magnolia"   % "2.0.19" % Test
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    fork := true,
+    fork         := true,
     connectInput := true,
     // app層ではWartRemoverは無効化
-    wartremoverErrors := Seq.empty,
-    Compile / doc / sources := Seq.empty,
-    Compile / packageDoc / publishArtifact := false,
+    wartremoverErrors                      := Seq.empty,
+    Compile / doc / sources                := Seq.empty,
+    Compile / packageDoc / publishArtifact := false
   )
 
 lazy val root = project
   .in(file("."))
   .aggregate(core, app)
   .settings(
-    name := "monadris",
+    name           := "monadris",
     publish / skip := true
   )

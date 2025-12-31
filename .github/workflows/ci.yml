@@ -11,14 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
+        cache: 'sbt' # 依存関係をキャッシュして高速化
 
     - name: Setup sbt
       uses: sbt/setup-sbt@v1
+
+    - name: Lint, Format Check and Compile
+      run: sbt scalafmtCheckAll scalafmtSbtCheck "scalafixAll --check" compile
 
     - name: Run tests with coverage
       run: sbt coverage test coverageReport

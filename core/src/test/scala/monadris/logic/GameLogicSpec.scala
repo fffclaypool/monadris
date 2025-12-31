@@ -1,8 +1,8 @@
 package monadris.logic
 
-import monadris.domain.config.AppConfig
-import monadris.domain.*
 import monadris.TestConfig
+import monadris.domain.*
+import monadris.domain.config.AppConfig
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -10,8 +10,8 @@ import org.scalatest.matchers.should.Matchers
 class GameLogicSpec extends AnyFlatSpec with Matchers:
 
   val config: AppConfig = TestConfig.testConfig
-  val gridWidth = config.grid.width
-  val gridHeight = config.grid.height
+  val gridWidth         = config.grid.width
+  val gridHeight        = config.grid.height
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
@@ -19,7 +19,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   def nextShapeProvider: () => TetrominoShape = () => TetrominoShape.O
 
   "GameLogic.update with MoveLeft" should "move tetromino left" in {
-    val state = initialState
+    val state     = initialState
     val originalX = state.currentTetromino.position.x
 
     val newState = GameLogic.update(state, Input.MoveLeft, nextShapeProvider, config)
@@ -41,7 +41,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update with MoveRight" should "move tetromino right" in {
-    val state = initialState
+    val state     = initialState
     val originalX = state.currentTetromino.position.x
 
     val newState = GameLogic.update(state, Input.MoveRight, nextShapeProvider, config)
@@ -50,7 +50,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update with MoveDown" should "move tetromino down" in {
-    val state = initialState
+    val state     = initialState
     val originalY = state.currentTetromino.position.y
 
     val newState = GameLogic.update(state, Input.MoveDown, nextShapeProvider, config)
@@ -76,7 +76,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update with RotateClockwise" should "rotate tetromino" in {
-    val state = initialState
+    val state            = initialState
     val originalRotation = state.currentTetromino.rotation
 
     val newState = GameLogic.update(state, Input.RotateClockwise, nextShapeProvider, config)
@@ -85,7 +85,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update with RotateCounterClockwise" should "rotate tetromino CCW" in {
-    val state = initialState
+    val state            = initialState
     val originalRotation = state.currentTetromino.rotation
 
     val newState = GameLogic.update(state, Input.RotateCounterClockwise, nextShapeProvider, config)
@@ -94,7 +94,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update with HardDrop" should "drop tetromino to bottom immediately" in {
-    val state = initialState
+    val state     = initialState
     val originalY = state.currentTetromino.position.y
 
     val newState = GameLogic.update(state, Input.HardDrop, nextShapeProvider, config)
@@ -114,7 +114,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "unpause when paused" in {
-    val state = initialState
+    val state       = initialState
     val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider, config)
     pausedState.status shouldBe GameStatus.Paused
 
@@ -124,7 +124,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update with Tick" should "move tetromino down" in {
-    val state = initialState
+    val state     = initialState
     val originalY = state.currentTetromino.position.y
 
     val newState = GameLogic.update(state, Input.Tick, nextShapeProvider, config)
@@ -133,9 +133,9 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update" should "not respond to input when paused (except Pause)" in {
-    val state = initialState
+    val state       = initialState
     val pausedState = GameLogic.update(state, Input.Pause, nextShapeProvider, config)
-    val originalX = pausedState.currentTetromino.position.x
+    val originalX   = pausedState.currentTetromino.position.x
 
     val afterMove = GameLogic.update(pausedState, Input.MoveLeft, nextShapeProvider, config)
 
@@ -144,7 +144,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
 
   "GameLogic.update" should "increase score when clearing lines" in {
     // 底の行をほぼ埋める
-    val filled = Cell.Filled(TetrominoShape.I)
+    val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
     val grid = (0 until gridWidth - 1).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
       g.place(Position(x, bottomRow), filled)

@@ -2,8 +2,8 @@ package monadris.infrastructure
 
 import zio.*
 
-import monadris.domain.config.AppConfig
 import monadris.domain.Input
+import monadris.domain.config.AppConfig
 
 /**
  * ターミナル入力のパース処理を集約
@@ -72,15 +72,17 @@ object TerminalInput:
       config    <- ZIO.service[AppConfig]
       _         <- TtyService.sleep(config.terminal.escapeSequenceWaitMs)
       available <- TtyService.available()
-      result    <- if available <= 0 then ZIO.succeed(None)
-                   else parseEscapeBody
+      result <-
+        if available <= 0 then ZIO.succeed(None)
+        else parseEscapeBody
     yield result
 
   private def parseEscapeBody: ZIO[TtyService & AppConfig, Throwable, Option[Input]] =
     for
-      second    <- TtyService.read()
-      result    <- if second != '[' then ZIO.succeed(None)
-                   else parseArrowKey
+      second <- TtyService.read()
+      result <-
+        if second != '[' then ZIO.succeed(None)
+        else parseArrowKey
     yield result
 
   private def parseArrowKey: ZIO[TtyService & AppConfig, Throwable, Option[Input]] =
@@ -88,8 +90,9 @@ object TerminalInput:
       config    <- ZIO.service[AppConfig]
       _         <- TtyService.sleep(config.terminal.escapeSequenceSecondWaitMs)
       available <- TtyService.available()
-      result    <- if available <= 0 then ZIO.succeed(None)
-                   else TtyService.read().map(key => arrowToInput(key))
+      result <-
+        if available <= 0 then ZIO.succeed(None)
+        else TtyService.read().map(key => arrowToInput(key))
     yield result
 
   /**
@@ -98,8 +101,9 @@ object TerminalInput:
   def readKeyZIO: ZIO[TtyService & AppConfig, Throwable, ParseResult] =
     for
       available <- TtyService.available()
-      result    <- if available <= 0 then ZIO.succeed(ParseResult.Timeout)
-                   else readKeyBody
+      result <-
+        if available <= 0 then ZIO.succeed(ParseResult.Timeout)
+        else readKeyBody
     yield result
 
   private def readKeyBody: ZIO[TtyService & AppConfig, Throwable, ParseResult] =
@@ -114,8 +118,7 @@ object TerminalInput:
         case Some(input) => ParseResult.Arrow(input)
         case None        => ParseResult.Unknown
       }
-    else
-      ZIO.succeed(ParseResult.Regular(key))
+    else ZIO.succeed(ParseResult.Regular(key))
 
   /**
    * ParseResultをOption[Input]に変換（純粋関数）

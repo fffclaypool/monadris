@@ -1,9 +1,9 @@
 package monadris.infrastructure
 
+import monadris.domain.Input
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import monadris.domain.Input
 
 class TerminalInputSpec extends AnyFlatSpec with Matchers:
 
@@ -129,7 +129,7 @@ class TerminalInputSpec extends AnyFlatSpec with Matchers:
 
   "TerminalInput.ParseResult" should "have all expected variants" in {
     // Just verify the enum variants exist
-    val arrow = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
+    val arrow   = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
     val regular = TerminalInput.ParseResult.Regular(65)
     val timeout = TerminalInput.ParseResult.Timeout
     val unknown = TerminalInput.ParseResult.Unknown

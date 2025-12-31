@@ -1,13 +1,21 @@
 # Monadris
 
-![CI](https://github.com/fffclaypool/monadris/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/fffclaypool/monadris/actions/workflows/ci.yml/badge.svg)](https://github.com/fffclaypool/monadris/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/fffclaypool/monadris/graph/badge.svg)](https://codecov.io/gh/fffclaypool/monadris)
-![Scala](https://img.shields.io/badge/scala-3.3.1-dc322f.svg)
-![ZIO](https://img.shields.io/badge/ZIO-2.0-1a237e.svg)
+![Scala](https://img.shields.io/badge/scala-3.3.5-dc322f.svg?logo=scala&logoColor=white)
+![ZIO](https://img.shields.io/badge/ZIO-2.0-1a237e.svg?logo=scala&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+
+[![Scalafmt](https://img.shields.io/badge/code_style-scalafmt-c22d40.svg?logo=scala&logoColor=white)](.scalafmt.conf)
+[![Scalafix](https://img.shields.io/badge/linter-scalafix-brightgreen.svg?logo=scala&logoColor=white)](.scalafix.conf)
+[![WartRemover](https://img.shields.io/badge/purity-WartRemover-blueviolet.svg?logo=scala&logoColor=white)](build.sbt)
 
 A strictly functional Tetris implementation in Scala 3 + ZIO.
 **Zero variables (`var`), zero exceptions, and zero side effects in the core domain.**
+
+## Demo
+
+https://github.com/user-attachments/assets/4d8b7920-68e7-45d8-9a86-fbe476922b3c
 
 ## Features
 
@@ -69,7 +77,7 @@ graph TD
         ConfigLoader["Config Loader"]:::impure
     end
 
-    subgraph Boundary ["🚧 Physical Barrier (SBT Module)"]
+    subgraph Boundary ["🚧 Physical Barrier"]
         direction TB
         subgraph CoreProject ["Core Project (Pure Scala)"]
             Logic["Game Logic"]:::pure

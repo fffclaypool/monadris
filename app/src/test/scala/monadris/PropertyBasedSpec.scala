@@ -2,23 +2,22 @@ package monadris
 
 import zio.*
 import zio.test.*
-import zio.test.Assertion.*
 
 import monadris.domain.*
 import monadris.infrastructure.TestServices
 import monadris.logic.*
 
 /**
- * Property-Based Testing for pure functions
- * Tests invariants that should hold for any valid input
+ * 純粋関数のプロパティベーステスト
+ * 任意の有効な入力に対して成立すべき不変条件をテスト
  */
 object PropertyBasedSpec extends ZIOSpecDefault:
 
-  val gridWidth: Int = TestServices.testConfig.grid.width
+  val gridWidth: Int  = TestServices.testConfig.grid.width
   val gridHeight: Int = TestServices.testConfig.grid.height
 
   // ============================================================
-  // Generators
+  // ジェネレータ
   // ============================================================
 
   val genTetrominoShape: Gen[Any, TetrominoShape] =
@@ -41,30 +40,32 @@ object PropertyBasedSpec extends ZIOSpecDefault:
 
   val genTetromino: Gen[Any, Tetromino] =
     for
-      shape <- genTetrominoShape
-      pos <- genPosition
+      shape    <- genTetrominoShape
+      pos      <- genPosition
       rotation <- genRotation
     yield Tetromino(shape, pos, rotation)
 
   val genValidTetromino: Gen[Any, Tetromino] =
     for
-      shape <- genTetrominoShape
-      x <- Gen.int(2, gridWidth - 3)
-      y <- Gen.int(0, gridHeight - 5)
+      shape    <- genTetrominoShape
+      x        <- Gen.int(2, gridWidth - 3)
+      y        <- Gen.int(0, gridHeight - 5)
       rotation <- genRotation
     yield Tetromino(shape, Position(x, y), rotation)
 
   val genInput: Gen[Any, Input] =
-    Gen.fromIterable(List(
-      Input.MoveLeft,
-      Input.MoveRight,
-      Input.MoveDown,
-      Input.RotateClockwise,
-      Input.RotateCounterClockwise,
-      Input.HardDrop,
-      Input.Pause,
-      Input.Tick
-    ))
+    Gen.fromIterable(
+      List(
+        Input.MoveLeft,
+        Input.MoveRight,
+        Input.MoveDown,
+        Input.RotateClockwise,
+        Input.RotateCounterClockwise,
+        Input.HardDrop,
+        Input.Pause,
+        Input.Tick
+      )
+    )
 
   val genInputSequence: Gen[Any, List[Input]] =
     Gen.listOfBounded(0, 50)(genInput)
@@ -78,11 +79,11 @@ object PropertyBasedSpec extends ZIOSpecDefault:
   def genGameState: Gen[Any, GameState] =
     for
       firstShape <- genTetrominoShape
-      nextShape <- genTetrominoShape
+      nextShape  <- genTetrominoShape
     yield GameState.initial(firstShape, nextShape, gridWidth, gridHeight)
 
   // ============================================================
-  // Grid Properties
+  // グリッドのプロパティ
   // ============================================================
 
   def spec = suite("Property-Based Tests")(
@@ -97,37 +98,34 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           assertTrue(allEmpty)
         }
       },
-
       test("placing a cell and reading it back returns the same cell") {
         check(genValidPosition, genTetrominoShape) { (pos, shape) =>
-          val grid = Grid.empty(gridWidth, gridHeight)
-          val cell = Cell.Filled(shape)
+          val grid    = Grid.empty(gridWidth, gridHeight)
+          val cell    = Cell.Filled(shape)
           val newGrid = grid.place(pos, cell)
           assertTrue(newGrid.get(pos) == Some(cell))
         }
       },
-
       test("placing a cell does not affect other cells") {
         check(genValidPosition, genValidPosition, genTetrominoShape) { (pos1, pos2, shape) =>
-          val grid = Grid.empty(gridWidth, gridHeight)
-          val cell = Cell.Filled(shape)
-          val newGrid = grid.place(pos1, cell)
+          val grid      = Grid.empty(gridWidth, gridHeight)
+          val cell      = Cell.Filled(shape)
+          val newGrid   = grid.place(pos1, cell)
           val unchanged = pos1 == pos2 || newGrid.get(pos2) == Some(Cell.Empty)
           assertTrue(unchanged)
         }
       },
-
       test("clearing rows reduces or maintains block count") {
         check(genTetrominoShape) { shape =>
-          val grid = Grid.empty(gridWidth, gridHeight)
+          val grid   = Grid.empty(gridWidth, gridHeight)
           val filled = Cell.Filled(shape)
-          // Fill bottom row completely
+          // 最下行を完全に埋める
           val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
             g.place(Position(x, gridHeight - 1), filled)
           }
           val clearedGrid = filledGrid.clearRows(List(gridHeight - 1))
 
-          // Count filled cells
+          // 埋まったセルを数える
           def countFilled(g: Grid): Int =
             (for
               x <- 0 until g.width
@@ -138,21 +136,20 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           assertTrue(countFilled(clearedGrid) <= countFilled(filledGrid))
         }
       },
-
       test("grid dimensions are preserved after operations") {
         check(genValidPosition, genTetrominoShape) { (pos, shape) =>
-          val grid = Grid.empty(gridWidth, gridHeight)
+          val grid    = Grid.empty(gridWidth, gridHeight)
           val newGrid = grid.place(pos, Cell.Filled(shape))
           assertTrue(
             newGrid.width == grid.width &&
-            newGrid.height == grid.height
+              newGrid.height == grid.height
           )
         }
       }
     ),
 
     // ============================================================
-    // Tetromino Properties
+    // テトリミノのプロパティ
     // ============================================================
 
     suite("Tetromino Properties")(
@@ -162,25 +159,18 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           assertTrue(tetromino.currentBlocks.size == 4)
         }
       },
-
       test("rotating 4 times returns to original orientation") {
         check(genTetromino) { tetromino =>
-          val rotated = tetromino
-            .rotateClockwise
-            .rotateClockwise
-            .rotateClockwise
-            .rotateClockwise
+          val rotated = tetromino.rotateClockwise.rotateClockwise.rotateClockwise.rotateClockwise
           assertTrue(rotated.rotation == tetromino.rotation)
         }
       },
-
       test("moving and reverse moving returns to original position") {
         check(genTetromino) { tetromino =>
           val movedAndBack = tetromino.moveLeft.moveRight
           assertTrue(movedAndBack.position == tetromino.position)
         }
       },
-
       test("blocks are always within reasonable bounds after spawn") {
         check(genTetrominoShape) { shape =>
           val tetromino = Tetromino.spawn(shape, gridWidth)
@@ -193,52 +183,48 @@ object PropertyBasedSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // Collision Properties
+    // 衝突のプロパティ
     // ============================================================
 
     suite("Collision Properties")(
       test("spawned tetromino is always valid on empty grid") {
         check(genTetrominoShape) { shape =>
-          val grid = Grid.empty(gridWidth, gridHeight)
+          val grid      = Grid.empty(gridWidth, gridHeight)
           val tetromino = Tetromino.spawn(shape, grid.width)
           assertTrue(Collision.isValidPosition(tetromino, grid))
         }
       },
-
       test("wall kick returns valid position or None") {
         check(genValidTetromino) { tetromino =>
-          val grid = Grid.empty(gridWidth, gridHeight)
+          val grid   = Grid.empty(gridWidth, gridHeight)
           val result = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
           val isValid = result match
             case Some(rotated) => Collision.isValidPosition(rotated, grid)
-            case None => true // None is also acceptable
+            case None          => true // Noneも許容される
           assertTrue(isValid)
         }
       },
-
       test("hard drop position is always at or below current position") {
         check(genValidTetromino) { tetromino =>
-          val grid = Grid.empty(gridWidth, gridHeight)
+          val grid    = Grid.empty(gridWidth, gridHeight)
           val dropped = Collision.hardDropPosition(tetromino, grid)
           assertTrue(dropped.position.y >= tetromino.position.y)
         }
       },
-
       test("hard drop position cannot move down further") {
         check(genValidTetromino) { tetromino =>
           val grid = Grid.empty(gridWidth, gridHeight)
-          // Only test if initial position is valid (some rotations may extend outside bounds)
+          // 初期位置が有効な場合のみテスト（一部の回転は範囲外に広がる可能性がある）
           if Collision.isValidPosition(tetromino, grid) then
             val dropped = Collision.hardDropPosition(tetromino, grid)
             assertTrue(Collision.hasLanded(dropped, grid))
-          else
-            assertTrue(true) // Skip invalid initial positions
+          else assertTrue(true) // 無効な初期位置はスキップ
         }
       }
     ),
 
     // ============================================================
-    // LineClearing Properties
+    // LineClearingのプロパティ
     // ============================================================
 
     suite("LineClearing Properties")(
@@ -249,31 +235,28 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           assertTrue(score >= 0)
         }
       },
-
       test("more lines cleared means higher or equal score at same level") {
         val scoreConfig = TestServices.testConfig.score
         check(genLevel) { level =>
           val scores = (0 to 4).map(lines => LineClearing.calculateScore(lines, level, scoreConfig))
           val isMonotonic = scores.sliding(2).forall {
             case Seq(a, b) => b >= a
-            case _ => true
+            case _         => true
           }
           assertTrue(isMonotonic)
         }
       },
-
       test("higher level means higher or equal score for same lines") {
         val scoreConfig = TestServices.testConfig.score
         check(genLinesCleared) { lines =>
           val scores = (1 to 10).map(level => LineClearing.calculateScore(lines, level, scoreConfig))
           val isMonotonic = scores.sliding(2).forall {
             case Seq(a, b) => b >= a
-            case _ => true
+            case _         => true
           }
           assertTrue(isMonotonic)
         }
       },
-
       test("level is always at least start level") {
         val levelConfig = TestServices.testConfig.level
         check(Gen.int(0, 100), Gen.int(1, 10)) { (totalLines, startLevel) =>
@@ -281,18 +264,16 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           assertTrue(level >= startLevel)
         }
       },
-
       test("drop interval is always positive and within bounds") {
         val speedConfig = TestServices.testConfig.speed
         check(genLevel) { level =>
           val interval = LineClearing.dropInterval(level, speedConfig)
           assertTrue(
             interval >= speedConfig.minDropIntervalMs &&
-            interval <= speedConfig.baseDropIntervalMs
+              interval <= speedConfig.baseDropIntervalMs
           )
         }
       },
-
       test("higher level means faster or equal drop speed") {
         val speedConfig = TestServices.testConfig.speed
         check(Gen.int(1, 19)) { level =>
@@ -304,7 +285,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // GameLogic Properties (Robustness)
+    // GameLogicのプロパティ（堅牢性）
     // ============================================================
 
     suite("GameLogic Robustness")(
@@ -312,71 +293,71 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape = () => TetrominoShape.O
+          val nextShape    = () => TetrominoShape.O
 
           val finalState = inputs.foldLeft(initialState) { (state, input) =>
             if state.isGameOver then state
             else GameLogic.update(state, input, nextShape, config)
           }
 
-          // Just verify it completed without exception
+          // 例外なく完了したことを確認するだけ
           assertTrue(true)
         }
       },
-
       test("score never decreases") {
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape = () => TetrominoShape.O
+          val nextShape    = () => TetrominoShape.O
 
-          val scores = inputs.scanLeft(initialState) { (state, input) =>
-            if state.isGameOver then state
-            else GameLogic.update(state, input, nextShape, config)
-          }.map(_.score)
+          val scores = inputs
+            .scanLeft(initialState) { (state, input) =>
+              if state.isGameOver then state
+              else GameLogic.update(state, input, nextShape, config)
+            }
+            .map(_.score)
 
           val neverDecreases = scores.sliding(2).forall {
             case Seq(a, b) => b >= a
-            case _ => true
+            case _         => true
           }
           assertTrue(neverDecreases)
         }
       },
-
       test("level never decreases") {
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape = () => TetrominoShape.O
+          val nextShape    = () => TetrominoShape.O
 
-          val levels = inputs.scanLeft(initialState) { (state, input) =>
-            if state.isGameOver then state
-            else GameLogic.update(state, input, nextShape, config)
-          }.map(_.level)
+          val levels = inputs
+            .scanLeft(initialState) { (state, input) =>
+              if state.isGameOver then state
+              else GameLogic.update(state, input, nextShape, config)
+            }
+            .map(_.level)
 
           val neverDecreases = levels.sliding(2).forall {
             case Seq(a, b) => b >= a
-            case _ => true
+            case _         => true
           }
           assertTrue(neverDecreases)
         }
       },
-
       test("pause toggle is idempotent after two presses") {
         val config = TestServices.testConfig
         check(genGameState) { state =>
-          val nextShape = () => TetrominoShape.O
-          val pausedOnce = GameLogic.update(state, Input.Pause, nextShape, config)
+          val nextShape   = () => TetrominoShape.O
+          val pausedOnce  = GameLogic.update(state, Input.Pause, nextShape, config)
           val pausedTwice = GameLogic.update(pausedOnce, Input.Pause, nextShape, config)
           assertTrue(pausedTwice.status == state.status)
         }
       },
-
       test("grid dimensions remain constant") {
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape = () => TetrominoShape.O
+          val nextShape    = () => TetrominoShape.O
 
           val finalState = inputs.foldLeft(initialState) { (state, input) =>
             if state.isGameOver then state
@@ -385,14 +366,14 @@ object PropertyBasedSpec extends ZIOSpecDefault:
 
           assertTrue(
             finalState.grid.width == initialState.grid.width &&
-            finalState.grid.height == initialState.grid.height
+              finalState.grid.height == initialState.grid.height
           )
         }
       }
     ),
 
     // ============================================================
-    // Rotation Properties
+    // 回転のプロパティ
     // ============================================================
 
     suite("Rotation Properties")(
@@ -402,14 +383,9 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           assertTrue(result == rotation)
         }
       },
-
       test("four clockwise rotations return to original") {
         check(genRotation) { rotation =>
-          val result = rotation
-            .rotateClockwise
-            .rotateClockwise
-            .rotateClockwise
-            .rotateClockwise
+          val result = rotation.rotateClockwise.rotateClockwise.rotateClockwise.rotateClockwise
           assertTrue(result == rotation)
         }
       }

@@ -4,29 +4,29 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
-import monadris.infrastructure.{TestServices as LocalTestServices}
+import monadris.infrastructure.TestServices as LocalTestServices
 
 object GameRunnerSpec extends ZIOSpecDefault:
 
-  val gridWidth: Int = LocalTestServices.testConfig.grid.width
+  val gridWidth: Int  = LocalTestServices.testConfig.grid.width
   val gridHeight: Int = LocalTestServices.testConfig.grid.height
 
   // ============================================================
-  // Test constants
+  // テスト定数
   // ============================================================
 
-  private val shapeSampleCount = 100
+  private val shapeSampleCount    = 100
   private val minimumUniqueShapes = 1
-  private val tripleRenderCount = 3
+  private val tripleRenderCount   = 3
 
   // ============================================================
-  // Test fixtures
+  // テストフィクスチャ
   // ============================================================
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
-  // Mock renderer that tracks render calls using Ref for pure functional state
+  // 純粋関数的な状態のためにRefを使用してレンダー呼び出しを追跡するモックレンダラー
   case class MockRendererState(renderCount: Int = 0, gameOverRendered: Boolean = false)
 
   class MockRenderer(stateRef: Ref[MockRendererState]) extends GameRunner.Renderer:
@@ -36,7 +36,7 @@ object GameRunnerSpec extends ZIOSpecDefault:
     def renderGameOver(state: GameState): UIO[Unit] =
       stateRef.update(_.copy(gameOverRendered = true))
 
-    def getRenderCount: UIO[Int] = stateRef.get.map(_.renderCount)
+    def getRenderCount: UIO[Int]          = stateRef.get.map(_.renderCount)
     def wasGameOverRendered: UIO[Boolean] = stateRef.get.map(_.gameOverRendered)
 
   object MockRenderer:
@@ -45,7 +45,7 @@ object GameRunnerSpec extends ZIOSpecDefault:
 
   def spec = suite("GameRunner")(
     // ============================================================
-    // GameCommand enum tests
+    // GameCommand enumテスト
     // ============================================================
 
     suite("GameCommand")(
@@ -57,21 +57,18 @@ object GameRunnerSpec extends ZIOSpecDefault:
           case _ =>
             assertTrue(false)
       },
-
       test("TimeTick is a valid command") {
         val cmd = GameRunner.GameCommand.TimeTick
         assertTrue(cmd == GameRunner.GameCommand.TimeTick)
       },
-
       test("Quit is a valid command") {
         val cmd = GameRunner.GameCommand.Quit
         assertTrue(cmd == GameRunner.GameCommand.Quit)
       },
-
       test("GameCommand enum has all expected variants") {
         val userAction = GameRunner.GameCommand.UserAction(Input.MoveDown)
-        val timeTick = GameRunner.GameCommand.TimeTick
-        val quit = GameRunner.GameCommand.Quit
+        val timeTick   = GameRunner.GameCommand.TimeTick
+        val quit       = GameRunner.GameCommand.Quit
 
         assertTrue(
           userAction.isInstanceOf[GameRunner.GameCommand],
@@ -79,12 +76,16 @@ object GameRunnerSpec extends ZIOSpecDefault:
           quit.isInstanceOf[GameRunner.GameCommand]
         )
       },
-
       test("UserAction can wrap all Input types") {
         val inputs = List(
-          Input.MoveLeft, Input.MoveRight, Input.MoveDown,
-          Input.RotateClockwise, Input.RotateCounterClockwise,
-          Input.HardDrop, Input.Pause, Input.Tick
+          Input.MoveLeft,
+          Input.MoveRight,
+          Input.MoveDown,
+          Input.RotateClockwise,
+          Input.RotateCounterClockwise,
+          Input.HardDrop,
+          Input.Pause,
+          Input.Tick
         )
         val commands = inputs.map(GameRunner.GameCommand.UserAction(_))
         assertTrue(commands.size == inputs.size)
@@ -92,16 +93,14 @@ object GameRunnerSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // RandomPieceGenerator tests
+    // RandomPieceGeneratorテスト
     // ============================================================
 
     suite("RandomPieceGenerator")(
       test("nextShape returns valid tetromino shape") {
-        for
-          shape <- GameRunner.RandomPieceGenerator.nextShape
+        for shape <- GameRunner.RandomPieceGenerator.nextShape
         yield assertTrue(TetrominoShape.values.contains(shape))
       },
-
       test("nextShape returns different shapes over multiple calls") {
         for
           shapes <- ZIO.collectAll(List.fill(shapeSampleCount)(GameRunner.RandomPieceGenerator.nextShape))
@@ -111,7 +110,7 @@ object GameRunnerSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // Renderer trait implementation tests
+    // Rendererトレイト実装テスト
     // ============================================================
 
     suite("Renderer trait")(
@@ -120,64 +119,59 @@ object GameRunnerSpec extends ZIOSpecDefault:
 
         for
           renderer <- MockRenderer.make
-          _ <- renderer.render(state)
-          _ <- renderer.render(state)
-          _ <- renderer.render(state)
-          count <- renderer.getRenderCount
+          _        <- renderer.render(state)
+          _        <- renderer.render(state)
+          _        <- renderer.render(state)
+          count    <- renderer.getRenderCount
         yield assertTrue(count == tripleRenderCount)
       },
-
       test("MockRenderer correctly tracks gameOver") {
         val state = initialState.copy(status = GameStatus.GameOver)
 
         for
-          renderer <- MockRenderer.make
-          _ <- renderer.renderGameOver(state)
+          renderer    <- MockRenderer.make
+          _           <- renderer.renderGameOver(state)
           wasRendered <- renderer.wasGameOverRendered
         yield assertTrue(wasRendered)
       }
     ),
 
     // ============================================================
-    // renderGame tests
+    // renderGameテスト
     // ============================================================
 
     suite("renderGame")(
       test("returns ScreenBuffer for initial state") {
         val state = initialState
-        for
-          buffer <- GameRunner.renderGame(state, LocalTestServices.testConfig, None)
+        for buffer <- GameRunner.renderGame(state, LocalTestServices.testConfig, None)
         yield assertTrue(
           buffer.width > minimumBufferDimension,
           buffer.height > minimumBufferDimension
         )
       }.provide(LocalTestServices.console),
-
       test("uses differential rendering when previous buffer provided") {
         val state = initialState
         for
-          service <- ZIO.service[LocalTestServices.TestConsoleService]
-          firstBuffer <- GameRunner.renderGame(state, LocalTestServices.testConfig, None)
-          _ <- service.buffer.set(List.empty) // Clear buffer
+          service      <- ZIO.service[LocalTestServices.TestConsoleService]
+          firstBuffer  <- GameRunner.renderGame(state, LocalTestServices.testConfig, None)
+          _            <- service.buffer.set(List.empty) // Clear buffer
           secondBuffer <- GameRunner.renderGame(state, LocalTestServices.testConfig, Some(firstBuffer))
-          output <- service.buffer.get
+          output       <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
-          // When buffers are identical, no clear screen and minimal output
+          // バッファが同一の場合、画面クリアなしで出力は最小限
           !combined.contains(Ansi.clearScreen) || combined.isEmpty
         )
       }.provide(LocalTestServices.console),
-
       test("renders game over state correctly") {
         val gameOverState = initialState.copy(status = GameStatus.GameOver)
-        for
-          buffer <- GameRunner.renderGame(gameOverState, LocalTestServices.testConfig, None)
+        for buffer <- GameRunner.renderGame(gameOverState, LocalTestServices.testConfig, None)
         yield assertTrue(buffer.width > minimumBufferDimension)
       }.provide(LocalTestServices.console)
     ),
 
     // ============================================================
-    // renderGameOver tests
+    // renderGameOverテスト
     // ============================================================
 
     suite("renderGameOver")(
@@ -185,8 +179,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
         val state = initialState.copy(score = 1000, level = 5, linesCleared = 20)
         for
           service <- ZIO.service[LocalTestServices.TestConsoleService]
-          _ <- GameRunner.renderGameOver(state)
-          output <- service.buffer.get
+          _       <- GameRunner.renderGameOver(state)
+          output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
           combined.contains("GAME OVER"),
@@ -198,15 +192,15 @@ object GameRunnerSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // showTitle tests
+    // showTitleテスト
     // ============================================================
 
     suite("showTitle")(
       test("outputs title screen content") {
         for
           service <- ZIO.service[LocalTestServices.TestConsoleService]
-          _ <- GameRunner.showTitle
-          output <- service.buffer.get
+          _       <- GameRunner.showTitle
+          output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
           combined.contains("Functional Tetris"),
@@ -216,91 +210,86 @@ object GameRunnerSpec extends ZIOSpecDefault:
     ),
 
     // ============================================================
-    // eventLoop tests
+    // eventLoopテスト
     // ============================================================
 
     suite("eventLoop")(
       test("Quit command exits immediately") {
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
           result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
         yield assertTrue(result.gameState == initialState)
       }.provide(LocalTestServices.console),
-
       test("UserAction updates state and continues") {
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveLeft))
-          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveLeft))
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
           result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
         yield assertTrue(
-          // State was processed (might be same or different depending on collision)
+          // 状態が処理された（衝突に応じて同じか異なる可能性がある）
           result.gameState != null
         )
       }.provide(LocalTestServices.console),
-
       test("TimeTick updates state and continues") {
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.TimeTick)
-          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
           result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
         yield assertTrue(result.gameState != null)
       }.provide(LocalTestServices.console),
-
       test("UserAction game over exits loop") {
-        // Create a state that's already game over
+        // 既にゲームオーバーの状態を作成
         val gameOverState = initialState.copy(status = GameStatus.GameOver)
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveDown))
+          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveDown))
           loopState = GameRunner.LoopState(gameOverState, None)
           result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
         yield assertTrue(result.gameState.isGameOver)
       }.provide(LocalTestServices.console),
-
       test("TimeTick game over exits loop") {
-        // Create a state that's already game over
+        // 既にゲームオーバーの状態を作成
         val gameOverState = initialState.copy(status = GameStatus.GameOver)
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           loopState = GameRunner.LoopState(gameOverState, None)
           result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
         yield assertTrue(result.gameState.isGameOver)
       }.provide(LocalTestServices.console),
-
       test("multiple commands processed in order") {
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveLeft))
-          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
-          _ <- queue.offer(GameRunner.GameCommand.TimeTick)
-          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveLeft))
+          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
+          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
           result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(LocalTestServices.console),
-
       test("game over transition exits on TimeTick") {
-        // Fill rows 0-1 PARTIALLY to block spawn area (leave gap at x=0 to prevent line clear)
+        // 行0-1を部分的に埋めてスポーンエリアをブロック（ライン消去を防ぐためx=0にギャップを残す）
         val topFilledGrid = (1 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
           (0 to 1).foldLeft(g) { (g2, y) =>
             g2.place(Position(x, y), Cell.Filled(TetrominoShape.I))
           }
         }
-        // O-tetromino at y=18 has blocks at y=18,19
-        // One tick moves to y=19 with blocks at y=19,20 - out of bounds, causes lock
-        val tetromino = Tetromino.spawn(TetrominoShape.O, gridWidth)
+        // y=18のOテトリミノはy=18,19にブロックを持つ
+        // 1ティックでy=19に移動し、y=19,20にブロック - 範囲外のためロック
+        val tetromino = Tetromino
+          .spawn(TetrominoShape.O, gridWidth)
           .copy(position = Position(tetrominoLockX, gridHeight - 2))
         val nearGameOverState = GameState(
           grid = topFilledGrid,
           currentTetromino = tetromino,
-          nextTetromino = TetrominoShape.I, // I spawns at (5,1) which is blocked
+          nextTetromino = TetrominoShape.I, // Iは(5,1)にスポーン、これはブロックされている
           score = 0,
           level = 1,
           linesCleared = 0,
@@ -308,28 +297,29 @@ object GameRunnerSpec extends ZIOSpecDefault:
         )
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.TimeTick)
-          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(nearGameOverState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          result <- GameRunner
+            .eventLoop(queue, loopState, LocalTestServices.testConfig)
             .timeout(testTimeoutDuration)
         yield assertTrue(result.exists(_.gameState.isGameOver))
       }.provide(LocalTestServices.console),
-
       test("game over transition exits on UserAction HardDrop") {
-        // Fill rows 0-1 PARTIALLY to block spawn area (leave gap at x=0 to prevent line clear)
+        // 行0-1を部分的に埋めてスポーンエリアをブロック（ライン消去を防ぐためx=0にギャップを残す）
         val topFilledGrid = (1 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
           (0 to 1).foldLeft(g) { (g2, y) =>
             g2.place(Position(x, y), Cell.Filled(TetrominoShape.I))
           }
         }
-        // Tetromino at row 3 (below filled rows, with room to drop to bottom)
-        val tetromino = Tetromino.spawn(TetrominoShape.O, gridWidth)
+        // テトリミノを行3に配置（埋められた行の下、底まで落下する余裕がある）
+        val tetromino = Tetromino
+          .spawn(TetrominoShape.O, gridWidth)
           .copy(position = Position(tetrominoLockX, tetrominoStartBelowFilledRow))
         val nearGameOverState = GameState(
           grid = topFilledGrid,
           currentTetromino = tetromino,
-          nextTetromino = TetrominoShape.I, // I spawns at (5,1) which is blocked
+          nextTetromino = TetrominoShape.I, // Iは(5,1)にスポーン、これはブロックされている
           score = 0,
           level = 1,
           linesCleared = 0,
@@ -337,28 +327,29 @@ object GameRunnerSpec extends ZIOSpecDefault:
         )
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
-          _ <- queue.offer(GameRunner.GameCommand.UserAction(Input.HardDrop))
-          _ <- queue.offer(GameRunner.GameCommand.Quit)
+          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.HardDrop))
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(nearGameOverState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          result <- GameRunner
+            .eventLoop(queue, loopState, LocalTestServices.testConfig)
             .timeout(testTimeoutDuration)
         yield assertTrue(result.exists(_.gameState.isGameOver))
       }.provide(LocalTestServices.console)
     )
   )
 
-  // Test constants for buffer validation
+  // バッファ検証用のテスト定数
   private val minimumBufferDimension = 0
   private val eventLoopQueueCapacity = 10
 
-  // Game over test constants
-  private val gameOverTopRowCount = 4
-  private val tetrominoLockX = 4
-  private val tetrominoBottomOffset = 2
-  private val tetrominoStartBelowFilledRow = 4  // Start at row 4 (below rows 0-1 filled area)
-  private val ticksToTriggerGameOver = 5
-  private val testTimeoutDuration = Duration.fromSeconds(5)
+  // ゲームオーバーテスト定数
+  private val gameOverTopRowCount          = 4
+  private val tetrominoLockX               = 4
+  private val tetrominoBottomOffset        = 2
+  private val tetrominoStartBelowFilledRow = 4 // 行4から開始（行0-1の埋められたエリアの下）
+  private val ticksToTriggerGameOver       = 5
+  private val testTimeoutDuration          = Duration.fromSeconds(5)
 
-  // ANSI escape sequences for assertions
+  // アサーション用のANSIエスケープシーケンス
   private object Ansi:
     val clearScreen = "\u001b[2J"

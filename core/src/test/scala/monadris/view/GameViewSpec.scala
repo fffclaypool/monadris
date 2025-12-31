@@ -1,23 +1,23 @@
 package monadris.view
 
+import monadris.TestConfig
+import monadris.domain.*
+import monadris.domain.config.*
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import monadris.domain.config.*
-import monadris.domain.*
-import monadris.TestConfig
 
 class GameViewSpec extends AnyFlatSpec with Matchers:
 
   val config: AppConfig = TestConfig.testConfig
-  val gridWidth: Int = config.grid.width
-  val gridHeight: Int = config.grid.height
+  val gridWidth: Int    = config.grid.width
+  val gridHeight: Int   = config.grid.height
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
   // ============================================================
-  // shapeToColor tests
+  // shapeToColor テスト
   // ============================================================
 
   "GameView.shapeToColor" should "return Cyan for I-tetromino" in {
@@ -55,7 +55,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   }
 
   // ============================================================
-  // toScreenBuffer tests
+  // toScreenBuffer テスト
   // ============================================================
 
   "GameView.toScreenBuffer" should "create non-empty buffer" in {
@@ -70,50 +70,51 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "include score info" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState, config)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Score:")
   }
 
   it should "include level info" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState, config)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Level:")
   }
 
   it should "include lines info" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState, config)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Lines:")
   }
 
   it should "include next piece info" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState, config)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Next:")
   }
 
   it should "show PAUSED when game is paused" in {
     val pausedState = initialState.copy(status = GameStatus.Paused)
-    val buffer = GameView.toScreenBuffer(pausedState, config)
-    val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
+    val buffer      = GameView.toScreenBuffer(pausedState, config)
+    val allText     = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("PAUSED")
   }
 
   it should "not show PAUSED when game is playing" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState, config)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
-    allText should not include("PAUSED")
+    allText should not include "PAUSED"
   }
 
   it should "include control hints" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState, config)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Quit")
   }
 
   it should "show filled blocks with color" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
+    val grid = Grid
+      .empty(gridWidth, gridHeight)
       .place(Position(5, 15), Cell.Filled(TetrominoShape.I))
     val stateWithBlock = initialState.copy(grid = grid)
 
@@ -128,40 +129,40 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
 
   it should "show empty cells" in {
     val buffer = GameView.toScreenBuffer(initialState, config)
-    // Empty cells should be rendered
+    // 空のセルが描画される
     buffer.pixels.exists(row => row.exists(p => p.char == '·')) shouldBe true
   }
 
   // ============================================================
-  // titleScreen tests
+  // titleScreen テスト
   // ============================================================
 
   "GameView.titleScreen" should "create buffer with title content" in {
-    val buffer = GameView.titleScreen
+    val buffer  = GameView.titleScreen
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Functional Tetris")
   }
 
   it should "include controls section" in {
-    val buffer = GameView.titleScreen
+    val buffer  = GameView.titleScreen
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Controls")
   }
 
   it should "mention movement keys" in {
-    val buffer = GameView.titleScreen
+    val buffer  = GameView.titleScreen
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Move")
   }
 
   it should "mention rotation" in {
-    val buffer = GameView.titleScreen
+    val buffer  = GameView.titleScreen
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Rotate")
   }
 
   it should "mention quit key" in {
-    val buffer = GameView.titleScreen
+    val buffer  = GameView.titleScreen
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Quit")
   }
@@ -173,33 +174,33 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   }
 
   // ============================================================
-  // gameOverScreen tests
+  // gameOverScreen テスト
   // ============================================================
 
   "GameView.gameOverScreen" should "create buffer with GAME OVER message" in {
-    val buffer = GameView.gameOverScreen(initialState)
+    val buffer  = GameView.gameOverScreen(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("GAME OVER")
   }
 
   it should "show final score" in {
     val stateWithScore = initialState.copy(score = 12345)
-    val buffer = GameView.gameOverScreen(stateWithScore)
-    val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
+    val buffer         = GameView.gameOverScreen(stateWithScore)
+    val allText        = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("12345")
   }
 
   it should "show lines cleared" in {
     val stateWithLines = initialState.copy(linesCleared = 42)
-    val buffer = GameView.gameOverScreen(stateWithLines)
-    val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
+    val buffer         = GameView.gameOverScreen(stateWithLines)
+    val allText        = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("42")
   }
 
   it should "show final level" in {
     val stateWithLevel = initialState.copy(level = 7)
-    val buffer = GameView.gameOverScreen(stateWithLevel)
-    val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
+    val buffer         = GameView.gameOverScreen(stateWithLevel)
+    val allText        = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("7")
   }
 
@@ -210,12 +211,12 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   }
 
   // ============================================================
-  // Grid rendering edge cases
+  // グリッド描画のエッジケース
   // ============================================================
 
   "GameView grid rendering" should "handle all tetromino shapes" in {
     TetrominoShape.values.foreach { shape =>
-      val state = GameState.initial(shape, TetrominoShape.I, gridWidth, gridHeight)
+      val state  = GameState.initial(shape, TetrominoShape.I, gridWidth, gridHeight)
       val buffer = GameView.toScreenBuffer(state, config)
       buffer.width should be > 0
     }
@@ -227,21 +228,22 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     }
 
     val stateWithFilledRow = initialState.copy(grid = grid)
-    val buffer = GameView.toScreenBuffer(stateWithFilledRow, config)
+    val buffer             = GameView.toScreenBuffer(stateWithFilledRow, config)
 
     val lockedCount = buffer.pixels.flatMap(_.filter(_.char == '▓')).size
-    lockedCount shouldBe >= (gridWidth)
+    lockedCount shouldBe >=(gridWidth)
   }
 
   it should "use correct colors for filled cells" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
+    val grid = Grid
+      .empty(gridWidth, gridHeight)
       .place(Position(0, 0), Cell.Filled(TetrominoShape.I))
       .place(Position(1, 0), Cell.Filled(TetrominoShape.O))
 
-    val state = initialState.copy(grid = grid)
+    val state  = initialState.copy(grid = grid)
     val buffer = GameView.toScreenBuffer(state, config)
 
-    // Both cells should be rendered as locked blocks
-    // (We can't easily verify exact colors without more complex assertions)
+    // 両方のセルがロックされたブロックとして描画される
+    // （複雑なアサーションなしでは正確な色を検証しにくい）
     buffer.pixels.exists(row => row.exists(p => p.char == '▓')) shouldBe true
   }

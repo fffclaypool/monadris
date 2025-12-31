@@ -12,11 +12,11 @@ object Collision:
    * 衝突の種類
    */
   enum CollisionType:
-    case None           // 衝突なし
-    case Wall           // 壁との衝突
-    case Floor          // 床との衝突
-    case Block          // 固定済みブロックとの衝突
-    case Ceiling        // 天井（ゲームオーバー判定用）
+    case None    // 衝突なし
+    case Wall    // 壁との衝突
+    case Floor   // 床との衝突
+    case Block   // 固定済みブロックとの衝突
+    case Ceiling // 天井（ゲームオーバー判定用）
 
   /**
    * テトリミノが有効な位置にあるかをチェック
@@ -48,19 +48,14 @@ object Collision:
     val blocks = tetromino.currentBlocks
 
     // 壁との衝突
-    if blocks.exists(p => p.x < 0 || p.x >= grid.width) then
-      CollisionType.Wall
+    if blocks.exists(p => p.x < 0 || p.x >= grid.width) then CollisionType.Wall
     // 床との衝突
-    else if blocks.exists(p => p.y >= grid.height) then
-      CollisionType.Floor
+    else if blocks.exists(p => p.y >= grid.height) then CollisionType.Floor
     // 天井より上（通常は問題なし、ゲームオーバー判定で使用）
-    else if blocks.exists(p => p.y < 0) then
-      CollisionType.Ceiling
+    else if blocks.exists(p => p.y < 0) then CollisionType.Ceiling
     // 固定済みブロックとの衝突
-    else if blocks.exists(p => !grid.isEmpty(p)) then
-      CollisionType.Block
-    else
-      CollisionType.None
+    else if blocks.exists(p => !grid.isEmpty(p)) then CollisionType.Block
+    else CollisionType.None
 
   /**
    * テトリミノが着地可能かどうか
@@ -68,7 +63,7 @@ object Collision:
    */
   def hasLanded(tetromino: Tetromino, grid: Grid): Boolean =
     isValidPosition(tetromino, grid) &&
-    !isValidPosition(tetromino.moveDown, grid)
+      !isValidPosition(tetromino.moveDown, grid)
 
   /**
    * ハードドロップ時の最終位置を計算
@@ -91,25 +86,30 @@ object Collision:
     grid: Grid,
     clockwise: Boolean
   ): Option[Tetromino] =
-    val rotated = if clockwise then tetromino.rotateClockwise
-                  else tetromino.rotateCounterClockwise
+    val rotated =
+      if clockwise then tetromino.rotateClockwise
+      else tetromino.rotateCounterClockwise
 
     // ウォールキックのオフセット（簡易版SRS）
     val offsets = tetromino.shape match
       case TetrominoShape.I =>
         List(
           Position(0, 0),
-          Position(-2, 0), Position(2, 0),
-          Position(-2, 1), Position(2, -1)
+          Position(-2, 0),
+          Position(2, 0),
+          Position(-2, 1),
+          Position(2, -1)
         )
       case TetrominoShape.O =>
-        List(Position(0, 0))  // O型は回転しても形が同じ
+        List(Position(0, 0)) // O型は回転しても形が同じ
       case _ =>
         List(
           Position(0, 0),
-          Position(-1, 0), Position(1, 0),
+          Position(-1, 0),
+          Position(1, 0),
           Position(0, -1),
-          Position(-1, -1), Position(1, -1)
+          Position(-1, -1),
+          Position(1, -1)
         )
 
     offsets.view

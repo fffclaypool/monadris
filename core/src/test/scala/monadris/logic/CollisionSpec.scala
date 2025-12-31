@@ -8,35 +8,36 @@ import org.scalatest.matchers.should.Matchers
 class CollisionSpec extends AnyFlatSpec with Matchers:
 
   "Collision.isValidPosition" should "return true for tetromino in valid position" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
     Collision.isValidPosition(tetromino, grid) shouldBe true
   }
 
   it should "return false when tetromino is out of left bound" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.I, Position(-2, 5), Rotation.R0)
 
     Collision.isValidPosition(tetromino, grid) shouldBe false
   }
 
   it should "return false when tetromino is out of right bound" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.I, Position(10, 5), Rotation.R0)
 
     Collision.isValidPosition(tetromino, grid) shouldBe false
   }
 
   it should "return false when tetromino is below floor" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.T, Position(5, 20), Rotation.R0)
 
     Collision.isValidPosition(tetromino, grid) shouldBe false
   }
 
   it should "return false when tetromino overlaps with filled cell" in {
-    val grid = Grid.empty(10, 20)
+    val grid = Grid
+      .empty(10, 20)
       .place(Position(5, 10), Cell.Filled(TetrominoShape.I))
     val tetromino = Tetromino(TetrominoShape.T, Position(5, 10), Rotation.R0)
 
@@ -44,28 +45,29 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   "Collision.detectCollision" should "return None for valid position" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
     Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.None
   }
 
   it should "detect wall collision" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.I, Position(-2, 5), Rotation.R0)
 
     Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Wall
   }
 
   it should "detect floor collision" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.T, Position(5, 20), Rotation.R0)
 
     Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Floor
   }
 
   it should "detect block collision" in {
-    val grid = Grid.empty(10, 20)
+    val grid = Grid
+      .empty(10, 20)
       .place(Position(5, 10), Cell.Filled(TetrominoShape.I))
     val tetromino = Tetromino(TetrominoShape.T, Position(5, 10), Rotation.R0)
 
@@ -81,14 +83,14 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "return false when tetromino can move down" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
     Collision.hasLanded(tetromino, grid) shouldBe false
   }
 
   "Collision.hardDropPosition" should "drop tetromino to lowest valid position" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
     val dropped = Collision.hardDropPosition(tetromino, grid)
@@ -100,7 +102,8 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "stop at filled blocks" in {
-    val grid = Grid.empty(10, 20)
+    val grid = Grid
+      .empty(10, 20)
       .place(Position(5, 15), Cell.Filled(TetrominoShape.I))
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
@@ -111,7 +114,7 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   "Collision.tryRotateWithWallKick" should "rotate when space is available" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.T, Position(5, 10), Rotation.R0)
 
     val result = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
@@ -121,7 +124,7 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "apply wall kick when near left wall" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.T, Position(0, 10), Rotation.R0)
 
     val result = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
@@ -130,7 +133,8 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   "Collision.isGameOver" should "return true when spawn position is blocked" in {
-    val grid = Grid.empty(10, 20)
+    val grid = Grid
+      .empty(10, 20)
       .place(Position(5, 1), Cell.Filled(TetrominoShape.I))
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
@@ -138,7 +142,7 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "return false when spawn position is clear" in {
-    val grid = Grid.empty(10, 20)
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
 
     Collision.isGameOver(tetromino, grid) shouldBe false

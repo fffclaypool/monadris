@@ -20,7 +20,7 @@ final case class GameState(
   linesCleared: Int,
   status: GameStatus
 ):
-  def isPlaying: Boolean = status == GameStatus.Playing
+  def isPlaying: Boolean  = status == GameStatus.Playing
   def isGameOver: Boolean = status == GameStatus.GameOver
 
 object GameState:
