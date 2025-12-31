@@ -9,7 +9,7 @@ val commonSettings = Seq(
   semanticdbVersion := scalafixSemanticdb.revision
 )
 
-// 純粋なコアロジック (激辛設定)
+// 純粋なコアロジック
 lazy val core = project
   .in(file("core"))
   .settings(commonSettings)
@@ -28,6 +28,7 @@ lazy val core = project
 lazy val app = project
   .in(file("app"))
   .dependsOn(core)
+  .enablePlugins(JavaAppPackaging)
   .settings(commonSettings)
   .settings(
     name := "monadris-app",
@@ -49,8 +50,8 @@ lazy val app = project
     connectInput := true,
     // app層ではWartRemoverは無効化
     wartremoverErrors := Seq.empty,
-    // Coverage exclusions for untestable IO code (Main entry point)
-    coverageExcludedFiles := ".*Main\\.scala"
+    Compile / doc / sources := Seq.empty,
+    Compile / packageDoc / publishArtifact := false,
   )
 
 lazy val root = project

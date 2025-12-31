@@ -1,10 +1,59 @@
 #!/bin/bash
-# テトリスを直接実行するスクリプト
-
 cd "$(dirname "$0")"
 
-CLASSPATH="/workspaces/fp-puzzle/target/scala-3.3.1/classes:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.3.1/scala3-library_3-3.3.1.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio_3/2.0.19/zio_3-2.0.19.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-streams_3/2.0.19/zio-streams_3-2.0.19.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-logging_3/2.1.15/zio-logging_3-2.1.15.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-logging-slf4j_3/2.1.15/zio-logging-slf4j_3-2.1.15.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-config_3/4.0.0-RC16/zio-config_3-4.0.0-RC16.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-config-typesafe_3/4.0.0-RC16/zio-config-typesafe_3-4.0.0-RC16.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-config-magnolia_3/4.0.0-RC16/zio-config-magnolia_3-4.0.0-RC16.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/ch/qos/logback/logback-classic/1.4.14/logback-classic-1.4.14.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/org/jline/jline/3.25.0/jline-3.25.0.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.10/scala-library-2.13.10.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-internal-macros_3/2.0.19/zio-internal-macros_3-2.0.19.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-stacktracer_3/2.0.19/zio-stacktracer_3-2.0.19.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/izumi-reflect_3/2.3.8/izumi-reflect_3-2.3.8.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-parser_3/0.1.9/zio-parser_3-0.1.9.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.7/slf4j-api-2.0.7.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/modules/scala-collection-compat_3/2.8.1/scala-collection-compat_3-2.8.1.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/com/typesafe/config/1.4.2/config-1.4.2.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/zio-config-derivation_3/4.0.0-RC16/zio-config-derivation_3-4.0.0-RC16.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/ch/qos/logback/logback-core/1.4.14/logback-core-1.4.14.jar:/home/vscode/.cache/coursier/v1/https/repo1.maven.org/maven2/dev/zio/izumi-reflect-thirdparty-boopickle-shaded_3/2.3.8/izumi-reflect-thirdparty-boopickle-shaded_3-2.3.8.jar"
+# 1. マーカーファイル（前回のビルド成功時刻を記録するファイル）
+BUILD_MARKER=".last_build_success"
 
-# ターミナルをリセットしてから実行
+# 2. 実行するスクリプトのパス
+#    (ファイル名が変わっても対応できるように自動検出)
+TARGET_SCRIPT=$(find ./app/target/universal/stage/bin -type f ! -name "*.bat" 2>/dev/null | head -n 1)
+
+# 3. ビルドが必要か判定する関数
+needs_build() {
+    # マーカーがない、または起動スクリプトがない場合はビルド必須
+    if [ ! -f "$BUILD_MARKER" ] || [ -z "$TARGET_SCRIPT" ] || [ ! -f "$TARGET_SCRIPT" ]; then
+        return 0
+    fi
+
+    # ソースコードの変更チェック
+    # -path "*/target/*" -prune : targetディレクトリの中身は無視する
+    # -newer "$BUILD_MARKER"    : 前回のビルド成功より新しいファイルを探す
+    CHANGED=$(find app/src core/src project build.sbt \
+        -name "target" -prune -o \
+        -name ".*" -prune -o \
+        -type f -newer "$BUILD_MARKER" -print -quit)
+
+    if [ -n "$CHANGED" ]; then
+        # 変更が見つかった場合（デバッグ用にファイル名を表示してもよい）
+        # echo "Change detected: $CHANGED"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# --- メイン処理 ---
+if needs_build; then
+    echo "Building..."
+    sbt --error app/stage
+
+    if [ $? -ne 0 ]; then
+        echo "Build failed."
+        exit 1
+    fi
+
+    # ★ビルド成功時にマーカーファイルの時刻を更新
+    touch "$BUILD_MARKER"
+
+    # スクリプトパスを再取得
+    TARGET_SCRIPT=$(find ./app/target/universal/stage/bin -type f ! -name "*.bat" | head -n 1)
+else
+    echo "No changes. Skipping build."
+    # メッセージが一瞬で見えるように少し待機
+    sleep 0.2
+fi
+
 clear
-exec java -cp "$CLASSPATH" monadris.Main
+
+# 実行
+"$TARGET_SCRIPT"
