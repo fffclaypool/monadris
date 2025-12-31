@@ -1,13 +1,8 @@
 package monadris.infrastructure
 
 import zio.*
-
 import monadris.view.{ScreenBuffer, Pixel, UiColor}
 
-/**
- * ScreenBuffer をコンソールに出力するレンダラー
- * UiColor を ANSI エスケープシーケンスに変換
- */
 object ConsoleRenderer:
 
   // ANSI color codes
@@ -20,12 +15,15 @@ object ConsoleRenderer:
   private val ANSI_BLUE = "\u001b[34m"
   private val ANSI_WHITE = "\u001b[37m"
 
+  // Cursor controls
+  private val HIDE_CURSOR = "\u001b[?25l"
+  private val SHOW_CURSOR = "\u001b[?25h"
+  private val HOME = "\u001b[H"
+  private val CLEAR_SCREEN = "\u001b[2J\u001b[3J"
+
   // raw modeでは \r\n が必要
   private val NL = "\r\n"
 
-  /**
-   * UiColor を ANSI カラーコードに変換
-   */
   private def colorToAnsi(color: UiColor): String = color match
     case UiColor.Cyan    => ANSI_CYAN
     case UiColor.Yellow  => ANSI_YELLOW
@@ -36,9 +34,6 @@ object ConsoleRenderer:
     case UiColor.White   => ANSI_WHITE
     case UiColor.Default => ANSI_RESET
 
-  /**
-   * 行を ANSI 文字列に変換（色の切り替えを最適化）
-   */
   private def rowToString(row: Vector[Pixel]): String =
     val (result, lastColor) = row.foldLeft((new StringBuilder, UiColor.Default)) {
       case ((sb, currentColor), pixel) =>
@@ -47,32 +42,27 @@ object ConsoleRenderer:
         sb.append(pixel.char)
         (sb, pixel.color)
     }
-
-    if lastColor != UiColor.Default then
-      result.append(ANSI_RESET)
-
+    if lastColor != UiColor.Default then result.append(ANSI_RESET)
     result.toString
 
-  /**
-   * ScreenBuffer 全体を文字列に変換
-   */
   def bufferToString(buffer: ScreenBuffer): String =
     buffer.pixels.map(rowToString).mkString(NL)
 
   /**
-   * 画面クリア + バッファ描画
+   * 初回描画や全描画用
+   * カーソルを隠し、ホームポジションに戻してから描画
    */
   def render(buffer: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
     for
-      _ <- ConsoleService.print("\u001b[H\u001b[2J\u001b[3J")
+      // カーソル非表示 -> ホーム -> 画面クリア
+      _ <- ConsoleService.print(s"$HIDE_CURSOR$HOME$CLEAR_SCREEN")
       _ <- ConsoleService.print(bufferToString(buffer))
       _ <- ConsoleService.print(NL)
       _ <- ConsoleService.flush()
     yield ()
 
   /**
-   * 差分描画対応のrender
-   * previousがNoneの場合は全描画、Someの場合は差分のみ描画
+   * 差分描画対応
    */
   def render(current: ScreenBuffer, previous: Option[ScreenBuffer]): ZIO[ConsoleService, Throwable, Unit] =
     previous match
@@ -80,7 +70,8 @@ object ConsoleRenderer:
       case Some(prev) => renderDiff(current, prev)
 
   /**
-   * 2つのバッファの差分を計算し、変更点のみを描画
+   * 差分のみ描画
+   * カーソル移動が多く発生するため、HIDE_CURSORがないとチラつきが酷くなる
    */
   private def renderDiff(current: ScreenBuffer, previous: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
     val diffString = computeDiffString(current, previous)
@@ -88,14 +79,10 @@ object ConsoleRenderer:
       ZIO.unit
     else
       for
-        _ <- ConsoleService.print(diffString)
+        _ <- ConsoleService.print(HIDE_CURSOR + diffString)
         _ <- ConsoleService.flush()
       yield ()
 
-  /**
-   * 2つのバッファの差分を ANSI エスケープシーケンス付き文字列に変換
-   * 変更があった座標のみカーソル移動 + 描画
-   */
   private def computeDiffString(current: ScreenBuffer, previous: ScreenBuffer): String =
     val coordinates = for
       y <- 0 until current.height
@@ -115,7 +102,6 @@ object ConsoleRenderer:
           // カーソル移動（1-based座標）
           accSb.append(s"\u001b[${y + 1};${x + 1}H")
 
-          // 色の変更が必要な場合のみ色コードを出力
           val newColor =
             if currentPixel.color != accColor then
               accSb.append(colorToAnsi(currentPixel.color))
@@ -129,17 +115,14 @@ object ConsoleRenderer:
           (accSb, accColor)
     }
 
-    // 最後に色をリセット
     if lastColor != UiColor.Default then
       sb.append(ANSI_RESET)
 
     sb.toString
 
-  /**
-   * バッファのみ描画（画面クリアなし）
-   */
   def renderWithoutClear(buffer: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
     for
+      _ <- ConsoleService.print(HIDE_CURSOR)
       _ <- ConsoleService.print(bufferToString(buffer))
       _ <- ConsoleService.print(NL)
       _ <- ConsoleService.flush()
