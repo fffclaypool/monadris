@@ -128,8 +128,26 @@ sequenceDiagram
     end
 ```
 
-## Requirements
+## Development Environment
 
+### Option 1: Dev Containers (Recommended)
+
+The easiest way to get started is using [Dev Containers](https://containers.dev/). All dependencies are pre-configured.
+
+**VS Code:**
+1. Install [Docker](https://www.docker.com/) and [VS Code](https://code.visualstudio.com/)
+2. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+3. Open this repository in VS Code
+4. Click "Reopen in Container" when prompted (or run `Dev Containers: Reopen in Container` from the command palette)
+
+The dev container includes:
+- Java 21
+- sbt, Scala CLI, scalafmt (via Coursier)
+- Metals extension for VS Code
+
+### Option 2: Local Setup
+
+**Requirements:**
 - Java 21+
 - sbt 1.9+
 - Bash (for execution script)
@@ -143,7 +161,7 @@ sequenceDiagram
 sbt compile
 
 # Run game
-sh run.sh
+./run.sh
 ```
 
 ## Controls
