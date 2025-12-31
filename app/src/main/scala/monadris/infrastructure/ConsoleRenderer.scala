@@ -1,24 +1,27 @@
 package monadris.infrastructure
 
 import zio.*
-import monadris.view.{ScreenBuffer, Pixel, UiColor}
+
+import monadris.view.Pixel
+import monadris.view.ScreenBuffer
+import monadris.view.UiColor
 
 object ConsoleRenderer:
 
-  // ANSI color codes
-  private val ANSI_RESET = "\u001b[0m"
-  private val ANSI_CYAN = "\u001b[36m"
-  private val ANSI_YELLOW = "\u001b[33m"
+  // ANSIカラーコード
+  private val ANSI_RESET   = "\u001b[0m"
+  private val ANSI_CYAN    = "\u001b[36m"
+  private val ANSI_YELLOW  = "\u001b[33m"
   private val ANSI_MAGENTA = "\u001b[35m"
-  private val ANSI_GREEN = "\u001b[32m"
-  private val ANSI_RED = "\u001b[31m"
-  private val ANSI_BLUE = "\u001b[34m"
-  private val ANSI_WHITE = "\u001b[37m"
+  private val ANSI_GREEN   = "\u001b[32m"
+  private val ANSI_RED     = "\u001b[31m"
+  private val ANSI_BLUE    = "\u001b[34m"
+  private val ANSI_WHITE   = "\u001b[37m"
 
-  // Cursor controls
-  private val HIDE_CURSOR = "\u001b[?25l"
-  private val SHOW_CURSOR = "\u001b[?25h"
-  private val HOME = "\u001b[H"
+  // カーソル制御
+  private val HIDE_CURSOR  = "\u001b[?25l"
+  private val SHOW_CURSOR  = "\u001b[?25h"
+  private val HOME         = "\u001b[H"
   private val CLEAR_SCREEN = "\u001b[2J\u001b[3J"
 
   // raw modeでは \r\n が必要
@@ -35,12 +38,10 @@ object ConsoleRenderer:
     case UiColor.Default => ANSI_RESET
 
   private def rowToString(row: Vector[Pixel]): String =
-    val (result, lastColor) = row.foldLeft((new StringBuilder, UiColor.Default)) {
-      case ((sb, currentColor), pixel) =>
-        if pixel.color != currentColor then
-          sb.append(colorToAnsi(pixel.color))
-        sb.append(pixel.char)
-        (sb, pixel.color)
+    val (result, lastColor) = row.foldLeft((new StringBuilder, UiColor.Default)) { case ((sb, currentColor), pixel) =>
+      if pixel.color != currentColor then sb.append(colorToAnsi(pixel.color))
+      sb.append(pixel.char)
+      (sb, pixel.color)
     }
     if lastColor != UiColor.Default then result.append(ANSI_RESET)
     result.toString
@@ -66,7 +67,7 @@ object ConsoleRenderer:
    */
   def render(current: ScreenBuffer, previous: Option[ScreenBuffer]): ZIO[ConsoleService, Throwable, Unit] =
     previous match
-      case None => render(current)
+      case None       => render(current)
       case Some(prev) => renderDiff(current, prev)
 
   /**
@@ -75,8 +76,7 @@ object ConsoleRenderer:
    */
   private def renderDiff(current: ScreenBuffer, previous: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
     val diffString = computeDiffString(current, previous)
-    if diffString.isEmpty then
-      ZIO.unit
+    if diffString.isEmpty then ZIO.unit
     else
       for
         _ <- ConsoleService.print(HIDE_CURSOR + diffString)
@@ -93,10 +93,8 @@ object ConsoleRenderer:
       case ((accSb, accColor), (x, y)) =>
         val currentPixel = current.pixels(y)(x)
         val prevPixel =
-          if y < previous.height && x < previous.width then
-            previous.pixels(y)(x)
-          else
-            Pixel(' ', UiColor.Default)
+          if y < previous.height && x < previous.width then previous.pixels(y)(x)
+          else Pixel(' ', UiColor.Default)
 
         if currentPixel != prevPixel then
           // カーソル移動（1-based座標）
@@ -106,17 +104,14 @@ object ConsoleRenderer:
             if currentPixel.color != accColor then
               accSb.append(colorToAnsi(currentPixel.color))
               currentPixel.color
-            else
-              accColor
+            else accColor
 
           accSb.append(currentPixel.char)
           (accSb, newColor)
-        else
-          (accSb, accColor)
+        else (accSb, accColor)
     }
 
-    if lastColor != UiColor.Default then
-      sb.append(ANSI_RESET)
+    if lastColor != UiColor.Default then sb.append(ANSI_RESET)
 
     sb.toString
 

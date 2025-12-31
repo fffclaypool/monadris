@@ -2,8 +2,8 @@ package monadris.view
 
 import scala.util.chaining.*
 
-import monadris.domain.config.AppConfig
 import monadris.domain.*
+import monadris.domain.config.AppConfig
 
 /**
  * GameState を ScreenBuffer に変換する純粋関数群
@@ -29,13 +29,13 @@ object GameView:
     val ControlsAreaHeight = 4
 
     // 画面サイズのフォールバック値
-    val DefaultTitleWidth = 40
+    val DefaultTitleWidth    = 40
     val DefaultGameOverWidth = 30
 
   // グリッド描画用の文字定数
   private val FilledBlock = '█'
   private val LockedBlock = '▓'
-  private val EmptyCell = '·'
+  private val EmptyCell   = '·'
 
   /**
    * テトリミノの形状から色を取得
@@ -53,14 +53,15 @@ object GameView:
    * ゲーム状態を画面バッファに変換
    */
   def toScreenBuffer(state: GameState, config: AppConfig): ScreenBuffer =
-    val gridWidth = config.grid.width
+    val gridWidth  = config.grid.width
     val gridHeight = config.grid.height
 
     // グリッド + 枠線 + 情報欄用の幅と高さを計算
-    val totalWidth = gridWidth + Layout.HorizontalBorder + Layout.InfoPanelWidth
+    val totalWidth  = gridWidth + Layout.HorizontalBorder + Layout.InfoPanelWidth
     val totalHeight = gridHeight + Layout.VerticalBorder + Layout.ControlsAreaHeight
 
-    ScreenBuffer.empty(totalWidth, totalHeight)
+    ScreenBuffer
+      .empty(totalWidth, totalHeight)
       .pipe(renderGrid(_, state, gridWidth, gridHeight))
       .pipe(renderInfo(_, state, gridWidth + Layout.InfoPanelLeftPadding))
       .pipe(renderControls(_, gridHeight + Layout.VerticalBorder))
@@ -74,12 +75,12 @@ object GameView:
     gridWidth: Int,
     gridHeight: Int
   ): ScreenBuffer =
-    val grid = state.grid
+    val grid          = state.grid
     val fallingBlocks = state.currentTetromino.currentBlocks.toSet
-    val fallingColor = shapeToColor(state.currentTetromino.shape)
+    val fallingColor  = shapeToColor(state.currentTetromino.shape)
 
     // 上枠
-    val topBorder = "┌" + "─" * gridWidth + "┐"
+    val topBorder     = "┌" + "─" * gridWidth + "┐"
     val withTopBorder = buffer.drawText(0, 0, topBorder)
 
     // グリッド本体（行ごとに一括描画）
@@ -87,11 +88,11 @@ object GameView:
       // その行のグリッド部分のピクセル列を一括生成
       val rowPixels = (0 until gridWidth).map { x =>
         val pos = Position(x, y)
-        if fallingBlocks.contains(pos) then
-          Pixel(FilledBlock, fallingColor)
-        else grid.get(pos) match
-          case Some(Cell.Filled(shape)) => Pixel(LockedBlock, shapeToColor(shape))
-          case _ => Pixel(EmptyCell, UiColor.Default)
+        if fallingBlocks.contains(pos) then Pixel(FilledBlock, fallingColor)
+        else
+          grid.get(pos) match
+            case Some(Cell.Filled(shape)) => Pixel(LockedBlock, shapeToColor(shape))
+            case _                        => Pixel(EmptyCell, UiColor.Default)
       }.toVector
 
       // 左枠、グリッド一括描画、右枠をチェーンして更新
@@ -144,7 +145,7 @@ object GameView:
       "║    Q          : Quit               ║",
       "╚════════════════════════════════════╝"
     )
-    val width = lines.map(_.length).maxOption.getOrElse(Layout.DefaultTitleWidth)
+    val width  = lines.map(_.length).maxOption.getOrElse(Layout.DefaultTitleWidth)
     val height = lines.length + 1
 
     lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
@@ -165,7 +166,7 @@ object GameView:
       s"║  Level: ${"%6d".format(state.level)}        ║",
       "╚═══════════════════════╝"
     )
-    val width = lines.map(_.length).maxOption.getOrElse(Layout.DefaultGameOverWidth)
+    val width  = lines.map(_.length).maxOption.getOrElse(Layout.DefaultGameOverWidth)
     val height = lines.length + 1
 
     lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>

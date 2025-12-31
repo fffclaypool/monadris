@@ -31,8 +31,7 @@ final case class ScreenBuffer(
    * 指定位置のピクセルを更新
    */
   def update(x: Int, y: Int, pixel: Pixel): ScreenBuffer =
-    if x >= 0 && x < width && y >= 0 && y < height then
-      copy(pixels = pixels.updated(y, pixels(y).updated(x, pixel)))
+    if x >= 0 && x < width && y >= 0 && y < height then copy(pixels = pixels.updated(y, pixels(y).updated(x, pixel)))
     else this
 
   /**
@@ -56,13 +55,12 @@ final case class ScreenBuffer(
    */
   def drawPixels(x: Int, y: Int, newPixels: Vector[Pixel]): ScreenBuffer =
     if y >= 0 && y < height && newPixels.nonEmpty then
-      val row = pixels(y)
+      val row        = pixels(y)
       val updatedRow = row.patch(x, newPixels, newPixels.length)
       // 行の長さが変わらないように調整（念のため）
       val safeRow = if updatedRow.length > width then updatedRow.take(width) else updatedRow
       copy(pixels = pixels.updated(y, safeRow))
-    else
-      this
+    else this
 
   /**
    * 指定行全体を取得

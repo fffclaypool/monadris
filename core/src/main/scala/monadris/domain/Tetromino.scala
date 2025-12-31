@@ -53,7 +53,7 @@ final case class Tetromino(
    * 回転を考慮した現在のブロック座標を計算
    */
   def currentBlocks: List[Position] =
-    val baseBlocks = shape.blocks
+    val baseBlocks    = shape.blocks
     val rotatedBlocks = rotateBlocks(baseBlocks, rotation)
     rotatedBlocks.map(_ + position)
 
@@ -67,10 +67,10 @@ final case class Tetromino(
       case Rotation.R180 => blocks.map(p => Position(-p.x, -p.y))
       case Rotation.R270 => blocks.map(p => Position(p.y, -p.x))
 
-  def moveLeft: Tetromino = copy(position = position + Position(-1, 0))
-  def moveRight: Tetromino = copy(position = position + Position(1, 0))
-  def moveDown: Tetromino = copy(position = position + Position(0, 1))
-  def rotateClockwise: Tetromino = copy(rotation = rotation.rotateClockwise)
+  def moveLeft: Tetromino               = copy(position = position + Position(-1, 0))
+  def moveRight: Tetromino              = copy(position = position + Position(1, 0))
+  def moveDown: Tetromino               = copy(position = position + Position(0, 1))
+  def rotateClockwise: Tetromino        = copy(rotation = rotation.rotateClockwise)
   def rotateCounterClockwise: Tetromino = copy(rotation = rotation.rotateCounterClockwise)
 
 object Tetromino:

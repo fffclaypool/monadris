@@ -1,7 +1,7 @@
 package monadris.logic
 
-import monadris.domain.config.AppConfig
 import monadris.domain.*
+import monadris.domain.config.AppConfig
 
 /**
  * ゲームの状態遷移を管理する純粋関数群
@@ -40,15 +40,15 @@ object GameLogic:
         case _ => state
     else
       input match
-        case Input.MoveLeft             => handleMove(state, _.moveLeft)
-        case Input.MoveRight            => handleMove(state, _.moveRight)
-        case Input.MoveDown             => handleMoveDown(state, nextShapeProvider, config)
-        case Input.RotateClockwise      => handleRotation(state, clockwise = true)
+        case Input.MoveLeft               => handleMove(state, _.moveLeft)
+        case Input.MoveRight              => handleMove(state, _.moveRight)
+        case Input.MoveDown               => handleMoveDown(state, nextShapeProvider, config)
+        case Input.RotateClockwise        => handleRotation(state, clockwise = true)
         case Input.RotateCounterClockwise => handleRotation(state, clockwise = false)
-        case Input.HardDrop             => handleHardDrop(state, nextShapeProvider, config)
-        case Input.Pause                => state.copy(status = GameStatus.Paused)
-        case Input.Quit                 => state
-        case Input.Tick                 => handleTick(state, nextShapeProvider, config)
+        case Input.HardDrop               => handleHardDrop(state, nextShapeProvider, config)
+        case Input.Pause                  => state.copy(status = GameStatus.Paused)
+        case Input.Quit                   => state
+        case Input.Tick                   => handleTick(state, nextShapeProvider, config)
 
   /**
    * 左右移動の処理
@@ -58,10 +58,8 @@ object GameLogic:
     moveFn: Tetromino => Tetromino
   ): GameState =
     val movedTetromino = moveFn(state.currentTetromino)
-    if Collision.isValidPosition(movedTetromino, state.grid) then
-      state.copy(currentTetromino = movedTetromino)
-    else
-      state
+    if Collision.isValidPosition(movedTetromino, state.grid) then state.copy(currentTetromino = movedTetromino)
+    else state
 
   /**
    * 下移動の処理
@@ -72,8 +70,7 @@ object GameLogic:
     config: AppConfig
   ): GameState =
     val movedTetromino = state.currentTetromino.moveDown
-    if Collision.isValidPosition(movedTetromino, state.grid) then
-      state.copy(currentTetromino = movedTetromino)
+    if Collision.isValidPosition(movedTetromino, state.grid) then state.copy(currentTetromino = movedTetromino)
     else
       // 着地 -> 固定処理
       lockTetromino(state, nextShapeProvider, config)
@@ -97,7 +94,7 @@ object GameLogic:
     val droppedTetromino = Collision.hardDropPosition(state.currentTetromino, state.grid)
     // ドロップした距離に応じてボーナススコア
     val dropDistance = droppedTetromino.position.y - state.currentTetromino.position.y
-    val bonusScore = dropDistance * 2
+    val bonusScore   = dropDistance * 2
 
     val newState = state.copy(
       currentTetromino = droppedTetromino,
@@ -131,7 +128,7 @@ object GameLogic:
 
     // 総ライン数とレベルの更新
     val newLinesCleared = state.linesCleared + clearResult.linesCleared
-    val newLevel = LineClearing.calculateLevel(newLinesCleared, config.level)
+    val newLevel        = LineClearing.calculateLevel(newLinesCleared, config.level)
 
     // 次のテトリミノを生成
     val nextTetromino = Tetromino.spawn(state.nextTetromino, state.grid.width)

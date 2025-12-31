@@ -4,8 +4,8 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
+import monadris.infrastructure.TestServices as LocalTestServices
 import monadris.logic.GameLogic
-import monadris.infrastructure.{TestServices as LocalTestServices}
 
 /**
  * メモリ負荷とリークをチェックするストレステスト
@@ -19,16 +19,16 @@ object StressTest extends ZIOSpecDefault:
   // ============================================================
 
   private object Constants:
-    val totalIterations = 100000
+    val totalIterations     = 100000
     val memoryCheckInterval = 10000
-    val bytesPerMegabyte = 1024 * 1024
+    val bytesPerMegabyte    = 1024 * 1024
 
   // ============================================================
   // Memory utilities
   // ============================================================
 
   private def getUsedMemoryMB: Long =
-    val runtime = java.lang.Runtime.getRuntime
+    val runtime   = java.lang.Runtime.getRuntime
     val usedBytes = runtime.totalMemory() - runtime.freeMemory()
     usedBytes / Constants.bytesPerMegabyte
 
@@ -55,7 +55,7 @@ object StressTest extends ZIOSpecDefault:
   // ============================================================
 
   private val testConfig = LocalTestServices.testConfig
-  private val gridWidth = testConfig.grid.width
+  private val gridWidth  = testConfig.grid.width
   private val gridHeight = testConfig.grid.height
 
   private def initialState: GameState =
@@ -76,11 +76,11 @@ object StressTest extends ZIOSpecDefault:
   def spec = suite("StressTest")(
     test("GameLogic handles 100,000 iterations without memory leak") {
       for
-        _ <- printMemoryStatus("START")
+        _          <- printMemoryStatus("START")
         finalState <- runGameLoop(initialState, Constants.totalIterations)
-        _ <- printMemoryStatus("BEFORE GC")
-        _ <- runGarbageCollection
-        _ <- printMemoryStatus("AFTER GC (Final)")
+        _          <- printMemoryStatus("BEFORE GC")
+        _          <- runGarbageCollection
+        _          <- printMemoryStatus("AFTER GC (Final)")
       yield assertTrue(
         finalState != null,
         finalState.score >= 0,
@@ -100,7 +100,7 @@ object StressTest extends ZIOSpecDefault:
     ZIO.succeed {
       val inputs = createInputSequence
 
-      var state = initialState
+      var state        = initialState
       var shapeCounter = 0
 
       for i <- 0 until iterations do

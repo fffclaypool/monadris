@@ -3,8 +3,9 @@ package monadris.infrastructure
 import zio.*
 import zio.test.*
 
-import monadris.view.{ScreenBuffer, UiColor}
-import monadris.infrastructure.{TestServices as Mocks}
+import monadris.infrastructure.TestServices as Mocks
+import monadris.view.ScreenBuffer
+import monadris.view.UiColor
 
 object ConsoleRendererSpec extends ZIOSpecDefault:
 
@@ -13,34 +14,34 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
   // ============================================================
 
   private object BufferSize:
-    val empty = 0
+    val empty  = 0
     val single = 1
-    val small = 3
+    val small  = 3
     val medium = 5
 
   private object Position:
     val origin = 0
-    val first = 0
+    val first  = 0
     val second = 1
-    val third = 2
+    val third  = 2
     val fourth = 3
-    val fifth = 4
+    val fifth  = 4
 
   // Expected counts
   private val singleColorCode = 1
 
   // ANSI escape sequences for assertions
   private object Ansi:
-    val home = "\u001b[H"
+    val home        = "\u001b[H"
     val clearScreen = "\u001b[2J"
-    val reset = "\u001b[0m"
-    val red = "\u001b[31m"
-    val green = "\u001b[32m"
-    val blue = "\u001b[34m"
-    val cyan = "\u001b[36m"
-    val yellow = "\u001b[33m"
-    val magenta = "\u001b[35m"
-    val white = "\u001b[37m"
+    val reset       = "\u001b[0m"
+    val red         = "\u001b[31m"
+    val green       = "\u001b[32m"
+    val blue        = "\u001b[34m"
+    val cyan        = "\u001b[36m"
+    val yellow      = "\u001b[33m"
+    val magenta     = "\u001b[35m"
+    val white       = "\u001b[37m"
     // Cursor move: row;col (1-based)
     val cursorRow1Col2 = "\u001b[1;2H"
     val cursorRow1Col3 = "\u001b[1;3H"
@@ -56,16 +57,16 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.isEmpty)
       },
-
       test("converts single character buffer") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X')
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains("X"))
       },
-
       test("includes ANSI color codes for colored pixels") {
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'R', UiColor.Red)
           .drawChar(Position.second, Position.origin, 'G', UiColor.Green)
           .drawChar(Position.third, Position.origin, 'B', UiColor.Blue)
@@ -80,9 +81,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           result.contains("B")
         )
       },
-
       test("includes reset code after colored text") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Cyan)
         val result = ConsoleRenderer.bufferToString(buffer)
 
@@ -91,10 +92,10 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           result.contains(Ansi.reset)
         )
       },
-
       test("handles multiple rows with newlines") {
         val twoRows = 2
-        val buffer = ScreenBuffer.empty(BufferSize.small, twoRows)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, twoRows)
           .drawText(Position.origin, Position.first, "ABC")
           .drawText(Position.origin, Position.second, "DEF")
         val result = ConsoleRenderer.bufferToString(buffer)
@@ -105,10 +106,10 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           result.contains("\r\n")
         )
       },
-
       test("optimizes color switching") {
         // Same color for adjacent characters
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'A', UiColor.Red)
           .drawChar(Position.second, Position.origin, 'B', UiColor.Red)
           .drawChar(Position.third, Position.origin, 'C', UiColor.Red)
@@ -119,7 +120,6 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
         val colorCodeCount = result.sliding(ansiCodeLength).count(_ == Ansi.red)
         assertTrue(colorCodeCount == singleColorCode)
       },
-
       test("handles all UiColor variants") {
         val colors = List(
           UiColor.Cyan,
@@ -138,9 +138,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
         assertTrue(result.count(_ == 'X') == colors.size)
       },
-
       test("handles default color without color code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Default)
         val result = ConsoleRenderer.bufferToString(buffer)
 
@@ -155,7 +155,8 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
     suite("render")(
       test("outputs to console with clear sequence") {
-        val buffer = ScreenBuffer.empty(BufferSize.medium, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.small)
           .drawText(Position.origin, Position.origin, "Test")
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -168,11 +169,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("Test")
         )
       }.provide(Mocks.console),
-
       test("flushes after rendering") {
         val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
-        for
-          _      <- ConsoleRenderer.render(buffer)
+        for _ <- ConsoleRenderer.render(buffer)
         yield assertTrue(true) // Flush called without error
       }.provide(Mocks.console)
     ),
@@ -183,7 +182,8 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
     suite("render with previous buffer")(
       test("full render when previous is None") {
-        val buffer = ScreenBuffer.empty(BufferSize.medium, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.small)
           .drawText(Position.origin, Position.origin, "Test")
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -196,11 +196,12 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("Test")
         )
       }.provide(Mocks.console),
-
       test("diff render outputs only changed pixels") {
-        val prev = ScreenBuffer.empty(BufferSize.medium, BufferSize.small)
+        val prev = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.small)
           .drawText(Position.origin, Position.origin, "AAAA")
-        val curr = ScreenBuffer.empty(BufferSize.medium, BufferSize.small)
+        val curr = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.small)
           .drawText(Position.origin, Position.origin, "ABBA")
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -214,9 +215,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("B")
         )
       }.provide(Mocks.console),
-
       test("diff render outputs nothing when buffers are identical") {
-        val buffer = ScreenBuffer.empty(BufferSize.medium, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.small)
           .drawText(Position.origin, Position.origin, "Same")
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -224,11 +225,12 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           output  <- service.buffer.get
         yield assertTrue(output.isEmpty)
       }.provide(Mocks.console),
-
       test("diff render handles color changes") {
-        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val prev = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Red)
-        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Blue)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -240,10 +242,10 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("X")
         )
       }.provide(Mocks.console),
-
       test("diff render handles different buffer sizes") {
         val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
-        val curr = ScreenBuffer.empty(BufferSize.medium, BufferSize.medium)
+        val curr = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.medium)
           .drawChar(Position.fifth, Position.fifth, 'X')
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -252,11 +254,11 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined = output.mkString
         yield assertTrue(combined.contains("X"))
       }.provide(Mocks.console),
-
       test("diff render optimizes same color for consecutive changed pixels") {
         // Previous: spaces, Current: two consecutive red Xs
         val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
-        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'X', UiColor.Red)
           .drawChar(Position.second, Position.origin, 'Y', UiColor.Red)
         for
@@ -270,14 +272,14 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains(Ansi.red)
         )
       }.provide(Mocks.console),
-
       test("diff render handles pixels outside previous buffer bounds") {
         // Previous buffer is 2x2, current is 4x4 with content at (3,3)
-        val prevSize = 2
-        val currSize = 4
+        val prevSize       = 2
+        val currSize       = 4
         val outOfBoundsPos = 3
-        val prev = ScreenBuffer.empty(prevSize, prevSize)
-        val curr = ScreenBuffer.empty(currSize, currSize)
+        val prev           = ScreenBuffer.empty(prevSize, prevSize)
+        val curr = ScreenBuffer
+          .empty(currSize, currSize)
           .drawChar(outOfBoundsPos, outOfBoundsPos, 'Z', UiColor.Green)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -297,7 +299,8 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
     suite("renderWithoutClear")(
       test("outputs to console without clear sequence") {
-        val buffer = ScreenBuffer.empty(BufferSize.medium, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.single)
           .drawText(Position.origin, Position.origin, "Hello")
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -309,9 +312,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           !combined.contains(Ansi.clearScreen)
         )
       }.provide(Mocks.console),
-
       test("includes newline at end") {
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawText(Position.origin, Position.origin, "Hi")
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -328,49 +331,50 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
     suite("Color ANSI codes")(
       test("Cyan produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Cyan)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.cyan))
       },
-
       test("Yellow produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Yellow)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.yellow))
       },
-
       test("Magenta produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Magenta)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.magenta))
       },
-
       test("Green produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Green)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.green))
       },
-
       test("Red produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Red)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.red))
       },
-
       test("Blue produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.Blue)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.blue))
       },
-
       test("White produces correct ANSI code") {
-        val buffer = ScreenBuffer.empty(BufferSize.single, BufferSize.single)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.single, BufferSize.single)
           .drawChar(Position.origin, Position.origin, 'X', UiColor.White)
         val result = ConsoleRenderer.bufferToString(buffer)
         assertTrue(result.contains(Ansi.white))
@@ -383,9 +387,11 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
     suite("computeDiffString edge cases")(
       test("diff render handles char change at same position") {
-        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val prev = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'A', UiColor.Default)
-        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'B', UiColor.Default)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -397,11 +403,12 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           !combined.contains(Ansi.clearScreen)
         )
       }.provide(Mocks.console),
-
       test("diff render handles color change without char change") {
-        val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val prev = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'X', UiColor.Red)
-        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'X', UiColor.Green)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -413,11 +420,11 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("X")
         )
       }.provide(Mocks.console),
-
       test("diff render handles multiple scattered changes") {
         val prevSize = 5
-        val prev = ScreenBuffer.empty(prevSize, prevSize)
-        val curr = ScreenBuffer.empty(prevSize, prevSize)
+        val prev     = ScreenBuffer.empty(prevSize, prevSize)
+        val curr = ScreenBuffer
+          .empty(prevSize, prevSize)
           .drawChar(0, 0, 'A', UiColor.Red)
           .drawChar(2, 2, 'B', UiColor.Blue)
           .drawChar(4, 4, 'C', UiColor.Green)
@@ -432,10 +439,10 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("C")
         )
       }.provide(Mocks.console),
-
       test("diff render resets color at end if last pixel was colored") {
         val prev = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
-        val curr = ScreenBuffer.empty(BufferSize.small, BufferSize.single)
+        val curr = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.single)
           .drawChar(Position.third, Position.origin, 'X', UiColor.Cyan)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -447,10 +454,10 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains(Ansi.reset)
         )
       }.provide(Mocks.console),
-
       test("diff render preserves same color across consecutive changes") {
         val prev = ScreenBuffer.empty(BufferSize.medium, BufferSize.single)
-        val curr = ScreenBuffer.empty(BufferSize.medium, BufferSize.single)
+        val curr = ScreenBuffer
+          .empty(BufferSize.medium, BufferSize.single)
           .drawChar(Position.first, Position.origin, 'A', UiColor.Red)
           .drawChar(Position.second, Position.origin, 'B', UiColor.Red)
           .drawChar(Position.third, Position.origin, 'C', UiColor.Red)
@@ -468,15 +475,16 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           redCount >= 1 // At least one red code should be present
         )
       }.provide(Mocks.console),
-
       test("diff render handles expanding buffer size") {
         val smallSize = 2
         val largeSize = 5
-        val prev = ScreenBuffer.empty(smallSize, smallSize)
+        val prev = ScreenBuffer
+          .empty(smallSize, smallSize)
           .drawChar(0, 0, 'X')
-        val curr = ScreenBuffer.empty(largeSize, largeSize)
-          .drawChar(0, 0, 'X')  // Same as before
-          .drawChar(3, 3, 'Y')  // New position beyond prev bounds
+        val curr = ScreenBuffer
+          .empty(largeSize, largeSize)
+          .drawChar(0, 0, 'X') // Same as before
+          .drawChar(3, 3, 'Y') // New position beyond prev bounds
         for
           service <- ZIO.service[Mocks.TestConsoleService]
           _       <- ConsoleRenderer.render(curr, Some(prev))
@@ -484,13 +492,14 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined = output.mkString
         yield assertTrue(combined.contains("Y"))
       }.provide(Mocks.console),
-
       test("diff render handles shrinking buffer size") {
         val largeSize = 5
         val smallSize = 2
-        val prev = ScreenBuffer.empty(largeSize, largeSize)
+        val prev = ScreenBuffer
+          .empty(largeSize, largeSize)
           .drawChar(4, 4, 'X')
-        val curr = ScreenBuffer.empty(smallSize, smallSize)
+        val curr = ScreenBuffer
+          .empty(smallSize, smallSize)
           .drawChar(0, 0, 'Y')
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -507,7 +516,8 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
 
     suite("Direct render methods")(
       test("render with clear outputs clear sequence and buffer") {
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.small)
           .drawChar(0, 0, 'X', UiColor.Red)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -519,9 +529,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("X")
         )
       }.provide(Mocks.console),
-
       test("renderWithoutClear outputs buffer without clear sequence") {
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.small)
           .drawChar(0, 0, 'Y', UiColor.Blue)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -533,9 +543,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("Y")
         )
       }.provide(Mocks.console),
-
       test("render dispatches to full render when previous is None") {
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.small)
           .drawChar(0, 0, 'Z')
         for
           service <- ZIO.service[Mocks.TestConsoleService]
@@ -547,9 +557,9 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
           combined.contains("Z")
         )
       }.provide(Mocks.console),
-
       test("computeDiffString returns empty for identical buffers") {
-        val buffer = ScreenBuffer.empty(BufferSize.small, BufferSize.small)
+        val buffer = ScreenBuffer
+          .empty(BufferSize.small, BufferSize.small)
           .drawChar(0, 0, 'A')
         for
           service <- ZIO.service[Mocks.TestConsoleService]

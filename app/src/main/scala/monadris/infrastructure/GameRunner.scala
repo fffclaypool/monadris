@@ -2,10 +2,11 @@ package monadris.infrastructure
 
 import zio.*
 
-import monadris.domain.config.AppConfig
 import monadris.domain.*
+import monadris.domain.config.AppConfig
 import monadris.logic.*
-import monadris.view.{GameView, ScreenBuffer}
+import monadris.view.GameView
+import monadris.view.ScreenBuffer
 
 /**
  * 副作用をZIOで管理するゲーム実行層
@@ -174,18 +175,14 @@ object GameRunner:
 
       case GameCommand.UserAction(input) =>
         processCommand(input, state, config).flatMap { newState =>
-          if newState.gameState.isGameOver then
-            ZIO.succeed(newState)
-          else
-            eventLoop(queue, newState, config)
+          if newState.gameState.isGameOver then ZIO.succeed(newState)
+          else eventLoop(queue, newState, config)
         }
 
       case GameCommand.TimeTick =>
         processCommand(Input.Tick, state, config).flatMap { newState =>
-          if newState.gameState.isGameOver then
-            ZIO.succeed(newState)
-          else
-            eventLoop(queue, newState, config)
+          if newState.gameState.isGameOver then ZIO.succeed(newState)
+          else eventLoop(queue, newState, config)
         }
     }
 
@@ -202,7 +199,9 @@ object GameRunner:
       oldGameState = state.gameState
       newGameState = GameLogic.update(oldGameState, input, () => nextShape, config)
       _ <- ZIO.when(newGameState.isGameOver && !oldGameState.isGameOver) {
-        ZIO.logInfo(s"Game Over - Score: ${newGameState.score}, Lines: ${newGameState.linesCleared}, Level: ${newGameState.level}")
+        ZIO.logInfo(
+          s"Game Over - Score: ${newGameState.score}, Lines: ${newGameState.linesCleared}, Level: ${newGameState.level}"
+        )
       }
       newBuffer <- renderGame(newGameState, config, state.previousBuffer)
     yield LoopState(newGameState, Some(newBuffer))

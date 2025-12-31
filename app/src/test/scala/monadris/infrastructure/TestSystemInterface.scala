@@ -20,8 +20,8 @@ object TestServices:
         queue <- Queue.unbounded[Int]
         _     <- queue.offerAll(inputs)
       yield new TtyService:
-        def available(): Task[Int] = queue.size
-        def read(): Task[Int] = queue.take
+        def available(): Task[Int]      = queue.size
+        def read(): Task[Int]           = queue.take
         def sleep(ms: Long): Task[Unit] = ZIO.unit
     }
 
@@ -31,11 +31,10 @@ object TestServices:
 
   case class TestConsoleService(buffer: Ref[List[String]]) extends ConsoleService:
     def print(text: String): Task[Unit] = buffer.update(_ :+ text)
-    def flush(): Task[Unit] = ZIO.unit
+    def flush(): Task[Unit]             = ZIO.unit
 
   val console: ULayer[TestConsoleService] = ZLayer.fromZIO {
-    for
-      buffer <- Ref.make(List.empty[String])
+    for buffer <- Ref.make(List.empty[String])
     yield TestConsoleService(buffer)
   }
 
@@ -47,8 +46,7 @@ object TestServices:
     def exec(cmd: String): Task[Unit] = history.update(_ :+ cmd)
 
   val command: ULayer[TestCommandService] = ZLayer.fromZIO {
-    for
-      history <- Ref.make(List.empty[String])
+    for history <- Ref.make(List.empty[String])
     yield TestCommandService(history)
   }
 

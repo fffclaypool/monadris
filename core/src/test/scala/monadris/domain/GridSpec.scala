@@ -8,12 +8,12 @@ import org.scalatest.matchers.should.Matchers
 class GridSpec extends AnyFlatSpec with Matchers:
 
   // Use configuration values instead of magic numbers
-  val gridWidth: Int = TestConfig.testConfig.grid.width
+  val gridWidth: Int  = TestConfig.testConfig.grid.width
   val gridHeight: Int = TestConfig.testConfig.grid.height
 
   // Test positions
-  val origin: Position = Position(0, 0)
-  val centerPosition: Position = Position(gridWidth / 2, gridHeight / 2)
+  val origin: Position            = Position(0, 0)
+  val centerPosition: Position    = Position(gridWidth / 2, gridHeight / 2)
   val lastValidPosition: Position = Position(gridWidth - 1, gridHeight - 1)
 
   // Out-of-bounds constants
@@ -30,8 +30,7 @@ class GridSpec extends AnyFlatSpec with Matchers:
     for
       x <- 0 until gridWidth
       y <- 0 until gridHeight
-    do
-      grid.get(Position(x, y)) shouldBe Some(Cell.Empty)
+    do grid.get(Position(x, y)) shouldBe Some(Cell.Empty)
   }
 
   it should "return None for out-of-bounds positions" in {
@@ -56,8 +55,8 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "place cells correctly" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
-    val filled = Cell.Filled(TetrominoShape.T)
+    val grid    = Grid.empty(gridWidth, gridHeight)
+    val filled  = Cell.Filled(TetrominoShape.T)
     val newGrid = grid.place(centerPosition, filled)
 
     newGrid.get(centerPosition) shouldBe Some(filled)
@@ -67,9 +66,9 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "place tetromino correctly" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
+    val grid      = Grid.empty(gridWidth, gridHeight)
     val tetromino = Tetromino.spawn(TetrominoShape.T, gridWidth)
-    val newGrid = grid.placeTetromino(tetromino)
+    val newGrid   = grid.placeTetromino(tetromino)
 
     tetromino.currentBlocks.foreach { pos =>
       newGrid.isEmpty(pos) shouldBe false
@@ -77,8 +76,8 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "detect completed rows" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
-    val filled = Cell.Filled(TetrominoShape.I)
+    val grid      = Grid.empty(gridWidth, gridHeight)
+    val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
 
     // 最下行を埋める
@@ -90,9 +89,9 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "detect multiple completed rows" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
-    val filled = Cell.Filled(TetrominoShape.I)
-    val bottomRow = gridHeight - 1
+    val grid            = Grid.empty(gridWidth, gridHeight)
+    val filled          = Cell.Filled(TetrominoShape.I)
+    val bottomRow       = gridHeight - 1
     val secondBottomRow = gridHeight - 2
 
     // 2行埋める
@@ -104,8 +103,8 @@ class GridSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear rows and add empty rows at top" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
-    val filled = Cell.Filled(TetrominoShape.I)
+    val grid      = Grid.empty(gridWidth, gridHeight)
+    val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
 
     // 最下行を埋める

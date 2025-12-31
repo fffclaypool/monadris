@@ -1,7 +1,9 @@
 package monadris.logic
 
-import monadris.domain.config.{ScoreConfig, LevelConfig, SpeedConfig}
 import monadris.domain.*
+import monadris.domain.config.LevelConfig
+import monadris.domain.config.ScoreConfig
+import monadris.domain.config.SpeedConfig
 
 /**
  * ライン消去とスコア計算を行う純粋関数群
@@ -22,12 +24,11 @@ object LineClearing:
    */
   def clearLines(grid: Grid, level: Int, config: ScoreConfig): ClearResult =
     val completedRows = grid.completedRows
-    val linesCleared = completedRows.size
+    val linesCleared  = completedRows.size
 
-    if linesCleared == 0 then
-      ClearResult(grid, 0, 0)
+    if linesCleared == 0 then ClearResult(grid, 0, 0)
     else
-      val newGrid = grid.clearRows(completedRows)
+      val newGrid     = grid.clearRows(completedRows)
       val scoreGained = calculateScore(linesCleared, level, config)
       ClearResult(newGrid, linesCleared, scoreGained)
 

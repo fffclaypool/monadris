@@ -1,10 +1,11 @@
 package monadris.infrastructure
 
-import zio.*
 import java.io.FileInputStream
 
-import monadris.domain.config.AppConfig
+import zio.*
+
 import monadris.config.ConfigLayer
+import monadris.domain.config.AppConfig
 
 /**
  * システムIOを抽象化するサービス定義
@@ -33,13 +34,12 @@ object TtyService:
 
   // Live実装 - 実際の/dev/ttyを使用
   val live: ZLayer[Any, Nothing, TtyService] = ZLayer.scoped {
-    for
-      tty <- ZIO.acquireRelease(
+    for tty <- ZIO.acquireRelease(
         ZIO.attempt(new FileInputStream("/dev/tty")).orDie
       )(fis => ZIO.succeed(fis.close()))
     yield new TtyService:
-      def available(): Task[Int] = ZIO.attemptBlocking(tty.available())
-      def read(): Task[Int] = ZIO.attemptBlocking(tty.read())
+      def available(): Task[Int]      = ZIO.attemptBlocking(tty.available())
+      def read(): Task[Int]           = ZIO.attemptBlocking(tty.read())
       def sleep(ms: Long): Task[Unit] = ZIO.sleep(ms.millis)
   }
 
@@ -62,7 +62,7 @@ object ConsoleService:
   val live: ZLayer[Any, Nothing, ConsoleService] = ZLayer.succeed {
     new ConsoleService:
       def print(text: String): Task[Unit] = ZIO.attempt(scala.Console.print(text))
-      def flush(): Task[Unit] = ZIO.attempt(java.lang.System.out.flush())
+      def flush(): Task[Unit]             = ZIO.attempt(java.lang.System.out.flush())
   }
 
 // ============================================================

@@ -14,8 +14,7 @@ object MainSpec extends ZIOSpecDefault:
   def spec = suite("Main Application")(
     test("program runs and exits with Q key") {
       val inputs = Chunk('q'.toInt)
-      for
-        _ <- Main.program
+      for _ <- Main.program
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
@@ -24,10 +23,8 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program runs and exits with lowercase q") {
-      for
-        _ <- Main.program
+      for _ <- Main.program
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
@@ -36,10 +33,8 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program runs and exits with uppercase Q") {
-      for
-        _ <- Main.program
+      for _ <- Main.program
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
@@ -48,7 +43,6 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program shows title screen") {
       for
         service <- ZIO.service[Mocks.TestConsoleService]
@@ -66,7 +60,6 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program shows game over screen") {
       for
         service <- ZIO.service[Mocks.TestConsoleService]
@@ -81,7 +74,6 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program enables and disables raw mode") {
       for
         service <- ZIO.service[Mocks.TestCommandService]
@@ -98,11 +90,9 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program handles movement before quit") {
       val inputs = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)
-      for
-        _ <- Main.program
+      for _ <- Main.program
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
@@ -111,12 +101,10 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program handles arrow keys before quit") {
       // ESC [ D (Left arrow) then q
       val inputs = Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)
-      for
-        _ <- Main.program
+      for _ <- Main.program
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
@@ -125,7 +113,6 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config
     ),
-
     test("program outputs game ended message") {
       for
         service <- ZIO.service[Mocks.TestConsoleService]

@@ -39,8 +39,7 @@ final case class Grid private (
    * 指定座標にブロックを配置した新しいグリッドを返す
    */
   def place(pos: Position, cell: Cell): Grid =
-    if isInBounds(pos) then
-      copy(cells = cells.updated(pos.y, cells(pos.y).updated(pos.x, cell)))
+    if isInBounds(pos) then copy(cells = cells.updated(pos.y, cells(pos.y).updated(pos.x, cell)))
     else this
 
   /**
@@ -67,7 +66,7 @@ final case class Grid private (
       acc.patch(idx, Nil, 1)
     }
     val emptyRow = Vector.fill(width)(Cell.Empty)
-    val newRows = Vector.fill(rowIndices.size)(emptyRow)
+    val newRows  = Vector.fill(rowIndices.size)(emptyRow)
     copy(cells = newRows ++ clearedCells)
 
 object Grid:

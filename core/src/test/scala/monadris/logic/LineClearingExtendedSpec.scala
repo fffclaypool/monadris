@@ -1,29 +1,29 @@
 package monadris.logic
 
-import monadris.domain.*
 import monadris.TestConfig
+import monadris.domain.*
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /**
- * Extended tests for LineClearing to improve branch coverage
+ * ブランチカバレッジを向上させるためのLineClearing拡張テスト
  */
 class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
 
-  val config = TestConfig.testConfig
+  val config      = TestConfig.testConfig
   val scoreConfig = config.score
   val levelConfig = config.level
   val speedConfig = config.speed
-  val gridWidth = config.grid.width
-  val gridHeight = config.grid.height
+  val gridWidth   = config.grid.width
+  val gridHeight  = config.grid.height
 
   // ============================================================
-  // clearLines edge cases
+  // clearLinesのエッジケース
   // ============================================================
 
   "LineClearing.clearLines" should "return zero score when no lines cleared" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
+    val grid   = Grid.empty(gridWidth, gridHeight)
     val result = LineClearing.clearLines(grid, level = 1, scoreConfig)
 
     result.linesCleared shouldBe 0
@@ -34,7 +34,7 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear single line and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Fill bottom row completely
+    // 最下行を完全に埋める
     val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
       g.place(Position(x, gridHeight - 1), filled)
     }
@@ -48,11 +48,11 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear double line and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Fill bottom 2 rows completely
-    val grid = (for {
+    // 下から2行を完全に埋める
+    val grid = (for
       y <- (gridHeight - 2) until gridHeight
       x <- 0 until gridWidth
-    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+    yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
       g.place(pos, filled)
     }
 
@@ -65,11 +65,11 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear triple line and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Fill bottom 3 rows completely
-    val grid = (for {
+    // 下から3行を完全に埋める
+    val grid = (for
       y <- (gridHeight - 3) until gridHeight
       x <- 0 until gridWidth
-    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+    yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
       g.place(pos, filled)
     }
 
@@ -82,11 +82,11 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear tetris (4 lines) and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Fill bottom 4 rows completely
-    val grid = (for {
+    // 下から4行を完全に埋める
+    val grid = (for
       y <- (gridHeight - 4) until gridHeight
       x <- 0 until gridWidth
-    } yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
+    yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>
       g.place(pos, filled)
     }
 
@@ -97,7 +97,7 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   // ============================================================
-  // calculateScore edge cases
+  // calculateScoreのエッジケース
   // ============================================================
 
   "LineClearing.calculateScore" should "return 0 for 0 lines" in {
@@ -114,7 +114,7 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "scale correctly with level" in {
-    val level1Score = LineClearing.calculateScore(1, 1, scoreConfig)
+    val level1Score  = LineClearing.calculateScore(1, 1, scoreConfig)
     val level10Score = LineClearing.calculateScore(1, 10, scoreConfig)
 
     level10Score shouldBe level1Score * 10
@@ -128,7 +128,7 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   // ============================================================
-  // calculateLevel edge cases
+  // calculateLevelのエッジケース
   // ============================================================
 
   "LineClearing.calculateLevel" should "start at level 1 by default" in {
@@ -153,7 +153,7 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   // ============================================================
-  // dropInterval edge cases
+  // dropIntervalのエッジケース
   // ============================================================
 
   "LineClearing.dropInterval" should "start at base interval for level 1" in {
@@ -161,8 +161,8 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "decrease as level increases" in {
-    val level1 = LineClearing.dropInterval(1, speedConfig)
-    val level5 = LineClearing.dropInterval(5, speedConfig)
+    val level1  = LineClearing.dropInterval(1, speedConfig)
+    val level5  = LineClearing.dropInterval(5, speedConfig)
     val level10 = LineClearing.dropInterval(10, speedConfig)
 
     level5 should be < level1
