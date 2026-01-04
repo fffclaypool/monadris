@@ -222,6 +222,16 @@ sbt "testOnly * -- -n heavy"
 - **View**: Layout generation and ViewModel construction.
 - **Stress Testing**: Validates memory safety and stack safety by running 100,000 game frames in a simulated environment (`StressTest.scala`).
 
+### Architecture Testing
+
+This project uses **ArchUnit** to automatically verify architectural rules. Any violation will cause `sbt test` to fail.
+
+**Enforced Rules:**
+- **Domain Isolation**: Domain layer (`monadris.domain`) must not depend on upper layers (Logic, View).
+- **Logic/View Separation**: Logic layer must not depend on View layer, and vice versa.
+- **Purity**: Core module must not depend on impure infrastructure APIs (`java.io`, `java.sql`, `java.net`, `java.util.concurrent`) or effect systems (ZIO).
+- **No Cycles**: Package dependencies must be free of cycles.
+
 ## License
 
 MIT
