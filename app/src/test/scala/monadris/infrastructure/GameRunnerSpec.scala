@@ -5,6 +5,7 @@ import zio.test.*
 
 import monadris.domain.*
 import monadris.infrastructure.TestServices as LocalTestServices
+import monadris.logic.LineClearing
 
 object GameRunnerSpec extends ZIOSpecDefault:
 
@@ -219,7 +220,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
         yield assertTrue(result.gameState == initialState)
       }.provide(LocalTestServices.console),
       test("UserAction updates state and continues") {
@@ -228,7 +230,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveLeft))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
         yield assertTrue(
           // 状態が処理された（衝突に応じて同じか異なる可能性がある）
           result.gameState != null
@@ -240,7 +243,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
         yield assertTrue(result.gameState != null)
       }.provide(LocalTestServices.console),
       test("UserAction game over exits loop") {
@@ -250,7 +254,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveDown))
           loopState = GameRunner.LoopState(gameOverState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(gameOverState.level, LocalTestServices.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
         yield assertTrue(result.gameState.isGameOver)
       }.provide(LocalTestServices.console),
       test("TimeTick game over exits loop") {
@@ -260,7 +265,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           loopState = GameRunner.LoopState(gameOverState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(gameOverState.level, LocalTestServices.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
         yield assertTrue(result.gameState.isGameOver)
       }.provide(LocalTestServices.console),
       test("multiple commands processed in order") {
@@ -271,7 +277,8 @@ object GameRunnerSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
-          result <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(LocalTestServices.console),
       test("game over transition exits on TimeTick") {
@@ -300,8 +307,11 @@ object GameRunnerSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(nearGameOverState, None)
+          intervalRef <- Ref.make(
+            LineClearing.dropInterval(nearGameOverState.level, LocalTestServices.testConfig.speed)
+          )
           result <- GameRunner
-            .eventLoop(queue, loopState, LocalTestServices.testConfig)
+            .eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
             .timeout(testTimeoutDuration)
         yield assertTrue(result.exists(_.gameState.isGameOver))
       }.provide(LocalTestServices.console),
@@ -330,10 +340,35 @@ object GameRunnerSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.HardDrop))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(nearGameOverState, None)
+          intervalRef <- Ref.make(
+            LineClearing.dropInterval(nearGameOverState.level, LocalTestServices.testConfig.speed)
+          )
           result <- GameRunner
-            .eventLoop(queue, loopState, LocalTestServices.testConfig)
+            .eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
             .timeout(testTimeoutDuration)
         yield assertTrue(result.exists(_.gameState.isGameOver))
+      }.provide(LocalTestServices.console),
+      test("updates drop interval when level changes") {
+        // 高レベル（level = 5）の状態を作成
+        val highLevelState = initialState.copy(level = highLevelForTest)
+        // レベル1相当の初期間隔を設定
+        val level1Interval = LineClearing.dropInterval(1, LocalTestServices.testConfig.speed)
+        // レベル5相当の期待される間隔
+        val expectedInterval = LineClearing.dropInterval(highLevelForTest, LocalTestServices.testConfig.speed)
+        for
+          queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
+          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
+          _     <- queue.offer(GameRunner.GameCommand.Quit)
+          loopState = GameRunner.LoopState(highLevelState, None)
+          // 意図的にレベル1相当の間隔で初期化
+          intervalRef <- Ref.make(level1Interval)
+          _           <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          // processCommand実行後、intervalRefがレベル5相当の間隔に更新されているはず
+          updatedInterval <- intervalRef.get
+        yield assertTrue(
+          updatedInterval == expectedInterval,
+          updatedInterval < level1Interval
+        )
       }.provide(LocalTestServices.console)
     )
   )
@@ -348,7 +383,10 @@ object GameRunnerSpec extends ZIOSpecDefault:
   private val tetrominoBottomOffset        = 2
   private val tetrominoStartBelowFilledRow = 4 // 行4から開始（行0-1の埋められたエリアの下）
   private val ticksToTriggerGameOver       = 5
-  private val testTimeoutDuration          = Duration.fromSeconds(5)
+
+  // 落下間隔更新テスト定数
+  private val highLevelForTest    = 5
+  private val testTimeoutDuration = Duration.fromSeconds(5)
 
   // アサーション用のANSIエスケープシーケンス
   private object Ansi:
