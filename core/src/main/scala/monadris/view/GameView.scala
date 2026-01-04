@@ -4,6 +4,7 @@ import scala.util.chaining.*
 
 import monadris.domain.*
 import monadris.domain.config.AppConfig
+import monadris.logic.Collision
 
 /**
  * GameState を ScreenBuffer に変換する純粋関数群
@@ -35,6 +36,7 @@ object GameView:
   // グリッド描画用の文字定数
   private val FilledBlock = '█'
   private val LockedBlock = '▓'
+  private val GhostBlock  = '░'
   private val EmptyCell   = '·'
 
   /**
@@ -79,6 +81,10 @@ object GameView:
     val fallingBlocks = state.currentTetromino.currentBlocks.toSet
     val fallingColor  = shapeToColor(state.currentTetromino.shape)
 
+    // ゴーストピース（落下予測位置）を計算
+    val ghostTetromino = Collision.hardDropPosition(state.currentTetromino, state.grid)
+    val ghostBlocks    = ghostTetromino.currentBlocks.toSet
+
     // 上枠
     val topBorder     = "┌" + "─" * gridWidth + "┐"
     val withTopBorder = buffer.drawText(0, 0, topBorder)
@@ -89,6 +95,7 @@ object GameView:
       val rowPixels = (0 until gridWidth).map { x =>
         val pos = Position(x, y)
         if fallingBlocks.contains(pos) then Pixel(FilledBlock, fallingColor)
+        else if ghostBlocks.contains(pos) then Pixel(GhostBlock, fallingColor)
         else
           grid.get(pos) match
             case Some(Cell.Filled(shape)) => Pixel(LockedBlock, shapeToColor(shape))
