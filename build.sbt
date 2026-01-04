@@ -4,13 +4,16 @@ val commonSettings = Seq(
   version      := "0.1.0",
   scalaVersion := scala3Version,
   scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:imports", "-Xfatal-warnings"),
-  libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.17" % Test,
-  semanticdbEnabled                      := true,
-  semanticdbVersion                      := scalafixSemanticdb.revision,
-  scalafixOnCompile                      := true,
-  wartremoverCrossVersion                := CrossVersion.binary,
-  scalafixConfig                         := Some(file(".scalafix.conf")),
-  Test / scalafixConfig                  := Some(file(".scalafix-test.conf"))
+  libraryDependencies ++= Seq(
+    "org.scalatest"       %% "scalatest" % "3.2.17" % Test,
+    "com.tngtech.archunit" % "archunit"  % "1.2.1"  % Test
+  ),
+  semanticdbEnabled       := true,
+  semanticdbVersion       := scalafixSemanticdb.revision,
+  scalafixOnCompile       := true,
+  wartremoverCrossVersion := CrossVersion.binary,
+  scalafixConfig          := Some(file(".scalafix.conf")),
+  Test / scalafixConfig   := Some(file(".scalafix-test.conf"))
 )
 
 // 純粋なコアロジック
