@@ -220,7 +220,7 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
 
   it should "return true for all shapes when grid is completely full" in {
     val filled = Cell.Filled(TetrominoShape.I)
-    val grid = (for
+    val grid   = (for
       x <- 0 until gridWidth
       y <- 0 until gridHeight
     yield Position(x, y)).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, pos) =>

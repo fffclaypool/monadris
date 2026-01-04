@@ -135,7 +135,7 @@ object GameRunner:
   ): ZIO[TtyService & AppConfig, Throwable, Unit] =
     val readAndOffer = for
       parseResult <- TerminalInput.readKeyZIO
-      _ <- parseResult match
+      _           <- parseResult match
         case TerminalInput.ParseResult.Timeout =>
           TtyService.sleep(pollIntervalMs)
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>

@@ -105,7 +105,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val initialState = createInitialState()
       val tickCount    = 5
 
-      val ticks = Chunk.fill(tickCount)(Input.Tick)
+      val ticks      = Chunk.fill(tickCount)(Input.Tick)
       val finalState = processInputs(
         initialState,
         ticks,
@@ -122,7 +122,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val initialState = createInitialState(TetrominoShape.O)
 
       // Oテトリミノは十分なTick後に底に到達する
-      val manyTicks = Chunk.fill(TestConstants.GridHeight)(Input.Tick)
+      val manyTicks  = Chunk.fill(TestConstants.GridHeight)(Input.Tick)
       val finalState = processInputs(
         initialState,
         manyTicks,
@@ -164,7 +164,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val config = Mocks.testConfig
 
       // 底の行をほぼ完全に埋める（Iピース用にcolumn 4-5にギャップを残す）
-      val bottomRow = TestConstants.GridHeight - 1
+      val bottomRow          = TestConstants.GridHeight - 1
       val almostCompleteGrid = (0 until TestConstants.GridWidth)
         .filterNot(x => x >= 4 && x < 8) // Iピース用のギャップを残す
         .foldLeft(Grid.empty(TestConstants.GridWidth, TestConstants.GridHeight)) { (g, x) =>
@@ -173,7 +173,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
 
       // Iピースをギャップを埋める位置に配置
       val iPiece = Tetromino(TetrominoShape.I, Position(5, bottomRow), Rotation.R0)
-      val state = GameState(
+      val state  = GameState(
         grid = almostCompleteGrid,
         currentTetromino = iPiece,
         nextTetromino = TetrominoShape.T,
@@ -200,7 +200,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val config = Mocks.testConfig
 
       // 4行をほぼ完全に埋めたグリッドを作成
-      val bottomRows = (TestConstants.GridHeight - 4 until TestConstants.GridHeight).toList
+      val bottomRows         = (TestConstants.GridHeight - 4 until TestConstants.GridHeight).toList
       val almostCompleteGrid = bottomRows.foldLeft(
         Grid.empty(TestConstants.GridWidth, TestConstants.GridHeight)
       ) { (grid, rowIdx) =>
@@ -304,7 +304,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val initialY      = gameOverState.currentTetromino.position.y
 
       // 様々な入力を試す
-      val inputs = Chunk(Input.MoveLeft, Input.MoveRight, Input.Tick, Input.HardDrop)
+      val inputs     = Chunk(Input.MoveLeft, Input.MoveRight, Input.Tick, Input.HardDrop)
       val finalState = processInputs(
         gameOverState,
         inputs,
@@ -362,7 +362,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val initialX    = pausedState.currentTetromino.position.x
       val initialY    = pausedState.currentTetromino.position.y
 
-      val inputs = Chunk(Input.MoveLeft, Input.MoveRight, Input.MoveDown, Input.RotateClockwise)
+      val inputs     = Chunk(Input.MoveLeft, Input.MoveRight, Input.MoveDown, Input.RotateClockwise)
       val finalState = processInputs(
         pausedState,
         inputs,

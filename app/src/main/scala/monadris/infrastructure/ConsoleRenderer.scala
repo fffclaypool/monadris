@@ -92,7 +92,7 @@ object ConsoleRenderer:
     val (sb, lastColor) = coordinates.foldLeft((new StringBuilder, UiColor.Default)) {
       case ((accSb, accColor), (x, y)) =>
         val currentPixel = current.pixels(y)(x)
-        val prevPixel =
+        val prevPixel    =
           if y < previous.height && x < previous.width then previous.pixels(y)(x)
           else Pixel(' ', UiColor.Default)
 

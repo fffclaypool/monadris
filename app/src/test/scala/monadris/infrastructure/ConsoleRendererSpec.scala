@@ -94,7 +94,7 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
       },
       test("handles multiple rows with newlines") {
         val twoRows = 2
-        val buffer = ScreenBuffer
+        val buffer  = ScreenBuffer
           .empty(BufferSize.small, twoRows)
           .drawText(Position.origin, Position.first, "ABC")
           .drawText(Position.origin, Position.second, "DEF")
@@ -278,7 +278,7 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
         val currSize       = 4
         val outOfBoundsPos = 3
         val prev           = ScreenBuffer.empty(prevSize, prevSize)
-        val curr = ScreenBuffer
+        val curr           = ScreenBuffer
           .empty(currSize, currSize)
           .drawChar(outOfBoundsPos, outOfBoundsPos, 'Z', UiColor.Green)
         for
@@ -423,7 +423,7 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
       test("diff render handles multiple scattered changes") {
         val prevSize = 5
         val prev     = ScreenBuffer.empty(prevSize, prevSize)
-        val curr = ScreenBuffer
+        val curr     = ScreenBuffer
           .empty(prevSize, prevSize)
           .drawChar(0, 0, 'A', UiColor.Red)
           .drawChar(2, 2, 'B', UiColor.Blue)
@@ -478,7 +478,7 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
       test("diff render handles expanding buffer size") {
         val smallSize = 2
         val largeSize = 5
-        val prev = ScreenBuffer
+        val prev      = ScreenBuffer
           .empty(smallSize, smallSize)
           .drawChar(0, 0, 'X')
         val curr = ScreenBuffer
@@ -495,7 +495,7 @@ object ConsoleRendererSpec extends ZIOSpecDefault:
       test("diff render handles shrinking buffer size") {
         val largeSize = 5
         val smallSize = 2
-        val prev = ScreenBuffer
+        val prev      = ScreenBuffer
           .empty(largeSize, largeSize)
           .drawChar(4, 4, 'X')
         val curr = ScreenBuffer

@@ -72,7 +72,7 @@ object TerminalInput:
       config    <- ZIO.service[AppConfig]
       _         <- TtyService.sleep(config.terminal.escapeSequenceWaitMs)
       available <- TtyService.available()
-      result <-
+      result    <-
         if available <= 0 then ZIO.succeed(None)
         else parseEscapeBody
     yield result
@@ -90,7 +90,7 @@ object TerminalInput:
       config    <- ZIO.service[AppConfig]
       _         <- TtyService.sleep(config.terminal.escapeSequenceSecondWaitMs)
       available <- TtyService.available()
-      result <-
+      result    <-
         if available <= 0 then ZIO.succeed(None)
         else TtyService.read().map(key => arrowToInput(key))
     yield result
@@ -101,7 +101,7 @@ object TerminalInput:
   def readKeyZIO: ZIO[TtyService & AppConfig, Throwable, ParseResult] =
     for
       available <- TtyService.available()
-      result <-
+      result    <-
         if available <= 0 then ZIO.succeed(ParseResult.Timeout)
         else readKeyBody
     yield result

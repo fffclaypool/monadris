@@ -48,11 +48,10 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     GameView.shapeToColor(TetrominoShape.L) shouldBe UiColor.White
   }
 
-  it should "return correct color for all shapes" in {
+  it should "return correct color for all shapes" in
     TetrominoShape.values.foreach { shape =>
       GameView.shapeToColor(shape) shouldBe a[UiColor]
     }
-  }
 
   // ============================================================
   // toScreenBuffer テスト
@@ -214,13 +213,12 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   // グリッド描画のエッジケース
   // ============================================================
 
-  "GameView grid rendering" should "handle all tetromino shapes" in {
+  "GameView grid rendering" should "handle all tetromino shapes" in
     TetrominoShape.values.foreach { shape =>
       val state  = GameState.initial(shape, TetrominoShape.I, gridWidth, gridHeight)
       val buffer = GameView.toScreenBuffer(state, config)
       buffer.width should be > 0
     }
-  }
 
   it should "handle grid with multiple filled cells" in {
     val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>

@@ -62,7 +62,7 @@ final case class Grid private (
    */
   def clearRows(rowIndices: List[Int]): Grid =
     val sortedIndices = rowIndices.sorted.reverse
-    val clearedCells = sortedIndices.foldLeft(cells) { (acc, idx) =>
+    val clearedCells  = sortedIndices.foldLeft(cells) { (acc, idx) =>
       acc.patch(idx, Nil, 1)
     }
     val emptyRow = Vector.fill(width)(Cell.Empty)

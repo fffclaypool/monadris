@@ -90,7 +90,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
     suite("Grid Properties")(
       test("empty grid has all cells empty") {
         check(Gen.int(5, 15), Gen.int(10, 25)) { (width, height) =>
-          val grid = Grid.empty(width, height)
+          val grid     = Grid.empty(width, height)
           val allEmpty = (for
             x <- 0 until width
             y <- 0 until height
@@ -173,7 +173,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       },
       test("blocks are always within reasonable bounds after spawn") {
         check(genTetrominoShape) { shape =>
-          val tetromino = Tetromino.spawn(shape, gridWidth)
+          val tetromino      = Tetromino.spawn(shape, gridWidth)
           val allBlocksValid = tetromino.currentBlocks.forall { pos =>
             pos.x >= 0 && pos.x < gridWidth && pos.y >= 0
           }
@@ -196,8 +196,8 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       },
       test("wall kick returns valid position or None") {
         check(genValidTetromino) { tetromino =>
-          val grid   = Grid.empty(gridWidth, gridHeight)
-          val result = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
+          val grid    = Grid.empty(gridWidth, gridHeight)
+          val result  = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
           val isValid = result match
             case Some(rotated) => Collision.isValidPosition(rotated, grid)
             case None          => true // Noneも許容される
@@ -238,7 +238,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       test("more lines cleared means higher or equal score at same level") {
         val scoreConfig = TestServices.testConfig.score
         check(genLevel) { level =>
-          val scores = (0 to 4).map(lines => LineClearing.calculateScore(lines, level, scoreConfig))
+          val scores      = (0 to 4).map(lines => LineClearing.calculateScore(lines, level, scoreConfig))
           val isMonotonic = scores.sliding(2).forall {
             case Seq(a, b) => b >= a
             case _         => true
@@ -249,7 +249,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       test("higher level means higher or equal score for same lines") {
         val scoreConfig = TestServices.testConfig.score
         check(genLinesCleared) { lines =>
-          val scores = (1 to 10).map(level => LineClearing.calculateScore(lines, level, scoreConfig))
+          val scores      = (1 to 10).map(level => LineClearing.calculateScore(lines, level, scoreConfig))
           val isMonotonic = scores.sliding(2).forall {
             case Seq(a, b) => b >= a
             case _         => true

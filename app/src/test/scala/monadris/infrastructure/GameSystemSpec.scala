@@ -384,7 +384,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         // h (MoveLeft) を入力後、q で終了
         val inputs = Chunk('h'.toInt, 'q'.toInt)
         for
-          service <- ZIO.service[Mocks.TestConsoleService]
+          service    <- ZIO.service[Mocks.TestConsoleService]
           finalState <- GameRunner
             .interactiveGameLoop(initialState)
             .timeout(1.second)
@@ -487,7 +487,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("render is called with updated state") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _ <- GameRunner
+          _       <- GameRunner
             .interactiveGameLoop(initialState)
             .timeout(1.second)
           output <- service.buffer.get
