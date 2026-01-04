@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/devcontainers/java:1-21-bullseye
 
-RUN apt-get update && apt-get install -y gnupg2 && \
+RUN apt-get update && apt-get install -y gnupg2 python3-pip && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://repo.charm.sh/apt/gpg.key | gpg --dearmor -o /etc/apt/keyrings/charm.gpg && \
@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y gnupg2 && \
     apt-get update && \
     apt-get install -y nodejs vhs ffmpeg chromium && \
     npm install -g @anthropic-ai/claude-code repomix && \
+    pip3 install pre-commit && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
