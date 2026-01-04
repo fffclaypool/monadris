@@ -38,6 +38,6 @@
         ]
       }
     },
-    "postCreateCommand": "sbt sbtVersion",
+    "postCreateCommand": "sbt sbtVersion && pre-commit install",
     "remoteUser": "vscode"
 }
