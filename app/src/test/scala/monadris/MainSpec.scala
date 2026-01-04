@@ -46,7 +46,7 @@ object MainSpec extends ZIOSpecDefault:
     test("program shows title screen") {
       for
         service <- ZIO.service[Mocks.TestConsoleService]
-        _ <- Main.program
+        _       <- Main.program
           .timeout(5.seconds)
         output <- service.buffer.get
         combined = output.mkString
@@ -63,7 +63,7 @@ object MainSpec extends ZIOSpecDefault:
     test("program shows game over screen") {
       for
         service <- ZIO.service[Mocks.TestConsoleService]
-        _ <- Main.program
+        _       <- Main.program
           .timeout(5.seconds)
         output <- service.buffer.get
         combined = output.mkString
@@ -77,7 +77,7 @@ object MainSpec extends ZIOSpecDefault:
     test("program enables and disables raw mode") {
       for
         service <- ZIO.service[Mocks.TestCommandService]
-        _ <- Main.program
+        _       <- Main.program
           .timeout(5.seconds)
         history <- service.history.get
       yield assertTrue(
@@ -116,7 +116,7 @@ object MainSpec extends ZIOSpecDefault:
     test("program outputs game ended message") {
       for
         service <- ZIO.service[Mocks.TestConsoleService]
-        _ <- Main.program
+        _       <- Main.program
           .timeout(5.seconds)
         output <- service.buffer.get
         combined = output.mkString

@@ -146,7 +146,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     // 底の行をほぼ埋める
     val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
-    val grid = (0 until gridWidth - 1).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+    val grid      = (0 until gridWidth - 1).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
 

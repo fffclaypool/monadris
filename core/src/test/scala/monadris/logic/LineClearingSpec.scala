@@ -42,9 +42,9 @@ class LineClearingSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "clear one completed line" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val filled    = Cell.Filled(TetrominoShape.I)
-    val bottomRow = gridHeight - 1
+    val grid       = Grid.empty(gridWidth, gridHeight)
+    val filled     = Cell.Filled(TetrominoShape.I)
+    val bottomRow  = gridHeight - 1
     val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
@@ -60,7 +60,7 @@ class LineClearingSpec extends AnyFlatSpec with Matchers:
     val filled          = Cell.Filled(TetrominoShape.I)
     val bottomRow       = gridHeight - 1
     val secondBottomRow = gridHeight - 2
-    val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
+    val filledGrid      = (0 until gridWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, secondBottomRow), filled)
         .place(Position(x, bottomRow), filled)
     }

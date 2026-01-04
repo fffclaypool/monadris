@@ -130,8 +130,8 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "return empty list for partially filled row" in {
-    val grid   = Grid.empty(DefaultWidth, DefaultHeight)
-    val filled = Cell.Filled(TetrominoShape.I)
+    val grid        = Grid.empty(DefaultWidth, DefaultHeight)
+    val filled      = Cell.Filled(TetrominoShape.I)
     val partialGrid = (0 until DefaultWidth - 1).foldLeft(grid) { (g, x) =>
       g.place(Position(x, DefaultHeight - 1), filled)
     }

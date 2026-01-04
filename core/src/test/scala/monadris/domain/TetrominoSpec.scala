@@ -42,11 +42,10 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
     Rotation.R270.rotateCounterClockwise shouldBe Rotation.R180
   }
 
-  "TetrominoShape" should "have correct block counts" in {
+  "TetrominoShape" should "have correct block counts" in
     TetrominoShape.values.foreach { shape =>
       shape.blocks.size shouldBe blocksPerTetromino
     }
-  }
 
   "Tetromino" should "spawn at center of grid" in {
     val tetromino       = Tetromino.spawn(TetrominoShape.I, gridWidth)
