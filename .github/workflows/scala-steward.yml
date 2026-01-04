@@ -1,0 +1,19 @@
+name: Scala Steward
+
+on:
+  schedule:
+    # Run daily at 15:00 UTC (00:00 JST)
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+jobs:
+  scala-steward:
+    runs-on: ubuntu-latest
+    name: Update dependencies with Scala Steward
+    steps:
+      - name: Run Scala Steward
+        uses: scala-steward-org/scala-steward-action@v2
+        with:
+          github-token: ${{ secrets.SCALA_STEWARD_TOKEN }}
+          author-name: "Scala Steward"
+          author-email: "me@scala-steward.org"
