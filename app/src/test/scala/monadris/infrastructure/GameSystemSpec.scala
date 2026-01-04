@@ -8,6 +8,7 @@ import monadris.config.ConfigLayer
 import monadris.domain.*
 import monadris.domain.config.AppConfig
 import monadris.infrastructure.TestServices as Mocks
+import monadris.logic.LineClearing
 import monadris.view.GameView
 
 /**
@@ -756,7 +757,8 @@ object GameSystemSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.Pause))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(pausedState, None)
-          result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(pausedState.level, Mocks.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
         yield assertTrue(result.gameState.status == GameStatus.Playing)
       }.provide(Mocks.console),
       test("eventLoop processes multiple Ticks") {
@@ -766,7 +768,8 @@ object GameSystemSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
-          result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, Mocks.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
         yield assertTrue(result.gameState != null)
       }.provide(Mocks.console),
       test("eventLoop updates previousBuffer after each command") {
@@ -775,7 +778,8 @@ object GameSystemSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
           loopState = GameRunner.LoopState(initialState, None)
-          result <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig)
+          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, Mocks.testConfig.speed))
+          result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(Mocks.console)
     ),

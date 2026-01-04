@@ -103,18 +103,22 @@ object GameRunner:
       // 初回描画（全描画）
       initialBuffer <- renderGame(initialState, config, None)
 
+      // 落下間隔を保持するRef（レベル変化に応じて動的に更新される）
+      initialInterval = LineClearing.dropInterval(initialState.level, config.speed)
+      intervalRef <- Ref.make(initialInterval)
+
       // Input Fiber: キー入力を読み取り、コマンドをQueueに追加
       inputFiber <- inputProducer(commandQueue, config.terminal.inputPollIntervalMs).fork
 
       // Tick Fiber: 一定間隔でTickコマンドをQueueに追加
-      initialInterval = LineClearing.dropInterval(initialState.level, config.speed).toInt
-      tickFiber <- tickProducer(commandQueue, initialInterval).fork
+      tickFiber <- tickProducer(commandQueue, intervalRef).fork
 
       // Main Loop: Queueからコマンドを取り出して処理
       finalLoopState <- eventLoop(
         commandQueue,
         LoopState(initialState, Some(initialBuffer)),
-        config
+        config,
+        intervalRef
       )
 
       // Fiberを停止
@@ -146,15 +150,16 @@ object GameRunner:
 
   /**
    * Tick Producer: 一定間隔でTickコマンドをQueueに追加
-   * Note: 現在は固定間隔。レベル変化への追従は将来の拡張として検討
+   * intervalRefを参照して動的に間隔を調整
    */
   private def tickProducer(
     queue: Queue[GameCommand],
-    intervalMs: Int
+    intervalRef: Ref[Long]
   ): ZIO[TtyService, Throwable, Unit] =
     val tickAndSleep = for
-      _ <- TtyService.sleep(intervalMs)
-      _ <- queue.offer(GameCommand.TimeTick)
+      interval <- intervalRef.get
+      _        <- TtyService.sleep(interval.toInt)
+      _        <- queue.offer(GameCommand.TimeTick)
     yield ()
 
     tickAndSleep.forever
@@ -167,32 +172,34 @@ object GameRunner:
   private[infrastructure] def eventLoop(
     queue: Queue[GameCommand],
     state: LoopState,
-    config: AppConfig
+    config: AppConfig,
+    intervalRef: Ref[Long]
   ): ZIO[ConsoleService, Throwable, LoopState] =
     queue.take.flatMap {
       case GameCommand.Quit =>
         ZIO.succeed(state)
 
       case GameCommand.UserAction(input) =>
-        processCommand(input, state, config).flatMap { newState =>
+        processCommand(input, state, config, intervalRef).flatMap { newState =>
           if newState.gameState.isGameOver then ZIO.succeed(newState)
-          else eventLoop(queue, newState, config)
+          else eventLoop(queue, newState, config, intervalRef)
         }
 
       case GameCommand.TimeTick =>
-        processCommand(Input.Tick, state, config).flatMap { newState =>
+        processCommand(Input.Tick, state, config, intervalRef).flatMap { newState =>
           if newState.gameState.isGameOver then ZIO.succeed(newState)
-          else eventLoop(queue, newState, config)
+          else eventLoop(queue, newState, config, intervalRef)
         }
     }
 
   /**
-   * コマンド処理: 状態更新 + 差分描画
+   * コマンド処理: 状態更新 + 差分描画 + 落下間隔の動的更新
    */
   private def processCommand(
     input: Input,
     state: LoopState,
-    config: AppConfig
+    config: AppConfig,
+    intervalRef: Ref[Long]
   ): ZIO[ConsoleService, Throwable, LoopState] =
     for
       nextShape <- RandomPieceGenerator.nextShape
@@ -203,5 +210,8 @@ object GameRunner:
           s"Game Over - Score: ${newGameState.score}, Lines: ${newGameState.linesCleared}, Level: ${newGameState.level}"
         )
       }
+      // レベルに応じた落下間隔を計算し、Refを更新（ゲームオーバー時は更新しない）
+      newInterval = LineClearing.dropInterval(newGameState.level, config.speed)
+      _         <- ZIO.unless(newGameState.isGameOver)(intervalRef.set(newInterval))
       newBuffer <- renderGame(newGameState, config, state.previousBuffer)
     yield LoopState(newGameState, Some(newBuffer))
