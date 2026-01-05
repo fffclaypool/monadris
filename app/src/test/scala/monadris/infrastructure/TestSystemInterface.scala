@@ -15,7 +15,14 @@ object TestServices:
   // ============================================================
 
   def terminal(inputs: Chunk[Int]): ZLayer[Any, Nothing, Terminal] =
-    Terminal.test(inputs)
+    ZLayer.fromZIO {
+      for
+        queue <- Queue.unbounded[Int]
+        _     <- queue.offerAll(inputs)
+      yield new Terminal:
+        def available: Task[Int] = queue.size
+        def read: Task[Int]      = queue.take
+    }
 
   // ============================================================
   // Console出力モック - バッファに蓄積（テスト検証用）
