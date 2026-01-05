@@ -13,7 +13,6 @@ import monadris.domain.model.game.TetrisGame
 import monadris.domain.model.piece.Rotation
 import monadris.domain.model.piece.TetrominoShape
 import monadris.infrastructure.TestServices as LocalTestServices
-import monadris.infrastructure.input.InputTranslator
 
 object GameIntegrationSpec extends ZIOSpecDefault:
 
@@ -69,17 +68,17 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       // Can't directly set board, so this test verifies the concept
       assertTrue(board.get(Position(0, 19)) == Some(filled))
     },
-    test("InputTranslator converts Input to GameCommand") {
+    test("InputLoop translates Input to GameCommand") {
       assertTrue(
-        InputTranslator.translate(Input.MoveLeft) == Some(GameCommand.MoveLeft),
-        InputTranslator.translate(Input.MoveRight) == Some(GameCommand.MoveRight),
-        InputTranslator.translate(Input.MoveDown) == Some(GameCommand.SoftDrop),
-        InputTranslator.translate(Input.HardDrop) == Some(GameCommand.HardDrop),
-        InputTranslator.translate(Input.RotateClockwise) == Some(GameCommand.RotateCW),
-        InputTranslator.translate(Input.RotateCounterClockwise) == Some(GameCommand.RotateCCW),
-        InputTranslator.translate(Input.Pause) == Some(GameCommand.TogglePause),
-        InputTranslator.translate(Input.Tick) == Some(GameCommand.Tick),
-        InputTranslator.translate(Input.Quit) == None
+        InputLoop.translateToCommand(Input.MoveLeft) == Some(GameCommand.MoveLeft),
+        InputLoop.translateToCommand(Input.MoveRight) == Some(GameCommand.MoveRight),
+        InputLoop.translateToCommand(Input.MoveDown) == Some(GameCommand.SoftDrop),
+        InputLoop.translateToCommand(Input.HardDrop) == Some(GameCommand.HardDrop),
+        InputLoop.translateToCommand(Input.RotateClockwise) == Some(GameCommand.RotateCW),
+        InputLoop.translateToCommand(Input.RotateCounterClockwise) == Some(GameCommand.RotateCCW),
+        InputLoop.translateToCommand(Input.Pause) == Some(GameCommand.TogglePause),
+        InputLoop.translateToCommand(Input.Tick) == Some(GameCommand.Tick),
+        InputLoop.translateToCommand(Input.Quit) == None
       )
     }
   )

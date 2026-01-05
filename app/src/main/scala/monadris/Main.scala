@@ -3,6 +3,8 @@ package monadris
 import zio.*
 import zio.logging.backend.SLF4J
 
+import monadris.application.GameEngine
+import monadris.config.ConfigLayer
 import monadris.domain.config.AppConfig
 import monadris.domain.model.game.TetrisGame
 import monadris.infrastructure.*
@@ -10,13 +12,16 @@ import monadris.infrastructure.*
 /**
  * テトリスのメインエントリーポイント
  * ZIOAppを使用してエフェクトを実行
- * 構成と起動のみに集中し、ロジックはinfrastructureパッケージに委譲
+ * 構成と起動のみに集中し、ロジックはGameEngineに委譲
  */
 object Main extends ZIOAppDefault:
 
+  // ゲームに必要な環境型
+  type GameEnv = Terminal & AppConfig
+
   override def run: Task[Unit] =
     program
-      .provideLayer(Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ GameEnv.live)
+      .provideLayer(Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ Terminal.live ++ ConfigLayer.live)
       .catchAll {
         case error: Config.Error =>
           ZIO.logError(s"Configuration error: ${error.getMessage}")
@@ -38,8 +43,8 @@ object Main extends ZIOAppDefault:
     for
       config <- ZIO.service[AppConfig]
       _      <- ZIO.logInfo("Monadris starting...")
-      _      <- GameRunner.showTitle
-      _      <- TtyService.sleep(config.timing.titleDelayMs)
+      _      <- GameEngine.showTitleScreen
+      _      <- ZIO.sleep(config.timing.titleDelayMs.millis)
     yield ()
 
   private val initializeGame: ZIO[AppConfig, Nothing, TetrisGame] =
@@ -55,12 +60,9 @@ object Main extends ZIOAppDefault:
     )
 
   private def runGameSession(initialGame: TetrisGame): ZIO[GameEnv, Throwable, TetrisGame] =
-    for
-      _ <- TerminalControl.enableRawMode
-      finalGame <- GameRunner
-        .interactiveGameLoop(initialGame)
-        .ensuring(TerminalControl.disableRawMode.ignore)
-    yield finalGame
+    Terminal.withRawMode {
+      GameEngine.runSession(initialGame)
+    }
 
   private def showOutro(finalGame: TetrisGame): ZIO[GameEnv, Throwable, Unit] =
     val score = finalGame.scoreState
@@ -69,8 +71,14 @@ object Main extends ZIOAppDefault:
       _ <- ZIO.logInfo(
         s"Game finished - Score: ${score.score}, Lines: ${score.linesCleared}, Level: ${score.level}"
       )
-      _ <- GameRunner.renderGameOver(finalGame)
-      _ <- ConsoleService.print("\nGame ended.\r\n")
-      _ <- TtyService.sleep(config.timing.outroDelayMs)
+      _ <- GameEngine.showGameOverScreen(finalGame)
+      _ <- printGameEnded
+      _ <- ZIO.sleep(config.timing.outroDelayMs.millis)
       _ <- ZIO.logInfo("Monadris shutting down...")
     yield ()
+
+  private def printGameEnded: Task[Unit] =
+    ZIO.attempt {
+      scala.Console.print("\nGame ended.\r\n")
+      java.lang.System.out.flush()
+    }

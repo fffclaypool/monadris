@@ -11,43 +11,35 @@ import monadris.domain.config.*
 object TestServices:
 
   // ============================================================
-  // TtyService テスト実装 - キューベースの入力シミュレーション
+  // Terminal テスト実装 - キューベースの入力シミュレーション
   // ============================================================
 
-  def tty(inputs: Chunk[Int]): ZLayer[Any, Nothing, TtyService] =
-    ZLayer.fromZIO {
-      for
-        queue <- Queue.unbounded[Int]
-        _     <- queue.offerAll(inputs)
-      yield new TtyService:
-        def available(): Task[Int]      = queue.size
-        def read(): Task[Int]           = queue.take
-        def sleep(ms: Long): Task[Unit] = ZIO.unit
-    }
+  def terminal(inputs: Chunk[Int]): ZLayer[Any, Nothing, Terminal] =
+    Terminal.test(inputs)
 
   // ============================================================
-  // ConsoleService テスト実装 - バッファに蓄積
+  // Console出力モック - バッファに蓄積（テスト検証用）
   // ============================================================
 
-  case class TestConsoleService(buffer: Ref[List[String]]) extends ConsoleService:
+  case class TestConsoleOutput(buffer: Ref[List[String]]):
     def print(text: String): Task[Unit] = buffer.update(_ :+ text)
     def flush(): Task[Unit]             = ZIO.unit
 
-  val console: ULayer[TestConsoleService] = ZLayer.fromZIO {
+  def consoleOutput: ULayer[TestConsoleOutput] = ZLayer.fromZIO {
     for buffer <- Ref.make(List.empty[String])
-    yield TestConsoleService(buffer)
+    yield TestConsoleOutput(buffer)
   }
 
   // ============================================================
-  // CommandService テスト実装 - コマンド履歴を記録
+  // Command実行モック - コマンド履歴を記録（テスト検証用）
   // ============================================================
 
-  case class TestCommandService(history: Ref[List[String]]) extends CommandService:
+  case class TestCommandHistory(history: Ref[List[String]]):
     def exec(cmd: String): Task[Unit] = history.update(_ :+ cmd)
 
-  val command: ULayer[TestCommandService] = ZLayer.fromZIO {
+  def commandHistory: ULayer[TestCommandHistory] = ZLayer.fromZIO {
     for history <- Ref.make(List.empty[String])
-    yield TestCommandService(history)
+    yield TestCommandHistory(history)
   }
 
   // ============================================================

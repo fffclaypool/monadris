@@ -6,6 +6,11 @@ import monadris.view.Pixel
 import monadris.view.ScreenBuffer
 import monadris.view.UiColor
 
+/**
+ * ゲーム画面をコンソールに描画するレンダラー
+ *
+ * ZIO標準の Console を直接使用（独自ラッパーは不要）
+ */
 object ConsoleRenderer:
 
   // ANSIカラーコード
@@ -53,19 +58,14 @@ object ConsoleRenderer:
    * 初回描画や全描画用
    * カーソルを隠し、ホームポジションに戻してから描画
    */
-  def render(buffer: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
-    for
-      // カーソル非表示 -> ホーム -> 画面クリア
-      _ <- ConsoleService.print(s"$HIDE_CURSOR$HOME$CLEAR_SCREEN")
-      _ <- ConsoleService.print(bufferToString(buffer))
-      _ <- ConsoleService.print(NL)
-      _ <- ConsoleService.flush()
-    yield ()
+  def render(buffer: ScreenBuffer): Task[Unit] =
+    val output = s"$HIDE_CURSOR$HOME$CLEAR_SCREEN${bufferToString(buffer)}$NL"
+    printAndFlush(output)
 
   /**
    * 差分描画対応
    */
-  def render(current: ScreenBuffer, previous: Option[ScreenBuffer]): ZIO[ConsoleService, Throwable, Unit] =
+  def render(current: ScreenBuffer, previous: Option[ScreenBuffer]): Task[Unit] =
     previous match
       case None       => render(current)
       case Some(prev) => renderDiff(current, prev)
@@ -74,14 +74,10 @@ object ConsoleRenderer:
    * 差分のみ描画
    * カーソル移動が多く発生するため、HIDE_CURSORがないとチラつきが酷くなる
    */
-  private def renderDiff(current: ScreenBuffer, previous: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
+  private def renderDiff(current: ScreenBuffer, previous: ScreenBuffer): Task[Unit] =
     val diffString = computeDiffString(current, previous)
     if diffString.isEmpty then ZIO.unit
-    else
-      for
-        _ <- ConsoleService.print(HIDE_CURSOR + diffString)
-        _ <- ConsoleService.flush()
-      yield ()
+    else printAndFlush(HIDE_CURSOR + diffString)
 
   private def computeDiffString(current: ScreenBuffer, previous: ScreenBuffer): String =
     val coordinates = for
@@ -115,10 +111,13 @@ object ConsoleRenderer:
 
     sb.toString
 
-  def renderWithoutClear(buffer: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
-    for
-      _ <- ConsoleService.print(HIDE_CURSOR)
-      _ <- ConsoleService.print(bufferToString(buffer))
-      _ <- ConsoleService.print(NL)
-      _ <- ConsoleService.flush()
-    yield ()
+  def renderWithoutClear(buffer: ScreenBuffer): Task[Unit] =
+    val output = s"$HIDE_CURSOR${bufferToString(buffer)}$NL"
+    printAndFlush(output)
+
+  // 内部ヘルパー: print + flush
+  private def printAndFlush(text: String): Task[Unit] =
+    ZIO.attempt {
+      scala.Console.print(text)
+      java.lang.System.out.flush()
+    }

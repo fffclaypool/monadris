@@ -126,6 +126,99 @@ object PropertyBasedSpec extends ZIOSpecDefault:
               newBoard.height == board.height
           )
         }
+      },
+      test("clearCompletedRows returns (board, 0) when no rows are complete") {
+        val board             = Board.empty(gridWidth, gridHeight)
+        val (newBoard, count) = board.clearCompletedRows()
+        assertTrue(count == 0, newBoard == board)
+      },
+      test("clearCompletedRows clears a complete row and returns correct count") {
+        // Fill the bottom row completely
+        val board = (0 until gridWidth).foldLeft(Board.empty(gridWidth, gridHeight)) { (b, x) =>
+          b.placeCell(Position(x, gridHeight - 1), Cell.Filled(TetrominoShape.I))
+        }
+        val (newBoard, count) = board.clearCompletedRows()
+        assertTrue(
+          count == 1,
+          newBoard.height == gridHeight,
+          newBoard.get(Position(0, gridHeight - 1)) == Some(Cell.Empty)
+        )
+      },
+      test("clearCompletedRows clears multiple complete rows") {
+        // Fill the bottom two rows completely
+        val board = (0 until gridWidth).foldLeft(Board.empty(gridWidth, gridHeight)) { (b, x) =>
+          b.placeCell(Position(x, gridHeight - 1), Cell.Filled(TetrominoShape.I))
+            .placeCell(Position(x, gridHeight - 2), Cell.Filled(TetrominoShape.J))
+        }
+        val (newBoard, count) = board.clearCompletedRows()
+        assertTrue(
+          count == 2,
+          newBoard.height == gridHeight
+        )
+      },
+      test("clearCompletedRows preserves non-complete rows") {
+        // Fill bottom row completely, leave one cell empty in second row
+        val bottomFilled = (0 until gridWidth).foldLeft(Board.empty(gridWidth, gridHeight)) { (b, x) =>
+          b.placeCell(Position(x, gridHeight - 1), Cell.Filled(TetrominoShape.I))
+        }
+        // Add partial row above (leave position 0 empty)
+        val withPartial = (1 until gridWidth).foldLeft(bottomFilled) { (b, x) =>
+          b.placeCell(Position(x, gridHeight - 2), Cell.Filled(TetrominoShape.J))
+        }
+        val (newBoard, count) = withPartial.clearCompletedRows()
+        assertTrue(
+          count == 1,
+          // The partial row should drop down to the bottom
+          newBoard.get(Position(1, gridHeight - 1)) == Some(Cell.Filled(TetrominoShape.J))
+        )
+      },
+      test("completedRows returns correct indices") {
+        // Fill middle row completely
+        val middleRow = gridHeight / 2
+        val board = (0 until gridWidth).foldLeft(Board.empty(gridWidth, gridHeight)) { (b, x) =>
+          b.placeCell(Position(x, middleRow), Cell.Filled(TetrominoShape.T))
+        }
+        assertTrue(board.completedRows == List(middleRow))
+      },
+      test("completedRows returns empty list for empty board") {
+        val board = Board.empty(gridWidth, gridHeight)
+        assertTrue(board.completedRows.isEmpty)
+      },
+      test("get returns None for out of bounds position") {
+        val board = Board.empty(gridWidth, gridHeight)
+        assertTrue(
+          board.get(Position(-1, 0)) == None,
+          board.get(Position(0, -1)) == None,
+          board.get(Position(gridWidth, 0)) == None,
+          board.get(Position(0, gridHeight)) == None
+        )
+      },
+      test("isEmpty returns false for out of bounds position") {
+        val board = Board.empty(gridWidth, gridHeight)
+        assertTrue(!board.isEmpty(Position(-1, 0)))
+      },
+      test("canPlace returns false when blocks are out of bounds") {
+        val board  = Board.empty(gridWidth, gridHeight)
+        val blocks = List(Position(-1, 0), Position(0, 0))
+        assertTrue(!board.canPlace(blocks))
+      },
+      test("placeCell ignores out of bounds positions") {
+        val board    = Board.empty(gridWidth, gridHeight)
+        val newBoard = board.placeCell(Position(-1, 0), Cell.Filled(TetrominoShape.I))
+        assertTrue(newBoard == board)
+      },
+      test("dropDistance calculates correct distance") {
+        val board    = Board.empty(gridWidth, gridHeight)
+        val blocks   = List(Position(5, 0))
+        val distance = board.dropDistance(blocks)
+        assertTrue(distance == gridHeight - 1)
+      },
+      test("isBlocked returns true when position is occupied") {
+        val board = Board
+          .empty(gridWidth, gridHeight)
+          .placeCell(Position(5, 5), Cell.Filled(TetrominoShape.I))
+        val blocks = List(Position(5, 5))
+        assertTrue(board.isBlocked(blocks))
       }
     ),
 
