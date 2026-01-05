@@ -2,11 +2,15 @@ package monadris.view
 
 import scala.util.chaining.*
 
-import monadris.domain.*
 import monadris.domain.config.AppConfig
+import monadris.domain.model.board.Cell
+import monadris.domain.model.board.Position
+import monadris.domain.model.game.GamePhase
+import monadris.domain.model.game.TetrisGame
+import monadris.domain.model.piece.TetrominoShape
 
 /**
- * GameState を ScreenBuffer に変換する純粋関数群
+ * TetrisGame を ScreenBuffer に変換する純粋関数群
  * ANSIコードに依存せず、色は UiColor で表現
  */
 object GameView:
@@ -52,7 +56,7 @@ object GameView:
   /**
    * ゲーム状態を画面バッファに変換
    */
-  def toScreenBuffer(state: GameState, config: AppConfig): ScreenBuffer =
+  def toScreenBuffer(game: TetrisGame, config: AppConfig): ScreenBuffer =
     val gridWidth  = config.grid.width
     val gridHeight = config.grid.height
 
@@ -62,8 +66,8 @@ object GameView:
 
     ScreenBuffer
       .empty(totalWidth, totalHeight)
-      .pipe(renderGrid(_, state, gridWidth, gridHeight))
-      .pipe(renderInfo(_, state, gridWidth + Layout.InfoPanelLeftPadding))
+      .pipe(renderGrid(_, game, gridWidth, gridHeight))
+      .pipe(renderInfo(_, game, gridWidth + Layout.InfoPanelLeftPadding))
       .pipe(renderControls(_, gridHeight + Layout.VerticalBorder))
 
   /**
@@ -71,13 +75,13 @@ object GameView:
    */
   private def renderGrid(
     buffer: ScreenBuffer,
-    state: GameState,
+    game: TetrisGame,
     gridWidth: Int,
     gridHeight: Int
   ): ScreenBuffer =
-    val grid          = state.grid
-    val fallingBlocks = state.currentTetromino.currentBlocks.toSet
-    val fallingColor  = shapeToColor(state.currentTetromino.shape)
+    val board         = game.board
+    val fallingBlocks = game.activePiece.blocks.toSet
+    val fallingColor  = shapeToColor(game.activePiece.shape)
 
     // 上枠
     val topBorder     = "┌" + "─" * gridWidth + "┐"
@@ -90,7 +94,7 @@ object GameView:
         val pos = Position(x, y)
         if fallingBlocks.contains(pos) then Pixel(FilledBlock, fallingColor)
         else
-          grid.get(pos) match
+          board.get(pos) match
             case Some(Cell.Filled(shape)) => Pixel(LockedBlock, shapeToColor(shape))
             case _                        => Pixel(EmptyCell, UiColor.Default)
       }.toVector
@@ -109,13 +113,13 @@ object GameView:
   /**
    * 情報欄を描画
    */
-  private def renderInfo(buffer: ScreenBuffer, state: GameState, startX: Int): ScreenBuffer =
+  private def renderInfo(buffer: ScreenBuffer, game: TetrisGame, startX: Int): ScreenBuffer =
     buffer
-      .drawText(startX, 1, s"Score: ${state.score}")
-      .drawText(startX, 2, s"Level: ${state.level}")
-      .drawText(startX, 3, s"Lines: ${state.linesCleared}")
-      .drawText(startX, 5, s"Next: ${state.nextTetromino}")
-      .drawText(startX, 7, if state.status == GameStatus.Paused then "** PAUSED **" else "")
+      .drawText(startX, 1, s"Score: ${game.scoreState.score}")
+      .drawText(startX, 2, s"Level: ${game.scoreState.level}")
+      .drawText(startX, 3, s"Lines: ${game.scoreState.linesCleared}")
+      .drawText(startX, 5, s"Next: ${game.nextShape}")
+      .drawText(startX, 7, if game.phase == GamePhase.Paused then "** PAUSED **" else "")
 
   /**
    * 操作説明を描画
@@ -155,15 +159,16 @@ object GameView:
   /**
    * ゲームオーバー画面用のバッファを生成
    */
-  def gameOverScreen(state: GameState): ScreenBuffer =
+  def gameOverScreen(game: TetrisGame): ScreenBuffer =
+    val score = game.scoreState
     val lines = List(
       "",
       "╔═══════════════════════╗",
       "║      GAME OVER!       ║",
       "╠═══════════════════════╣",
-      s"║  Score: ${"%6d".format(state.score)}        ║",
-      s"║  Lines: ${"%6d".format(state.linesCleared)}        ║",
-      s"║  Level: ${"%6d".format(state.level)}        ║",
+      s"║  Score: ${"%6d".format(score.score)}        ║",
+      s"║  Lines: ${"%6d".format(score.linesCleared)}        ║",
+      s"║  Level: ${"%6d".format(score.level)}        ║",
       "╚═══════════════════════╝"
     )
     val width  = lines.map(_.length).maxOption.getOrElse(Layout.DefaultGameOverWidth)

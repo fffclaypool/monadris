@@ -3,8 +3,8 @@ package monadris
 import zio.*
 import zio.logging.backend.SLF4J
 
-import monadris.domain.*
 import monadris.domain.config.AppConfig
+import monadris.domain.model.game.TetrisGame
 import monadris.infrastructure.*
 
 /**
@@ -27,10 +27,10 @@ object Main extends ZIOAppDefault:
   val program: ZIO[GameEnv, Throwable, Unit] =
     ZIO.scoped {
       for
-        _            <- showIntro
-        initialState <- initializeGame
-        finalState   <- runGameSession(initialState)
-        _            <- showOutro(finalState)
+        _           <- showIntro
+        initialGame <- initializeGame
+        finalGame   <- runGameSession(initialGame)
+        _           <- showOutro(finalGame)
       yield ()
     }
 
@@ -42,28 +42,34 @@ object Main extends ZIOAppDefault:
       _      <- TtyService.sleep(config.timing.titleDelayMs)
     yield ()
 
-  private val initializeGame: ZIO[AppConfig, Nothing, GameState] =
+  private val initializeGame: ZIO[AppConfig, Nothing, TetrisGame] =
     for
-      config     <- ZIO.service[AppConfig]
-      firstShape <- GameRunner.RandomPieceGenerator.nextShape
-      nextShape  <- GameRunner.RandomPieceGenerator.nextShape
-    yield GameState.initial(firstShape, nextShape, config.grid.width, config.grid.height)
+      config <- ZIO.service[AppConfig]
+      seed   <- Clock.currentTime(java.util.concurrent.TimeUnit.MILLISECONDS)
+    yield TetrisGame.create(
+      seed,
+      config.grid.width,
+      config.grid.height,
+      config.score,
+      config.level
+    )
 
-  private def runGameSession(initialState: GameState): ZIO[GameEnv, Throwable, GameState] =
+  private def runGameSession(initialGame: TetrisGame): ZIO[GameEnv, Throwable, TetrisGame] =
     for
       _ <- TerminalControl.enableRawMode
-      finalState <- GameRunner
-        .interactiveGameLoop(initialState)
+      finalGame <- GameRunner
+        .interactiveGameLoop(initialGame)
         .ensuring(TerminalControl.disableRawMode.ignore)
-    yield finalState
+    yield finalGame
 
-  private def showOutro(finalState: GameState): ZIO[GameEnv, Throwable, Unit] =
+  private def showOutro(finalGame: TetrisGame): ZIO[GameEnv, Throwable, Unit] =
+    val score = finalGame.scoreState
     for
       config <- ZIO.service[AppConfig]
       _ <- ZIO.logInfo(
-        s"Game finished - Score: ${finalState.score}, Lines: ${finalState.linesCleared}, Level: ${finalState.level}"
+        s"Game finished - Score: ${score.score}, Lines: ${score.linesCleared}, Level: ${score.level}"
       )
-      _ <- GameRunner.renderGameOver(finalState)
+      _ <- GameRunner.renderGameOver(finalGame)
       _ <- ConsoleService.print("\nGame ended.\r\n")
       _ <- TtyService.sleep(config.timing.outroDelayMs)
       _ <- ZIO.logInfo("Monadris shutting down...")

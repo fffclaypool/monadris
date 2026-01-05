@@ -5,10 +5,16 @@ import zio.test.*
 import zio.test.Assertion.*
 
 import monadris.config.ConfigLayer
-import monadris.domain.*
+import monadris.domain.Input
 import monadris.domain.config.AppConfig
+import monadris.domain.model.board.Board
+import monadris.domain.model.board.Cell
+import monadris.domain.model.board.Position
+import monadris.domain.model.game.GamePhase
+import monadris.domain.model.game.TetrisGame
+import monadris.domain.model.piece.TetrominoShape
+import monadris.domain.model.scoring.ScoreState
 import monadris.infrastructure.TestServices as Mocks
-import monadris.logic.LineClearing
 import monadris.view.GameView
 
 /**
@@ -25,15 +31,14 @@ object GameSystemSpec extends ZIOSpecDefault:
   // ============================================================
 
   private val minimumBufferDimension = 0
-  private val shapeSampleCount       = 20
-  private val minimumUniqueShapes    = 1
+  private val testSeed               = 42L
 
   // ANSI escape sequences for assertions
   private object Ansi:
     val clearScreen = "\u001b[2J"
 
-  def initialState: GameState =
-    GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+  def initialGame: TetrisGame =
+    TetrisGame.create(testSeed, gridWidth, gridHeight, Mocks.testConfig.score, Mocks.testConfig.level)
 
   def spec = suite("GameSystem Tests")(
     // ============================================================
@@ -176,14 +181,14 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("render outputs ANSI escape codes") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
+          _       <- GameRunner.renderGame(initialGame, Mocks.testConfig)
           output  <- service.buffer.get
         yield assertTrue(output.exists(_.contains("\u001b[H")))
       }.provide(Mocks.console),
       test("render outputs game info") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
+          _       <- GameRunner.renderGame(initialGame, Mocks.testConfig)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
@@ -193,10 +198,10 @@ object GameSystemSpec extends ZIOSpecDefault:
         )
       }.provide(Mocks.console),
       test("renderGameOver outputs GAME OVER message") {
-        val gameOverState = initialState.copy(status = GameStatus.GameOver)
+        val gameOverGame = initialGame.copy(phase = GamePhase.Over)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGameOver(gameOverState)
+          _       <- GameRunner.renderGameOver(gameOverGame)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("GAME OVER"))
@@ -366,129 +371,129 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("quit key terminates the loop") {
         // 'q' を入力してループを終了
         val inputs = Chunk('q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("Q key also terminates the loop") {
         val inputs = Chunk('Q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("movement input changes game state") {
         // h (MoveLeft) を入力後、q で終了
         val inputs = Chunk('h'.toInt, 'q'.toInt)
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+          finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .timeout(1.second)
           output <- service.buffer.get
         yield assertTrue(
-          finalState.isDefined,
+          finalGame.isDefined,
           output.exists(_.contains("Score:"))
         )
       }.provide(Mocks.tty(Chunk('h'.toInt, 'q'.toInt)) ++ Mocks.console ++ Mocks.config),
       test("arrow key input is processed") {
         // ESC [ D (Left arrow) を入力後、q で終了
         val inputs = Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("hard drop input is processed") {
         // Space (HardDrop) を入力後、q で終了
         val inputs = Chunk(' '.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("pause input is processed") {
         // p (Pause) を入力後、q で終了
         val inputs = Chunk('p'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("rotate input is processed") {
         // k (RotateClockwise) を入力後、q で終了
         val inputs = Chunk('k'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("counter-clockwise rotate is processed") {
         // z (RotateCounterClockwise) を入力後、q で終了
         val inputs = Chunk('z'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("unknown key is ignored") {
         // x (unknown) を入力後、q で終了
         val inputs = Chunk('x'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("multiple movements are processed") {
         // h, l, j を入力後、q で終了
         val inputs = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("up arrow rotates piece") {
         // ESC [ A (Up arrow = RotateClockwise) を入力後、q で終了
         val inputs = Chunk(27, '['.toInt, 'A'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("down arrow moves piece down") {
         // ESC [ B (Down arrow = MoveDown) を入力後、q で終了
         val inputs = Chunk(27, '['.toInt, 'B'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("right arrow moves piece right") {
         // ESC [ C (Right arrow = MoveRight) を入力後、q で終了
         val inputs = Chunk(27, '['.toInt, 'C'.toInt, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("render is called with updated state") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
           _ <- GameRunner
-            .interactiveGameLoop(initialState)
+            .interactiveGameLoop(initialGame)
             .timeout(1.second)
           output <- service.buffer.get
         // 複数回の描画が行われているはず（初期描画 + 移動後の描画）
@@ -497,48 +502,30 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("incomplete escape sequence is handled") {
         // ESC だけを入力（不完全なエスケープシーケンス）後、q で終了
         val inputs = Chunk(27, 'q'.toInt)
-        for finalState <- GameRunner
-            .interactiveGameLoop(initialState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(initialGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.isDefined)
+        yield assertTrue(finalGame.isDefined)
       },
       test("logs game over and exits when game over condition is met") {
         // 1. 即死するように積み上がった盤面を作成（上から2行目まで埋める）
-        val dangerousGrid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
-          g.place(Position(x, 2), Cell.Filled(TetrominoShape.I))
+        val dangerousBoard = (0 until gridWidth).foldLeft(Board.empty(gridWidth, gridHeight)) { (b, x) =>
+          b.placeCell(Position(x, 2), Cell.Filled(TetrominoShape.I))
         }
 
-        // 2. 次にブロックがスポーンしたら即衝突する状態
-        val dangerousState = GameState
-          .initial(TetrominoShape.T, TetrominoShape.O, gridWidth, gridHeight)
-          .copy(grid = dangerousGrid)
+        // 2. Create a game with the dangerous board
+        val game          = initialGame
+        val dangerousGame = game.copy(board = dangerousBoard)
 
         // 3. 入力: HardDrop (即座に固定→判定→GameOver)
         val inputs = Chunk(' '.toInt)
 
-        for finalState <- GameRunner
-            .interactiveGameLoop(dangerousState)
+        for finalGame <- GameRunner
+            .interactiveGameLoop(dangerousGame)
             .provide(Mocks.tty(inputs) ++ Mocks.console ++ Mocks.config)
             .timeout(1.second)
-        yield assertTrue(finalState.map(_.isGameOver).getOrElse(false))
-      }
-    ),
-
-    // ============================================================
-    // RandomPieceGenerator Tests
-    // ============================================================
-
-    suite("RandomPieceGenerator")(
-      test("nextShape returns valid shape") {
-        for shape <- GameRunner.RandomPieceGenerator.nextShape
-        yield assertTrue(TetrominoShape.values.contains(shape))
-      },
-      test("nextShape returns different shapes over time") {
-        for
-          shapes <- ZIO.collectAll(List.fill(shapeSampleCount)(GameRunner.RandomPieceGenerator.nextShape))
-          uniqueShapes = shapes.toSet
-        yield assertTrue(uniqueShapes.size > minimumUniqueShapes)
+        yield assertTrue(finalGame.map(_.isOver).getOrElse(false))
       }
     ),
 
@@ -550,7 +537,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("renderGrid includes borders") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
+          _       <- GameRunner.renderGame(initialGame, Mocks.testConfig)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(
@@ -564,7 +551,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("renderGrid shows current tetromino") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
+          _       <- GameRunner.renderGame(initialGame, Mocks.testConfig)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("█"))
@@ -572,7 +559,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("renderGrid shows empty cells") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
+          _       <- GameRunner.renderGame(initialGame, Mocks.testConfig)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("·"))
@@ -580,13 +567,13 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("render shows Next piece info") {
         for
           service <- ZIO.service[Mocks.TestConsoleService]
-          _       <- GameRunner.renderGame(initialState, Mocks.testConfig)
+          _       <- GameRunner.renderGame(initialGame, Mocks.testConfig)
           output  <- service.buffer.get
           combined = output.mkString
         yield assertTrue(combined.contains("Next:"))
       }.provide(Mocks.console),
       test("renderGame returns ScreenBuffer") {
-        for buffer <- GameRunner.renderGame(initialState, Mocks.testConfig)
+        for buffer <- GameRunner.renderGame(initialGame, Mocks.testConfig)
         yield assertTrue(
           buffer.width > minimumBufferDimension,
           buffer.height > minimumBufferDimension
@@ -595,9 +582,9 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("renderGame with previous buffer uses differential rendering") {
         for
           service     <- ZIO.service[Mocks.TestConsoleService]
-          firstBuffer <- GameRunner.renderGame(initialState, Mocks.testConfig, None)
+          firstBuffer <- GameRunner.renderGame(initialGame, Mocks.testConfig, None)
           _           <- service.buffer.set(List.empty) // clear buffer
-          _           <- GameRunner.renderGame(initialState, Mocks.testConfig, Some(firstBuffer))
+          _           <- GameRunner.renderGame(initialGame, Mocks.testConfig, Some(firstBuffer))
           output      <- service.buffer.get
         yield assertTrue(
           // Same state = no changes = no output (or minimal output)
@@ -689,27 +676,27 @@ object GameSystemSpec extends ZIOSpecDefault:
 
     suite("GameRunner LoopState")(
       test("LoopState holds game state and previous buffer") {
-        val state     = initialState
-        val buffer    = GameView.toScreenBuffer(state, Mocks.testConfig)
-        val loopState = GameRunner.LoopState(state, Some(buffer))
+        val game      = initialGame
+        val buffer    = GameView.toScreenBuffer(game, Mocks.testConfig)
+        val loopState = GameRunner.LoopState(game, Some(buffer))
 
         assertTrue(
-          loopState.gameState == state,
+          loopState.game == game,
           loopState.previousBuffer.isDefined,
           loopState.previousBuffer.get == buffer
         )
       },
       test("LoopState can hold None for previousBuffer") {
-        val loopState = GameRunner.LoopState(initialState, None)
+        val loopState = GameRunner.LoopState(initialGame, None)
         assertTrue(loopState.previousBuffer.isEmpty)
       }
     ),
 
     // ============================================================
-    // GameCommand Additional Tests
+    // RunnerCommand Additional Tests
     // ============================================================
 
-    suite("GameCommand Additional Coverage")(
+    suite("RunnerCommand Additional Coverage")(
       test("UserAction wraps all input types") {
         val allInputs = List(
           Input.MoveLeft,
@@ -721,25 +708,25 @@ object GameSystemSpec extends ZIOSpecDefault:
           Input.Pause,
           Input.Tick
         )
-        val commands = allInputs.map(GameRunner.GameCommand.UserAction(_))
+        val commands = allInputs.map(GameRunner.RunnerCommand.UserAction(_))
         assertTrue(commands.size == allInputs.size)
       },
-      test("GameCommand pattern matching works correctly") {
-        val userAction = GameRunner.GameCommand.UserAction(Input.MoveLeft)
-        val tick       = GameRunner.GameCommand.TimeTick
-        val quit       = GameRunner.GameCommand.Quit
+      test("RunnerCommand pattern matching works correctly") {
+        val userAction = GameRunner.RunnerCommand.UserAction(Input.MoveLeft)
+        val tick       = GameRunner.RunnerCommand.TimeTick
+        val quit       = GameRunner.RunnerCommand.Quit
 
         val userActionMatched = userAction match
-          case GameRunner.GameCommand.UserAction(i) => i == Input.MoveLeft
-          case _                                    => false
+          case GameRunner.RunnerCommand.UserAction(i) => i == Input.MoveLeft
+          case _                                      => false
 
         val tickMatched = tick match
-          case GameRunner.GameCommand.TimeTick => true
-          case _                               => false
+          case GameRunner.RunnerCommand.TimeTick => true
+          case _                                 => false
 
         val quitMatched = quit match
-          case GameRunner.GameCommand.Quit => true
-          case _                           => false
+          case GameRunner.RunnerCommand.Quit => true
+          case _                             => false
 
         assertTrue(userActionMatched, tickMatched, quitMatched)
       }
@@ -751,34 +738,34 @@ object GameSystemSpec extends ZIOSpecDefault:
 
     suite("eventLoop Edge Cases")(
       test("eventLoop handles Pause toggle") {
-        val pausedState = initialState.copy(status = GameStatus.Paused)
+        val pausedGame = initialGame.copy(phase = GamePhase.Paused)
         for
-          queue <- Queue.bounded[GameRunner.GameCommand](10)
-          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.Pause))
-          _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(pausedState, None)
-          intervalRef <- Ref.make(LineClearing.dropInterval(pausedState.level, Mocks.testConfig.speed))
+          queue <- Queue.bounded[GameRunner.RunnerCommand](10)
+          _     <- queue.offer(GameRunner.RunnerCommand.UserAction(Input.Pause))
+          _     <- queue.offer(GameRunner.RunnerCommand.Quit)
+          loopState = GameRunner.LoopState(pausedGame, None)
+          intervalRef <- Ref.make(ScoreState.dropInterval(pausedGame.scoreState.level, Mocks.testConfig.speed))
           result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
-        yield assertTrue(result.gameState.status == GameStatus.Playing)
+        yield assertTrue(result.game.phase == GamePhase.Playing)
       }.provide(Mocks.console),
       test("eventLoop processes multiple Ticks") {
         for
-          queue <- Queue.bounded[GameRunner.GameCommand](10)
-          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
-          _     <- queue.offer(GameRunner.GameCommand.TimeTick)
-          _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
-          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, Mocks.testConfig.speed))
+          queue <- Queue.bounded[GameRunner.RunnerCommand](10)
+          _     <- queue.offer(GameRunner.RunnerCommand.TimeTick)
+          _     <- queue.offer(GameRunner.RunnerCommand.TimeTick)
+          _     <- queue.offer(GameRunner.RunnerCommand.Quit)
+          loopState = GameRunner.LoopState(initialGame, None)
+          intervalRef <- Ref.make(ScoreState.dropInterval(initialGame.scoreState.level, Mocks.testConfig.speed))
           result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
-        yield assertTrue(result.gameState != null)
+        yield assertTrue(result.game != null)
       }.provide(Mocks.console),
       test("eventLoop updates previousBuffer after each command") {
         for
-          queue <- Queue.bounded[GameRunner.GameCommand](10)
-          _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
-          _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
-          intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, Mocks.testConfig.speed))
+          queue <- Queue.bounded[GameRunner.RunnerCommand](10)
+          _     <- queue.offer(GameRunner.RunnerCommand.UserAction(Input.MoveRight))
+          _     <- queue.offer(GameRunner.RunnerCommand.Quit)
+          loopState = GameRunner.LoopState(initialGame, None)
+          intervalRef <- Ref.make(ScoreState.dropInterval(initialGame.scoreState.level, Mocks.testConfig.speed))
           result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(Mocks.console)

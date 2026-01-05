@@ -2,9 +2,13 @@ package monadris.infrastructure
 
 import zio.*
 
-import monadris.domain.*
+import monadris.domain.Input
 import monadris.domain.config.AppConfig
-import monadris.logic.*
+import monadris.domain.model.game.DomainEvent
+import monadris.domain.model.game.GameCommand
+import monadris.domain.model.game.TetrisGame
+import monadris.domain.model.scoring.ScoreState
+import monadris.infrastructure.input.InputTranslator
 import monadris.view.GameView
 import monadris.view.ScreenBuffer
 
@@ -17,32 +21,10 @@ object GameRunner:
   /**
    * イベントループで扱うコマンド
    */
-  enum GameCommand:
+  enum RunnerCommand:
     case UserAction(input: Input) // ユーザー操作
     case TimeTick                 // 時間経過
     case Quit                     // 終了
-
-  /**
-   * 描画を抽象化するトレイト（依存性注入用）
-   */
-  trait Renderer:
-    def render(state: GameState): UIO[Unit]
-    def renderGameOver(state: GameState): UIO[Unit]
-
-  /**
-   * 乱数生成を抽象化
-   */
-  trait RandomPiece:
-    def nextShape: UIO[TetrominoShape]
-
-  /**
-   * ランダムピース生成器
-   */
-  object RandomPieceGenerator extends RandomPiece:
-    private val shapes = TetrominoShape.values.toVector
-
-    def nextShape: UIO[TetrominoShape] =
-      Random.nextIntBounded(shapes.size).map(shapes(_))
 
   /**
    * タイトル画面を表示
@@ -55,18 +37,18 @@ object GameRunner:
    * ゲーム画面を描画（差分描画対応）
    */
   def renderGame(
-    state: GameState,
+    game: TetrisGame,
     config: AppConfig,
     previousBuffer: Option[ScreenBuffer] = None
   ): ZIO[ConsoleService, Throwable, ScreenBuffer] =
-    val buffer = GameView.toScreenBuffer(state, config)
+    val buffer = GameView.toScreenBuffer(game, config)
     ConsoleRenderer.render(buffer, previousBuffer).as(buffer)
 
   /**
    * ゲームオーバー画面を描画
    */
-  def renderGameOver(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
-    val buffer = GameView.gameOverScreen(state)
+  def renderGameOver(game: TetrisGame): ZIO[ConsoleService, Throwable, Unit] =
+    val buffer = GameView.gameOverScreen(game)
     ConsoleRenderer.renderWithoutClear(buffer)
 
   // ============================================================
@@ -81,11 +63,11 @@ object GameRunner:
   // ============================================================
 
   /**
-   * ゲームループの状態（GameState + 前回描画バッファ）
+   * ゲームループの状態（TetrisGame + 前回描画バッファ）
    * テスト用にパッケージプライベート
    */
   private[infrastructure] case class LoopState(
-    gameState: GameState,
+    game: TetrisGame,
     previousBuffer: Option[ScreenBuffer]
   )
 
@@ -94,17 +76,17 @@ object GameRunner:
    * Queueを使って処理を直列化し、競合状態を解消
    */
   def interactiveGameLoop(
-    initialState: GameState
-  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, GameState] =
+    initialGame: TetrisGame
+  ): ZIO[TtyService & ConsoleService & AppConfig, Throwable, TetrisGame] =
     for
       config       <- ZIO.service[AppConfig]
-      commandQueue <- Queue.bounded[GameCommand](EventLoop.CommandQueueCapacity)
+      commandQueue <- Queue.bounded[RunnerCommand](EventLoop.CommandQueueCapacity)
 
       // 初回描画（全描画）
-      initialBuffer <- renderGame(initialState, config, None)
+      initialBuffer <- renderGame(initialGame, config, None)
 
       // 落下間隔を保持するRef（レベル変化に応じて動的に更新される）
-      initialInterval = LineClearing.dropInterval(initialState.level, config.speed)
+      initialInterval = ScoreState.dropInterval(initialGame.scoreState.level, config.speed)
       intervalRef <- Ref.make(initialInterval)
 
       // Input Fiber: キー入力を読み取り、コマンドをQueueに追加
@@ -116,7 +98,7 @@ object GameRunner:
       // Main Loop: Queueからコマンドを取り出して処理
       finalLoopState <- eventLoop(
         commandQueue,
-        LoopState(initialState, Some(initialBuffer)),
+        LoopState(initialGame, Some(initialBuffer)),
         config,
         intervalRef
       )
@@ -124,13 +106,13 @@ object GameRunner:
       // Fiberを停止
       _ <- inputFiber.interrupt
       _ <- tickFiber.interrupt
-    yield finalLoopState.gameState
+    yield finalLoopState.game
 
   /**
    * Input Producer: キー入力を読み取り、コマンドをQueueに追加
    */
   private def inputProducer(
-    queue: Queue[GameCommand],
+    queue: Queue[RunnerCommand],
     pollIntervalMs: Int
   ): ZIO[TtyService & AppConfig, Throwable, Unit] =
     val readAndOffer = for
@@ -139,10 +121,10 @@ object GameRunner:
         case TerminalInput.ParseResult.Timeout =>
           TtyService.sleep(pollIntervalMs)
         case TerminalInput.ParseResult.Regular(key) if TerminalInput.isQuitKey(key) =>
-          ZIO.logInfo("Quit key pressed") *> queue.offer(GameCommand.Quit)
+          ZIO.logInfo("Quit key pressed") *> queue.offer(RunnerCommand.Quit)
         case _ =>
           TerminalInput.toInput(parseResult) match
-            case Some(input) => queue.offer(GameCommand.UserAction(input))
+            case Some(input) => queue.offer(RunnerCommand.UserAction(input))
             case None        => ZIO.unit
     yield ()
 
@@ -153,13 +135,13 @@ object GameRunner:
    * intervalRefを参照して動的に間隔を調整
    */
   private def tickProducer(
-    queue: Queue[GameCommand],
+    queue: Queue[RunnerCommand],
     intervalRef: Ref[Long]
   ): ZIO[TtyService, Throwable, Unit] =
     val tickAndSleep = for
       interval <- intervalRef.get
       _        <- TtyService.sleep(interval.toInt)
-      _        <- queue.offer(GameCommand.TimeTick)
+      _        <- queue.offer(RunnerCommand.TimeTick)
     yield ()
 
     tickAndSleep.forever
@@ -170,48 +152,64 @@ object GameRunner:
    * テスト用にパッケージプライベート
    */
   private[infrastructure] def eventLoop(
-    queue: Queue[GameCommand],
+    queue: Queue[RunnerCommand],
     state: LoopState,
     config: AppConfig,
     intervalRef: Ref[Long]
   ): ZIO[ConsoleService, Throwable, LoopState] =
     queue.take.flatMap {
-      case GameCommand.Quit =>
+      case RunnerCommand.Quit =>
         ZIO.succeed(state)
 
-      case GameCommand.UserAction(input) =>
-        processCommand(input, state, config, intervalRef).flatMap { newState =>
-          if newState.gameState.isGameOver then ZIO.succeed(newState)
-          else eventLoop(queue, newState, config, intervalRef)
-        }
+      case RunnerCommand.UserAction(input) =>
+        InputTranslator.translate(input) match
+          case Some(cmd) =>
+            processCommand(cmd, state, config, intervalRef).flatMap { newState =>
+              if newState.game.isOver then ZIO.succeed(newState)
+              else eventLoop(queue, newState, config, intervalRef)
+            }
+          case None =>
+            // Quit input
+            ZIO.succeed(state)
 
-      case GameCommand.TimeTick =>
-        processCommand(Input.Tick, state, config, intervalRef).flatMap { newState =>
-          if newState.gameState.isGameOver then ZIO.succeed(newState)
+      case RunnerCommand.TimeTick =>
+        processCommand(GameCommand.Tick, state, config, intervalRef).flatMap { newState =>
+          if newState.game.isOver then ZIO.succeed(newState)
           else eventLoop(queue, newState, config, intervalRef)
         }
     }
 
   /**
-   * コマンド処理: 状態更新 + 差分描画 + 落下間隔の動的更新
+   * コマンド処理: 状態更新 + イベントハンドリング + 差分描画 + 落下間隔の動的更新
    */
   private def processCommand(
-    input: Input,
+    cmd: GameCommand,
     state: LoopState,
     config: AppConfig,
     intervalRef: Ref[Long]
   ): ZIO[ConsoleService, Throwable, LoopState] =
+    val (newGame, events) = state.game.handle(cmd)
     for
-      nextShape <- RandomPieceGenerator.nextShape
-      oldGameState = state.gameState
-      newGameState = GameLogic.update(oldGameState, input, () => nextShape, config)
-      _ <- ZIO.when(newGameState.isGameOver && !oldGameState.isGameOver) {
-        ZIO.logInfo(
-          s"Game Over - Score: ${newGameState.score}, Lines: ${newGameState.linesCleared}, Level: ${newGameState.level}"
-        )
-      }
+      // ドメインイベントをログ出力
+      _ <- ZIO.foreach(events)(handleDomainEvent)
+
       // レベルに応じた落下間隔を計算し、Refを更新（ゲームオーバー時は更新しない）
-      newInterval = LineClearing.dropInterval(newGameState.level, config.speed)
-      _         <- ZIO.unless(newGameState.isGameOver)(intervalRef.set(newInterval))
-      newBuffer <- renderGame(newGameState, config, state.previousBuffer)
-    yield LoopState(newGameState, Some(newBuffer))
+      newInterval = ScoreState.dropInterval(newGame.scoreState.level, config.speed)
+      _         <- ZIO.unless(newGame.isOver)(intervalRef.set(newInterval))
+      newBuffer <- renderGame(newGame, config, state.previousBuffer)
+    yield LoopState(newGame, Some(newBuffer))
+
+  /**
+   * ドメインイベントのハンドリング
+   * 将来的にはサウンド再生などの副作用もここで実行
+   */
+  private def handleDomainEvent(event: DomainEvent): UIO[Unit] =
+    event match
+      case DomainEvent.LinesCleared(count, scoreGained) =>
+        ZIO.logInfo(s"Lines cleared: $count (+$scoreGained points)")
+      case DomainEvent.LevelUp(newLevel) =>
+        ZIO.logInfo(s"Level up! Now level $newLevel")
+      case DomainEvent.GameOver(finalScore) =>
+        ZIO.logInfo(s"Game Over - Final score: $finalScore")
+      case _ =>
+        ZIO.unit
