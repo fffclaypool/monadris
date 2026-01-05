@@ -12,43 +12,13 @@ jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Add label based on branch name
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-        run: |
-          BRANCH_NAME="${{ github.head_ref }}"
-
-          echo "Branch name: $BRANCH_NAME"
-
-          # Determine label based on branch prefix
-          LABEL=""
-          case "$BRANCH_NAME" in
-            feature/*)
-              LABEL="enhancement"
-              ;;
-            fix/*|hotfix/*)
-              LABEL="bug"
-              ;;
-            refactor/*)
-              LABEL="refactor"
-              ;;
-            docs/*)
-              LABEL="documentation"
-              ;;
-            chore/*)
-              LABEL="chore"
-              ;;
-            *)
-              echo "No matching prefix found. Skipping label assignment."
-              exit 0
-              ;;
-          esac
-
-          echo "Assigning label: $LABEL"
-
-          # Add label to PR using GitHub CLI
-          gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "$LABEL"
-
-          echo "Label '$LABEL' has been added to PR #$PR_NUMBER"
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: .github/scripts/add-pr-label.sh

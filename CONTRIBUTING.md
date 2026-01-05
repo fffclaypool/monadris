@@ -21,7 +21,8 @@ This repository enforces a strict branch naming convention. **Pull requests from
 | `hotfix/` | Urgent production fixes | `bug` |
 | `refactor/` | Code refactoring (no functional changes) | `refactor` |
 | `docs/` | Documentation updates | `documentation` |
-| `chore/` | Maintenance tasks, dependency updates | `chore` |
+| `chore/` | Maintenance tasks | `chore` |
+| `update/` | Dependency updates (used by Scala Steward) | `dependencies` |
 
 ### Examples
 
