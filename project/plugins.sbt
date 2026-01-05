@@ -1,5 +1,5 @@
 addSbtPlugin("org.scalameta"   % "sbt-scalafmt"        % "2.5.2")
 addSbtPlugin("ch.epfl.scala"   % "sbt-scalafix"        % "0.14.5")
 addSbtPlugin("org.scoverage"   % "sbt-scoverage"       % "2.0.11")
-addSbtPlugin("org.wartremover" % "sbt-wartremover"     % "3.2.5")
+addSbtPlugin("org.wartremover" % "sbt-wartremover"     % "3.2.7")
 addSbtPlugin("com.github.sbt"  % "sbt-native-packager" % "1.10.4")
