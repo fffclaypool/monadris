@@ -9,7 +9,8 @@
       "Bash(sbt coverage:*)",
       "Bash(find:*)",
       "Bash(sbt:*)",
-      "Bash(git worktree:*)"
+      "Bash(git worktree:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

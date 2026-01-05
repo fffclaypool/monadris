@@ -51,14 +51,3 @@ object Terminal:
       def available: Task[Int] = ZIO.attemptBlocking(tty.available())
       def read: Task[Int]      = ZIO.attemptBlocking(tty.read())
   }
-
-  // テスト用実装
-  def test(inputs: Chunk[Int]): ZLayer[Any, Nothing, Terminal] =
-    ZLayer.fromZIO {
-      for
-        queue <- Queue.unbounded[Int]
-        _     <- queue.offerAll(inputs)
-      yield new Terminal:
-        def available: Task[Int] = queue.size
-        def read: Task[Int]      = queue.take
-    }

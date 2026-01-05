@@ -4,7 +4,6 @@ import zio.*
 import zio.test.*
 import zio.test.TestAspect.*
 
-import monadris.infrastructure.Terminal
 import monadris.infrastructure.TestServices as Mocks
 
 /**
@@ -23,7 +22,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk('q'.toInt)),
+      Mocks.terminal(Chunk('q'.toInt)),
       Mocks.config
     ),
     test("program runs and exits with lowercase q") {
@@ -31,7 +30,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk('q'.toInt)),
+      Mocks.terminal(Chunk('q'.toInt)),
       Mocks.config
     ),
     test("program runs and exits with uppercase Q") {
@@ -39,7 +38,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk('Q'.toInt)),
+      Mocks.terminal(Chunk('Q'.toInt)),
       Mocks.config
     ),
     test("program handles movement before quit") {
@@ -48,7 +47,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)),
+      Mocks.terminal(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)),
       Mocks.config
     ),
     test("program handles arrow keys before quit") {
@@ -58,7 +57,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)),
+      Mocks.terminal(Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)),
       Mocks.config
     ),
     test("program handles rotation before quit") {
@@ -68,7 +67,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk(27, '['.toInt, 'A'.toInt, 'q'.toInt)),
+      Mocks.terminal(Chunk(27, '['.toInt, 'A'.toInt, 'q'.toInt)),
       Mocks.config
     ),
     test("program handles hard drop before quit") {
@@ -78,7 +77,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk(' '.toInt, 'q'.toInt)),
+      Mocks.terminal(Chunk(' '.toInt, 'q'.toInt)),
       Mocks.config
     ),
     test("program handles pause and unpause before quit") {
@@ -88,7 +87,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk('p'.toInt, 'p'.toInt, 'q'.toInt)),
+      Mocks.terminal(Chunk('p'.toInt, 'p'.toInt, 'q'.toInt)),
       Mocks.config
     ),
     test("program handles multiple movements before quit") {
@@ -98,7 +97,7 @@ object MainSpec extends ZIOSpecDefault:
           .timeout(5.seconds)
       yield assertTrue(true)
     }.provide(
-      Terminal.test(Chunk('h'.toInt, 'h'.toInt, 'l'.toInt, 'j'.toInt, 'j'.toInt, 'q'.toInt)),
+      Mocks.terminal(Chunk('h'.toInt, 'h'.toInt, 'l'.toInt, 'j'.toInt, 'j'.toInt, 'q'.toInt)),
       Mocks.config
     )
   ) @@ withLiveClock

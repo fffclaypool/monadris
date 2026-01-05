@@ -6,7 +6,6 @@ import zio.test.TestAspect.*
 
 import monadris.domain.config.AppConfig
 import monadris.domain.model.game.TetrisGame
-import monadris.infrastructure.Terminal
 import monadris.infrastructure.TestServices as Mocks
 
 /**
@@ -47,7 +46,7 @@ object GameEngineSpec extends ZIOSpecDefault:
         for finalGame <- GameEngine.runSession(game).timeout(3.seconds)
         yield assertTrue(finalGame.isDefined)
       }.provide(
-        Terminal.test(Chunk('q'.toInt)),
+        Mocks.terminal(Chunk('q'.toInt)),
         Mocks.config
       ),
       test("processes movement commands before quit") {
@@ -56,7 +55,7 @@ object GameEngineSpec extends ZIOSpecDefault:
         for finalGame <- GameEngine.runSession(game).timeout(3.seconds)
         yield assertTrue(finalGame.isDefined)
       }.provide(
-        Terminal.test(Chunk('h'.toInt, 'l'.toInt, 'q'.toInt)),
+        Mocks.terminal(Chunk('h'.toInt, 'l'.toInt, 'q'.toInt)),
         Mocks.config
       ),
       test("processes rotation commands") {
@@ -65,7 +64,7 @@ object GameEngineSpec extends ZIOSpecDefault:
         for finalGame <- GameEngine.runSession(game).timeout(3.seconds)
         yield assertTrue(finalGame.isDefined)
       }.provide(
-        Terminal.test(Chunk('k'.toInt, 'q'.toInt)),
+        Mocks.terminal(Chunk('k'.toInt, 'q'.toInt)),
         Mocks.config
       ),
       test("processes hard drop command") {
@@ -74,7 +73,7 @@ object GameEngineSpec extends ZIOSpecDefault:
         for finalGame <- GameEngine.runSession(game).timeout(3.seconds)
         yield assertTrue(finalGame.isDefined)
       }.provide(
-        Terminal.test(Chunk(' '.toInt, 'q'.toInt)),
+        Mocks.terminal(Chunk(' '.toInt, 'q'.toInt)),
         Mocks.config
       ),
       test("processes pause command") {
@@ -83,7 +82,7 @@ object GameEngineSpec extends ZIOSpecDefault:
         for finalGame <- GameEngine.runSession(game).timeout(3.seconds)
         yield assertTrue(finalGame.isDefined)
       }.provide(
-        Terminal.test(Chunk('p'.toInt, 'p'.toInt, 'q'.toInt)),
+        Mocks.terminal(Chunk('p'.toInt, 'p'.toInt, 'q'.toInt)),
         Mocks.config
       )
     )
