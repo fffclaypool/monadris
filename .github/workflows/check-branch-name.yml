@@ -1,0 +1,35 @@
+name: Branch Name Linter
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name convention
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          PATTERN="^(feature|fix|hotfix|refactor|docs|chore)/.+"
+
+          echo "Checking branch name: $BRANCH_NAME"
+
+          if [[ "$BRANCH_NAME" =~ $PATTERN ]]; then
+            echo "Branch name '$BRANCH_NAME' follows the naming convention."
+            exit 0
+          else
+            echo "::error::Branch name '$BRANCH_NAME' does not follow the naming convention."
+            echo ""
+            echo "Expected format: <type>/<description>"
+            echo "Valid prefixes: feature/, fix/, hotfix/, refactor/, docs/, chore/"
+            echo ""
+            echo "Examples:"
+            echo "  - feature/add-tetromino"
+            echo "  - fix/score-bug"
+            echo "  - refactor/clean-up-logic"
+            echo "  - docs/update-readme"
+            echo ""
+            echo "Please rename your branch and create a new PR."
+            exit 1
+          fi
