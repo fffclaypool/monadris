@@ -3,13 +3,13 @@ package monadris.infrastructure
 import zio.*
 import zio.test.*
 
-import monadris.domain.*
+import monadris.domain.model.game.GameCommand
+import monadris.domain.model.game.TetrisGame
 import monadris.infrastructure.TestServices as LocalTestServices
-import monadris.logic.GameLogic
 
 /**
  * メモリ負荷とリークをチェックするストレステスト
- * GameLogicを使用して大量のゲームループを実行し、
+ * TetrisGame.handleを使用して大量のゲームループを実行し、
  * メモリ使用量の推移を監視する
  */
 object StressTest extends ZIOSpecDefault:
@@ -22,6 +22,7 @@ object StressTest extends ZIOSpecDefault:
     val totalIterations     = 100000
     val memoryCheckInterval = 10000
     val bytesPerMegabyte    = 1024 * 1024
+    val testSeed            = 42L
 
   // ============================================================
   // Memory utilities
@@ -58,50 +59,41 @@ object StressTest extends ZIOSpecDefault:
   private val gridWidth  = testConfig.grid.width
   private val gridHeight = testConfig.grid.height
 
-  private def initialState: GameState =
-    GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-
-  /**
-   * 決定的なテトリミノ形状プロバイダー
-   * ランダム性を排除してテストを再現可能にする
-   */
-  private def deterministicShapeProvider(counter: Int): () => TetrominoShape =
-    val shapes = TetrominoShape.values
-    () => shapes(counter % shapes.length)
+  private def initialGame: TetrisGame =
+    TetrisGame.create(Constants.testSeed, gridWidth, gridHeight, testConfig.score, testConfig.level)
 
   // ============================================================
   // Stress test
   // ============================================================
 
   def spec = suite("StressTest")(
-    test("GameLogic handles 100,000 iterations without memory leak") {
+    test("TetrisGame handles 100,000 iterations without memory leak") {
       for
-        _          <- printMemoryStatus("START")
-        finalState <- runGameLoop(initialState, Constants.totalIterations)
-        _          <- printMemoryStatus("BEFORE GC")
-        _          <- runGarbageCollection
-        _          <- printMemoryStatus("AFTER GC (Final)")
+        _         <- printMemoryStatus("START")
+        finalGame <- runGameLoop(initialGame, Constants.totalIterations)
+        _         <- printMemoryStatus("BEFORE GC")
+        _         <- runGarbageCollection
+        _         <- printMemoryStatus("AFTER GC (Final)")
       yield assertTrue(
-        finalState != null,
-        finalState.score >= 0,
-        finalState.linesCleared >= 0
+        finalGame != null,
+        finalGame.scoreState.score >= 0,
+        finalGame.scoreState.linesCleared >= 0
       )
     } @@ TestAspect.timeout(5.minutes) @@ TestAspect.tag("heavy") @@ TestAspect.ifEnvSet("RUN_STRESS_TESTS")
   )
 
   /**
    * ゲームループを指定回数実行
-   * 純粋関数GameLogic.updateを繰り返し呼び出す
+   * 純粋関数TetrisGame.handleを繰り返し呼び出す
    */
   private def runGameLoop(
-    initialState: GameState,
+    initialGame: TetrisGame,
     iterations: Int
-  ): UIO[GameState] =
+  ): UIO[TetrisGame] =
     ZIO.succeed {
-      val inputs = createInputSequence
+      val commands = createCommandSequence
 
-      var state        = initialState
-      var shapeCounter = 0
+      var game = initialGame
 
       for i <- 0 until iterations do
         // 定期的なメモリチェック
@@ -110,37 +102,39 @@ object StressTest extends ZIOSpecDefault:
           println(s"[PROGRESS] Iteration $i: Memory used = ${usedMB}MB")
 
         // ゲームオーバーなら初期状態にリセット
-        if state.isGameOver then
-          state = initialState.copy(
-            score = state.score,
-            linesCleared = state.linesCleared
+        if game.isOver then
+          game = TetrisGame.create(
+            Constants.testSeed + i,
+            gridWidth,
+            gridHeight,
+            testConfig.score,
+            testConfig.level
           )
 
-        // 入力を選択
-        val input = inputs(i % inputs.length)
+        // コマンドを選択
+        val command = commands(i % commands.length)
 
         // 状態更新
-        val provider = deterministicShapeProvider(shapeCounter)
-        state = GameLogic.update(state, input, provider, testConfig)
-        shapeCounter = shapeCounter + 1
+        val (newGame, _) = game.handle(command)
+        game = newGame
 
-      state
+      game
     }
 
   /**
-   * テスト用の入力シーケンスを生成
+   * テスト用のコマンドシーケンスを生成
    * 様々な操作を含むパターン
    */
-  private def createInputSequence: Vector[Input] =
+  private def createCommandSequence: Vector[GameCommand] =
     Vector(
-      Input.Tick,
-      Input.MoveLeft,
-      Input.Tick,
-      Input.MoveRight,
-      Input.Tick,
-      Input.RotateClockwise,
-      Input.Tick,
-      Input.MoveDown,
-      Input.Tick,
-      Input.HardDrop
+      GameCommand.Tick,
+      GameCommand.MoveLeft,
+      GameCommand.Tick,
+      GameCommand.MoveRight,
+      GameCommand.Tick,
+      GameCommand.RotateCW,
+      GameCommand.Tick,
+      GameCommand.SoftDrop,
+      GameCommand.Tick,
+      GameCommand.HardDrop
     )

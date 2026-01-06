@@ -1,9 +1,7 @@
-package monadris.domain
+package monadris.domain.model.board
 
 /**
- * 2次元座標を表す不変データ構造
- * x: 列（左が0）
- * y: 行（上が0）
+ * 2次元座標を表す値オブジェクト
  */
 final case class Position(x: Int, y: Int):
   def +(other: Position): Position = Position(x + other.x, y + other.y)

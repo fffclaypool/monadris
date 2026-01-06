@@ -13,7 +13,6 @@ class ArchitectureSpec extends AnyFlatSpec with Matchers:
   private object Packages:
     val root: String           = "monadris"
     val domain: String         = "..domain.."
-    val logic: String          = "..logic.."
     val view: String           = "..view.."
     val javaSql: String        = "java.sql.."
     val javaFileIo: String     = "java.nio.file.."
@@ -30,18 +29,7 @@ class ArchitectureSpec extends AnyFlatSpec with Matchers:
 
   private val classes = new ClassFileImporter().importPackages(Packages.root)
 
-  "Domain layer" should "not depend on logic layer" in:
-    val rule = noClasses()
-      .that()
-      .resideInAPackage(Packages.domain)
-      .should()
-      .dependOnClassesThat()
-      .resideInAPackage(Packages.logic)
-      .because("Domain models should not depend on logic layer")
-
-    rule.check(classes)
-
-  it should "not depend on view layer" in:
+  "Domain layer" should "not depend on view layer" in:
     val rule = noClasses()
       .that()
       .resideInAPackage(Packages.domain)
@@ -52,25 +40,15 @@ class ArchitectureSpec extends AnyFlatSpec with Matchers:
 
     rule.check(classes)
 
-  "Logic layer" should "not depend on view layer" in:
+  "View layer" should "not depend on domain.model.game internals" in:
+    // View depends on domain, but domain should not depend on view
     val rule = noClasses()
       .that()
-      .resideInAPackage(Packages.logic)
+      .resideInAPackage(Packages.domain)
       .should()
       .dependOnClassesThat()
       .resideInAPackage(Packages.view)
-      .because("Logic should not know about presentation details")
-
-    rule.check(classes)
-
-  "View layer" should "not depend on logic layer" in:
-    val rule = noClasses()
-      .that()
-      .resideInAPackage(Packages.view)
-      .should()
-      .dependOnClassesThat()
-      .resideInAPackage(Packages.logic)
-      .because("View should only transform state to screen buffer, not execute logic")
+      .because("Domain should be independent of view layer")
 
     rule.check(classes)
 

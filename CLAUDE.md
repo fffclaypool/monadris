@@ -41,18 +41,24 @@ monadris/
 ├── core/                 # Pure logic (ZIO-independent)
 │   └── src/
 │       ├── main/scala/monadris/
-│       │   ├── domain/       # Pure data structures
-│       │   │   └── config/   # Pure config case classes
-│       │   ├── logic/        # Pure game logic
-│       │   └── view/         # Pure view transformation
+│       │   ├── domain/
+│       │   │   ├── config/           # Pure config case classes
+│       │   │   ├── model/
+│       │   │   │   ├── board/        # Board, Cell, Position
+│       │   │   │   ├── game/         # TetrisGame, GameCommand, DomainEvent, GamePhase
+│       │   │   │   ├── piece/        # ActivePiece, Tetromino, Rotation
+│       │   │   │   └── scoring/      # ScoreState
+│       │   │   └── service/          # PieceQueue (7-bag)
+│       │   └── view/                 # Pure view transformation
 │       └── test/scala/monadris/
 ├── app/                  # Impure layer (ZIO-dependent)
 │   └── src/
 │       ├── main/scala/monadris/
-│       │   ├── config/       # ZIO Config loading (ConfigLayer)
+│       │   ├── config/               # ZIO Config loading (ConfigLayer)
 │       │   └── infrastructure/
+│       │       └── input/            # InputTranslator (ACL)
 │       └── test/scala/monadris/
-│       └── resources/        # application.conf, logback.xml
+│       └── resources/                # application.conf, logback.xml
 └── build.sbt
 ```
 
@@ -61,11 +67,15 @@ monadris/
 #### `core` Project (Pure Layer)
 - **No ZIO dependency** - pure Scala only
 - **WartRemover enforced** - `var`, `null`, `throw`, `return` are compile errors
+- **Functional DDD**: Domain models contain business logic (rich domain model)
 - Contains:
-  - `domain/` - Pure data structures (`GameState`, `Grid`, `Tetromino`, `Input`)
+  - `domain/model/game/` - Aggregate root (`TetrisGame`), commands (`GameCommand`), events (`DomainEvent`)
+  - `domain/model/board/` - Board aggregate with collision logic (`Board`, `Cell`, `Position`)
+  - `domain/model/piece/` - Piece aggregate with movement/rotation (`ActivePiece`, `Tetromino`, `Rotation`)
+  - `domain/model/scoring/` - Score value object (`ScoreState`)
+  - `domain/service/` - Domain services (`PieceQueue` - 7-bag algorithm)
   - `domain/config/` - Pure `case class` definitions (`AppConfig`, etc.)
-  - `logic/` - Pure functions: `(State, Input) => State`
-  - `view/` - Pure transformation: `State => ScreenBuffer`
+  - `view/` - Pure transformation: `TetrisGame => ScreenBuffer`
 
 #### `app` Project (Impure Layer)
 - Depends on `core`
@@ -74,6 +84,7 @@ monadris/
 - Contains:
   - `config/ConfigLayer` - ZIO Config loading from `application.conf`
   - `infrastructure/` - `ConsoleRenderer`, `TerminalInput`, `GameRunner`
+  - `infrastructure/input/` - `InputTranslator` (Anti-Corruption Layer: `Input` → `GameCommand`)
   - `Main.scala` - Application entry point
 
 ### WartRemover (Purity Enforcement)

@@ -8,7 +8,9 @@
       "Bash(sbt \"testOnly monadris.logic.GameLogicExtendedSpec\")",
       "Bash(sbt coverage:*)",
       "Bash(find:*)",
-      "Bash(sbt:*)"
+      "Bash(sbt:*)",
+      "Bash(git worktree:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

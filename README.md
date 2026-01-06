@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/4d8b7920-68e7-45d8-9a86-fbe476922b3c
 
 - **Zero Mutation**: `var`, `null`, `throw`, and `return` are forbidden at compile time via **WartRemover** (in `core`).
 - **Physical Separation**: Multi-project architecture strictly isolates pure `core` logic from impure `app` infrastructure.
-- **Pure Functions**: Game logic is modeled strictly as `(State, Input) => State`.
+- **Functional DDD**: Rich domain models with Event Sourcing style: `handle(cmd: GameCommand): (TetrisGame, List[DomainEvent])`.
 - **Event-Driven**: Utilizing **ZIO Queue** for non-blocking, thread-safe event handling.
 - **Effect Isolation**: Rendering, input, and time are wrapped in ZIO effects.
 - **Configurable**: Game settings are loaded from HOCON configuration files.
@@ -29,7 +29,7 @@ https://github.com/user-attachments/assets/4d8b7920-68e7-45d8-9a86-fbe476922b3c
 ## Architecture
 
 ### 1. Data Flow
-The internal state management follows a strict unidirectional data flow pattern (The Elm Architecture)
+The internal state management follows a Functional DDD pattern with Event Sourcing style.
 
 ```mermaid
 graph LR
@@ -40,23 +40,26 @@ graph LR
     classDef terminal fill:#263238,stroke:#000000,stroke-width:2px,color:#ffffff,rx:10,ry:10;
 
     Input["Input / Ticker"]:::infra
+    Translator["InputTranslator"]:::infra
     Queue["ZIO Queue"]:::infra
     Loop["Game Loop"]:::infra
     Renderer["Console Renderer"]:::infra
 
-    Logic["Game Logic"]:::core
-    State["Domain State"]:::core
+    Game["TetrisGame.handle()"]:::core
+    Events["DomainEvents"]:::core
 
     View["Game View"]:::view
 
     Terminal(("Terminal Output")):::terminal
 
-    Input -->|Command| Queue
-    Queue -->|Event| Loop
-    Loop -->|Action| Logic
-    Logic -->|Update| State
-    State -->|Data| View
-    View -->|ViewModel| Renderer
+    Input -->|Input| Translator
+    Translator -->|GameCommand| Queue
+    Queue -->|Command| Loop
+    Loop -->|Command| Game
+    Game -->|"(State, Events)"| Loop
+    Loop -->|Events| Events
+    Game -->|State| View
+    View -->|ScreenBuffer| Renderer
     Renderer -->|ANSI| Terminal
 ```
 
@@ -74,32 +77,38 @@ graph TD
         direction TB
         Main["Main / ZIO App"]:::impure
         Infra["Infrastructure"]:::impure
+        Translator["InputTranslator"]:::impure
         ConfigLoader["Config Loader"]:::impure
     end
 
     subgraph Boundary ["🚧 Physical Barrier"]
         direction TB
-        subgraph CoreProject ["Core Project (Pure Scala)"]
-            Logic["Game Logic"]:::pure
-            Domain["Domain Models"]:::pure
+        subgraph CoreProject ["Core Project (Pure Scala / Functional DDD)"]
+            Game["TetrisGame (Aggregate Root)"]:::pure
+            Board["Board Aggregate"]:::pure
+            Piece["ActivePiece Aggregate"]:::pure
+            Service["PieceQueue Service"]:::pure
             View["View Logic"]:::pure
         end
     end
 
     Main --> Infra
-    Infra --> Logic
+    Infra --> Translator
+    Translator --> Game
     Infra --> View
-    Logic --> Domain
-    View --> Domain
-    ConfigLoader --> Domain
+    Game --> Board
+    Game --> Piece
+    Game --> Service
+    View --> Game
+    ConfigLoader --> Game
 ```
 
 | Layer | Project | ZIO Dependency | Description |
 |-------|---------|----------------|-------------|
-| **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`) |
-| **Logic** | `core` | **No** | Pure state transitions (`GameLogic`) |
-| **View** | `core` | **No** | Pure transformation (`State => ScreenBuffer`) |
-| **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Loop |
+| **Domain Model** | `core` | **No** | Aggregates (`TetrisGame`, `Board`, `ActivePiece`), Value Objects (`ScoreState`) |
+| **Domain Service** | `core` | **No** | Domain services (`PieceQueue` - 7-bag algorithm) |
+| **View** | `core` | **No** | Pure transformation (`TetrisGame => ScreenBuffer`) |
+| **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Loop, InputTranslator |
 
 ### 3. Runtime Event Loop
 How ZIO handles concurrent inputs and serializes them into the game loop.
@@ -111,7 +120,7 @@ sequenceDiagram
     participant Timer as ⏰ Timer Fiber
     participant Queue as 📥 ZIO Queue
     participant GameLoop as 🔄 Game Loop
-    participant Core as 🧠 Pure Core
+    participant TetrisGame as 🧠 TetrisGame
     participant Screen as 🖥️ Terminal
 
     Note over Input, Timer: Running in Parallel (ZIO Fibers)
@@ -120,18 +129,19 @@ sequenceDiagram
         User->>Input: Press Key
         Input->>Queue: Offer(UserAction)
     and
-        Timer->>Timer: Sleep(100ms)
+        Timer->>Timer: Sleep(interval)
         Timer->>Queue: Offer(TimeTick)
     end
 
     Note over Queue, GameLoop: Serialize Concurrent Events
 
     loop Every Event
-        Queue->>GameLoop: Take(Command)
-        GameLoop->>Core: update(State, Command)
-        Core-->>GameLoop: New State
-        GameLoop->>Core: view(New State)
-        Core-->>GameLoop: ScreenBuffer
+        Queue->>GameLoop: Take(RunnerCommand)
+        GameLoop->>TetrisGame: handle(GameCommand)
+        TetrisGame-->>GameLoop: (NewState, DomainEvents)
+        GameLoop->>GameLoop: Log DomainEvents
+        GameLoop->>TetrisGame: toScreenBuffer(State)
+        TetrisGame-->>GameLoop: ScreenBuffer
         GameLoop->>Screen: Render(ANSI Codes)
     end
 ```
@@ -190,16 +200,20 @@ sbt compile
 monadris/
 ├── core/                       # Pure logic (ZIO-independent / WartRemover enforced)
 │   └── src/main/scala/monadris/
-│       ├── domain/             # Immutable data models
+│       ├── domain/
 │       │   ├── config/         # Pure config definition
-│       │   ├── GameState.scala
-│       │   └── ...
-│       ├── logic/              # Pure game rules
-│       └── view/               # Presentation logic
+│       │   ├── model/
+│       │   │   ├── board/      # Board, Cell, Position
+│       │   │   ├── game/       # TetrisGame (aggregate root), GameCommand, DomainEvent
+│       │   │   ├── piece/      # ActivePiece, Tetromino, Rotation
+│       │   │   └── scoring/    # ScoreState
+│       │   └── service/        # PieceQueue (7-bag algorithm)
+│       └── view/               # Pure transformation (TetrisGame => ScreenBuffer)
 ├── app/                        # Impure layer (ZIO-dependent)
 │   └── src/main/scala/monadris/
 │       ├── config/             # ZIO Config loading
-│       ├── infrastructure/     # ZIO effect implementation
+│       ├── infrastructure/
+│       │   └── input/          # InputTranslator (ACL)
 │       └── Main.scala
 └── build.sbt
 ```
@@ -218,8 +232,9 @@ sbt "testOnly * -- -n heavy"
 ```
 
 ### Test Coverage
-- **Domain & Logic**: Invariants, state transitions, collision detection.
-- **View**: Layout generation and ViewModel construction.
+- **Domain Model**: TetrisGame command handling, Board collision, ActivePiece rotation/movement, ScoreState calculations.
+- **Property-Based Tests**: Invariants verified with generators (e.g., "score never decreases", "4 rotations return to original").
+- **View**: Layout generation and ScreenBuffer construction.
 - **Stress Testing**: Validates memory safety and stack safety by running 100,000 game frames in a simulated environment (`StressTest.scala`).
 
 ### Architecture Testing
@@ -227,8 +242,7 @@ sbt "testOnly * -- -n heavy"
 This project uses **ArchUnit** to automatically verify architectural rules. Any violation will cause `sbt test` to fail.
 
 **Enforced Rules:**
-- **Domain Isolation**: Domain layer (`monadris.domain`) must not depend on upper layers (Logic, View).
-- **Logic/View Separation**: Logic layer must not depend on View layer, and vice versa.
+- **Domain Isolation**: Domain layer (`monadris.domain`) must not depend on View layer.
 - **Purity**: Core module must not depend on impure infrastructure APIs (`java.io`, `java.sql`, `java.net`, `java.util.concurrent`) or effect systems (ZIO).
 - **No Cycles**: Package dependencies must be free of cycles.
 
