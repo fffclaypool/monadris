@@ -40,17 +40,17 @@ lazy val app = project
   .settings(
     name := "monadris-app",
     libraryDependencies ++= Seq(
-      "dev.zio"       %% "zio"                 % "2.0.19",
-      "dev.zio"       %% "zio-streams"         % "2.0.19",
+      "dev.zio"       %% "zio"                 % "2.0.22",
+      "dev.zio"       %% "zio-streams"         % "2.0.22",
       "dev.zio"       %% "zio-logging"         % "2.1.17",
       "dev.zio"       %% "zio-logging-slf4j"   % "2.1.17",
       "dev.zio"       %% "zio-config"          % "4.0.0-RC16",
       "dev.zio"       %% "zio-config-typesafe" % "4.0.0-RC16",
       "dev.zio"       %% "zio-config-magnolia" % "4.0.0-RC16",
       "ch.qos.logback" % "logback-classic"     % "1.5.24",
-      "dev.zio"       %% "zio-test"            % "2.0.19" % Test,
-      "dev.zio"       %% "zio-test-sbt"        % "2.0.19" % Test,
-      "dev.zio"       %% "zio-test-magnolia"   % "2.0.19" % Test
+      "dev.zio"       %% "zio-test"            % "2.0.22" % Test,
+      "dev.zio"       %% "zio-test-sbt"        % "2.0.22" % Test,
+      "dev.zio"       %% "zio-test-magnolia"   % "2.0.22" % Test
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     fork         := true,
