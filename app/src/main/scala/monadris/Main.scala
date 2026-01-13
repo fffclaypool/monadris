@@ -51,7 +51,7 @@ object Main extends ZIOAppDefault:
 
   private def runGameSession(initialState: GameState): ZIO[GameEnv, Throwable, GameState] =
     for
-      _ <- TerminalControl.enableRawMode
+      _          <- TerminalControl.enableRawMode
       finalState <- GameRunner
         .interactiveGameLoop(initialState)
         .ensuring(TerminalControl.disableRawMode.ignore)
@@ -60,7 +60,7 @@ object Main extends ZIOAppDefault:
   private def showOutro(finalState: GameState): ZIO[GameEnv, Throwable, Unit] =
     for
       config <- ZIO.service[AppConfig]
-      _ <- ZIO.logInfo(
+      _      <- ZIO.logInfo(
         s"Game finished - Score: ${finalState.score}, Lines: ${finalState.linesCleared}, Level: ${finalState.level}"
       )
       _ <- GameRunner.renderGameOver(finalState)

@@ -50,7 +50,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     },
     test("Line clearing awards points") {
       val filled = Cell.Filled(TetrominoShape.I)
-      val grid = (0 until 9).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      val grid   = (0 until 9).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
         g.place(Position(x, 19), filled)
       }
 

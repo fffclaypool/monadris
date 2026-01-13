@@ -130,7 +130,7 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
 
   it should "apply wall kick when rotating near left wall" in {
     // Iテトリミノを左壁に移動して回転を試みる
-    val iState = GameState.initial(TetrominoShape.I, TetrominoShape.T, gridWidth, gridHeight)
+    val iState     = GameState.initial(TetrominoShape.I, TetrominoShape.T, gridWidth, gridHeight)
     val atLeftWall = (0 until gridWidth).foldLeft(iState) { (s, _) =>
       GameLogic.update(s, Input.MoveLeft, nextShapeProvider, config)
     }
@@ -145,7 +145,7 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "apply wall kick when rotating near right wall" in {
-    val iState = GameState.initial(TetrominoShape.I, TetrominoShape.T, gridWidth, gridHeight)
+    val iState      = GameState.initial(TetrominoShape.I, TetrominoShape.T, gridWidth, gridHeight)
     val atRightWall = (0 until gridWidth).foldLeft(iState) { (s, _) =>
       GameLogic.update(s, Input.MoveRight, nextShapeProvider, config)
     }
@@ -227,13 +227,12 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
   // 全テトリミノ形状
   // ============================================================
 
-  "GameLogic" should "handle all tetromino shapes" in {
+  "GameLogic" should "handle all tetromino shapes" in
     TetrominoShape.values.foreach { shape =>
       val state = GameState.initial(shape, TetrominoShape.I, gridWidth, gridHeight)
       val moved = GameLogic.update(state, Input.MoveDown, nextShapeProvider, config)
       moved.currentTetromino.position.y should be > state.currentTetromino.position.y
     }
-  }
 
   // ============================================================
   // restart関数
