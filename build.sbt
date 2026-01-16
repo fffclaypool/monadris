@@ -65,6 +65,8 @@ lazy val root = project
   .in(file("."))
   .aggregate(core, app)
   .settings(
-    name           := "monadris",
-    publish / skip := true
+    name                    := "monadris",
+    publish / skip          := true,
+    scalaVersion            := scala3Version,
+    wartremoverCrossVersion := CrossVersion.binary
   )
