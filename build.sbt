@@ -47,7 +47,7 @@ lazy val app = project
       "dev.zio"       %% "zio-config"          % "4.0.0-RC16",
       "dev.zio"       %% "zio-config-typesafe" % "4.0.0-RC16",
       "dev.zio"       %% "zio-config-magnolia" % "4.0.0-RC16",
-      "ch.qos.logback" % "logback-classic"     % "1.5.24",
+      "ch.qos.logback" % "logback-classic"     % "1.5.25",
       "dev.zio"       %% "zio-test"            % "2.1.24" % Test,
       "dev.zio"       %% "zio-test-sbt"        % "2.1.24" % Test,
       "dev.zio"       %% "zio-test-magnolia"   % "2.1.24" % Test
