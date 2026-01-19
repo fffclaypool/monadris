@@ -16,28 +16,34 @@ val commonSettings = Seq(
   Test / scalafixConfig   := Some(file(".scalafix-test.conf"))
 )
 
-// 純粋なコアロジック
 lazy val core = project
   .in(file("core"))
   .settings(commonSettings)
   .settings(
     name := "monadris-core",
-    // ZIOなどのライブラリ依存は一切なし
     // WartRemover: 純粋関数型を強制する (Compile スコープのみ)
     Compile / wartremoverErrors ++= Warts.unsafe.filterNot(_ == Wart.DefaultArguments), // DefaultArgumentsのみ許容
-    // 明示的に禁止を追加
     Compile / wartremoverErrors ++= Seq(Wart.Var, Wart.Null, Wart.Return, Wart.Throw),
     // テストコードではWartRemoverを除外
     wartremoverExcluded += (Test / sourceDirectory).value
   )
+
+// ストレステスト用の設定スコープ
+lazy val Stress = config("stress") extend Test
 
 // アプリケーション本体 (Coreに依存 + ZIO)
 lazy val app = project
   .in(file("app"))
   .dependsOn(core)
   .enablePlugins(JavaAppPackaging)
+  .configs(Stress)
   .settings(commonSettings)
   .settings(
+    inConfig(Stress)(Defaults.testSettings),
+    Stress / sourceDirectory := (Test / sourceDirectory).value,
+    Stress / envVars         := Map("RUN_STRESS_TESTS" -> "1"),
+    Stress / fork            := true,
+    Stress / testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     name := "monadris-app",
     libraryDependencies ++= Seq(
       "dev.zio"       %% "zio"                 % "2.1.24",
@@ -70,3 +76,5 @@ lazy val root = project
     scalaVersion            := scala3Version,
     wartremoverCrossVersion := CrossVersion.binary
   )
+
+addCommandAlias("stressTest", "app/Stress/testOnly *StressTest")

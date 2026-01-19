@@ -7,15 +7,15 @@
 - Test: `sbt test` (runs all tests, excludes stress tests by default)
 - Test core only: `sbt core/test`
 - Test app only: `sbt app/test`
-- Stress Test: `RUN_STRESS_TESTS=1 sbt test` (includes stress tests)
+- Stress Test: `sbt stressTest` (runs stress tests only)
 - Run: `sbt app/run`
 - Single Test: `sbt "testOnly monadris.package.ClassName"`
 - Fix Lint/Format: `sbt scalafix` (if configured)
 
 ### Test Tags
 - `heavy` - Long-running stress tests (e.g., 100,000 iterations). Tagged with `TestAspect.tag("heavy")`.
-- Stress tests are controlled by `RUN_STRESS_TESTS` environment variable (`TestAspect.ifEnvSet`).
-- **CI**: Stress tests are excluded by default. Set `RUN_STRESS_TESTS=1` to include them.
+- Stress tests use the `Stress` config scope in sbt with `RUN_STRESS_TESTS` environment variable.
+- **CI**: Run `sbt stressTest` to execute stress tests only.
 
 ## Git Workflow
 - **Commit Messages**: Write concise and descriptive messages (e.g., "feat: implement game loop", "refactor: separate view logic").
