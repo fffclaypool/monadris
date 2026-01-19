@@ -210,11 +210,11 @@ This project uses **ZIO Test**.
 Heavy tests (memory leak checks) are tagged with `heavy` and excluded by default.
 
 ```bash
-# Run standard unit tests (Fast)
-sbt "testOnly * -- -l heavy"
+# Run standard unit tests (Fast) - stress tests are excluded by default
+sbt test
 
 # Run stress tests only (Slow: 100,000 iterations)
-sbt "testOnly * -- -n heavy"
+sbt stressTest
 ```
 
 ### Test Coverage
@@ -231,6 +231,18 @@ This project uses **ArchUnit** to automatically verify architectural rules. Any 
 - **Logic/View Separation**: Logic layer must not depend on View layer, and vice versa.
 - **Purity**: Core module must not depend on impure infrastructure APIs (`java.io`, `java.sql`, `java.net`, `java.util.concurrent`) or effect systems (ZIO).
 - **No Cycles**: Package dependencies must be free of cycles.
+
+## GitHub Actions
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **CI** | Push/PR to `main` | Lint, format check, compile, test with coverage, SonarCloud scan, Codecov upload |
+| **Stress Test** | Weekly (Sun 03:00 UTC) / Manual | Run stress tests (`sbt stressTest`) |
+| **Scala Steward** | Daily (15:00 UTC) / Manual | Automated dependency updates |
+| **Manual Release** | Manual | Build and create GitHub release with tag |
+| **Auto Labeler** | PR events | Add labels to PRs based on branch name |
+| **Branch Name Linter** | PR events | Validate branch naming convention |
+| **Sync Labels** | Push to `main` (labels.yml) / Manual | Sync GitHub labels from `.github/labels.yml` |
 
 ## License
 
