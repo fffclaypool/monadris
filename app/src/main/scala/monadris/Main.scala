@@ -7,11 +7,6 @@ import monadris.domain.*
 import monadris.domain.config.AppConfig
 import monadris.infrastructure.*
 
-/**
- * テトリスのメインエントリーポイント
- * ZIOAppを使用してエフェクトを実行
- * 構成と起動のみに集中し、ロジックはinfrastructureパッケージに委譲
- */
 object Main extends ZIOAppDefault:
 
   override def run: Task[Unit] =

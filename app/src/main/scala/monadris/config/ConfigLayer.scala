@@ -7,9 +7,6 @@ import zio.config.typesafe.*
 
 import monadris.domain.config.AppConfig
 
-/**
- * ZIO Configを使った設定読み込みレイヤー
- */
 object ConfigLayer:
   private val configDescriptor: Config[AppConfig] =
     deriveConfig[AppConfig].nested("monadris")

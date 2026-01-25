@@ -1,8 +1,5 @@
 package monadris.domain
 
-/**
- * 回転状態（4方向）
- */
 enum Rotation:
   case R0, R90, R180, R270
 
@@ -18,17 +15,10 @@ enum Rotation:
     case R180 => R90
     case R270 => R180
 
-/**
- * テトリミノの種類（7種類）
- * 各形状はR0（初期状態）での相対座標として定義
- */
 enum TetrominoShape:
   case I, O, T, S, Z, J, L
 
-  /**
-   * R0状態での相対座標（ピボット基準）
-   * Standard Rotation System (SRS) に準拠
-   */
+  /** SRS準拠のR0状態での相対座標 */
   def blocks: List[Position] = this match
     case I => List(Position(-1, 0), Position(0, 0), Position(1, 0), Position(2, 0))
     case O => List(Position(0, 0), Position(1, 0), Position(0, 1), Position(1, 1))
@@ -38,28 +28,16 @@ enum TetrominoShape:
     case J => List(Position(-1, -1), Position(-1, 0), Position(0, 0), Position(1, 0))
     case L => List(Position(-1, 0), Position(0, 0), Position(1, 0), Position(1, -1))
 
-/**
- * 現在のテトリミノの状態
- * shape: テトリミノの種類
- * position: グリッド上の位置（ピボット位置）
- * rotation: 現在の回転状態
- */
 final case class Tetromino(
   shape: TetrominoShape,
   position: Position,
   rotation: Rotation
 ):
-  /**
-   * 回転を考慮した現在のブロック座標を計算
-   */
   def currentBlocks: List[Position] =
     val baseBlocks    = shape.blocks
     val rotatedBlocks = rotateBlocks(baseBlocks, rotation)
     rotatedBlocks.map(_ + position)
 
-  /**
-   * ブロックを指定された回転状態に変換
-   */
   private def rotateBlocks(blocks: List[Position], rot: Rotation): List[Position] =
     rot match
       case Rotation.R0   => blocks
@@ -74,9 +52,6 @@ final case class Tetromino(
   def rotateCounterClockwise: Tetromino = copy(rotation = rotation.rotateCounterClockwise)
 
 object Tetromino:
-  /**
-   * 初期位置でテトリミノを生成
-   */
   def spawn(shape: TetrominoShape, gridWidth: Int = 10): Tetromino =
     Tetromino(
       shape = shape,

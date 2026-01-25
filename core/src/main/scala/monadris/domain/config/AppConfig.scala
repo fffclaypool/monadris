@@ -1,9 +1,5 @@
 package monadris.domain.config
 
-/**
- * アプリケーション設定
- * 純粋なcase class定義のみ（ZIO非依存）
- */
 final case class AppConfig(
   grid: GridConfig,
   score: ScoreConfig,
