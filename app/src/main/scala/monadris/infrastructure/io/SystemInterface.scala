@@ -1,4 +1,4 @@
-package monadris.infrastructure
+package monadris.infrastructure.io
 
 import java.io.FileInputStream
 
@@ -6,8 +6,6 @@ import zio.*
 
 import monadris.config.ConfigLayer
 import monadris.domain.config.AppConfig
-
-// TtyService
 
 trait TtyService:
   def available(): Task[Int]
@@ -34,8 +32,6 @@ object TtyService:
       def sleep(ms: Long): Task[Unit] = ZIO.sleep(ms.millis)
   }
 
-// ConsoleService
-
 trait ConsoleService:
   def print(text: String): Task[Unit]
   def flush(): Task[Unit]
@@ -53,8 +49,6 @@ object ConsoleService:
       def flush(): Task[Unit]             = ZIO.attempt(java.lang.System.out.flush())
   }
 
-// CommandService
-
 trait CommandService:
   def exec(cmd: String): Task[Unit]
 
@@ -68,8 +62,6 @@ object CommandService:
         java.lang.Runtime.getRuntime.exec(Array("/bin/sh", "-c", cmd)).waitFor()
       }.unit
   }
-
-// GameEnv
 
 type GameEnv = TtyService & ConsoleService & CommandService & AppConfig
 

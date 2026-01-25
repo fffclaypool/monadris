@@ -1,10 +1,10 @@
-package monadris.infrastructure
+package monadris.infrastructure.runtime
 
 import zio.*
 import zio.test.*
 
 import monadris.domain.*
-import monadris.infrastructure.TestServices as LocalTestServices
+import monadris.infrastructure.io.TestServices as LocalTestServices
 import monadris.logic.GameLogic
 
 /**
@@ -14,18 +14,10 @@ import monadris.logic.GameLogic
  */
 object StressTest extends ZIOSpecDefault:
 
-  // ============================================================
-  // Test constants
-  // ============================================================
-
   private object Constants:
     val totalIterations     = 100000
     val memoryCheckInterval = 10000
     val bytesPerMegabyte    = 1024 * 1024
-
-  // ============================================================
-  // Memory utilities
-  // ============================================================
 
   private def getUsedMemoryMB: Long =
     val runtime   = java.lang.Runtime.getRuntime
@@ -47,12 +39,8 @@ object StressTest extends ZIOSpecDefault:
   private def runGarbageCollection: UIO[Unit] =
     ZIO.succeed {
       java.lang.System.gc()
-      Thread.sleep(100) // GCが完了するまで少し待機
+      Thread.sleep(100)
     }
-
-  // ============================================================
-  // Test fixtures
-  // ============================================================
 
   private val testConfig = LocalTestServices.testConfig
   private val gridWidth  = testConfig.grid.width
@@ -68,10 +56,6 @@ object StressTest extends ZIOSpecDefault:
   private def deterministicShapeProvider(counter: Int): () => TetrominoShape =
     val shapes = TetrominoShape.values
     () => shapes(counter % shapes.length)
-
-  // ============================================================
-  // Stress test
-  // ============================================================
 
   def spec = suite("StressTest")(
     test("GameLogic handles 100,000 iterations without memory leak") {
@@ -104,22 +88,18 @@ object StressTest extends ZIOSpecDefault:
       var shapeCounter = 0
 
       for i <- 0 until iterations do
-        // 定期的なメモリチェック
         if i > 0 && i % Constants.memoryCheckInterval == 0 then
           val usedMB = getUsedMemoryMB
           println(s"[PROGRESS] Iteration $i: Memory used = ${usedMB}MB")
 
-        // ゲームオーバーなら初期状態にリセット
         if state.isGameOver then
           state = initialState.copy(
             score = state.score,
             linesCleared = state.linesCleared
           )
 
-        // 入力を選択
         val input = inputs(i % inputs.length)
 
-        // 状態更新
         val provider = deterministicShapeProvider(shapeCounter)
         state = GameLogic.update(state, input, provider, testConfig)
         shapeCounter = shapeCounter + 1

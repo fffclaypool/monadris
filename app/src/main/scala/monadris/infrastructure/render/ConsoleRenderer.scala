@@ -1,7 +1,8 @@
-package monadris.infrastructure
+package monadris.infrastructure.render
 
 import zio.*
 
+import monadris.infrastructure.io.ConsoleService
 import monadris.view.Pixel
 import monadris.view.ScreenBuffer
 import monadris.view.UiColor

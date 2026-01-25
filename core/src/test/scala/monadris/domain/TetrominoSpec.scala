@@ -7,12 +7,10 @@ import org.scalatest.matchers.should.Matchers
 
 class TetrominoSpec extends AnyFlatSpec with Matchers:
 
-  // 設定値を使用
   val gridWidth: Int = TestConfig.testConfig.grid.width
 
-  // ドメイン定数
   val blocksPerTetromino: Int = 4
-  val spawnYPosition: Int     = 1 // テトリミノはy=1にスポーン
+  val spawnYPosition: Int     = 1
 
   "Position" should "support addition" in {
     val p1          = Position(1, 2)
@@ -101,8 +99,6 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
     val tetromino = Tetromino.spawn(TetrominoShape.O, gridWidth)
     val rotated   = tetromino.rotateClockwise
 
-    // O型は回転しても相対的な形状は同じ（2x2の正方形）
-    // ブロック間の相対位置を確認
     def relativePositions(blocks: List[Position]): Set[(Int, Int)] =
       val minX = blocks.map(_.x).min
       val minY = blocks.map(_.y).min
@@ -110,10 +106,6 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
 
     relativePositions(tetromino.currentBlocks) shouldBe relativePositions(rotated.currentBlocks)
   }
-
-  // ============================================================
-  // 各形状のblocks()メソッド直接テスト
-  // ============================================================
 
   "TetrominoShape.I" should "have correct block positions" in {
     val blocks = TetrominoShape.I.blocks
@@ -178,10 +170,6 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
     blocks should contain(Position(1, -1))
   }
 
-  // ============================================================
-  // 全形状の回転変換テスト
-  // ============================================================
-
   "All TetrominoShapes" should "have 4 blocks in all rotation states" in {
     for
       shape    <- TetrominoShape.values
@@ -203,7 +191,6 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
     val tetromino = Tetromino.spawn(TetrominoShape.I, gridWidth)
     val r0Blocks  = tetromino.currentBlocks
     val r90Blocks = tetromino.rotateClockwise.currentBlocks
-    // Iピースは水平から垂直に回転する
     r0Blocks.toSet should not be r90Blocks.toSet
   }
 

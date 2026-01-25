@@ -97,7 +97,7 @@ graph TD
 | Layer | Project | ZIO Dependency | Description |
 |-------|---------|----------------|-------------|
 | **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`) |
-| **Logic** | `core` | **No** | Pure state transitions (`GameLogic`) |
+| **Logic** | `core` | **No** | Pure state transitions (`GameLogic`, `GameLoop`) |
 | **View** | `core` | **No** | Pure transformation (`State => ScreenBuffer`) |
 | **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Loop |
 
@@ -194,12 +194,15 @@ monadris/
 │       │   ├── config/         # Pure config definition
 │       │   ├── GameState.scala
 │       │   └── ...
-│       ├── logic/              # Pure game rules
+│       ├── logic/              # Pure game rules (GameLogic, GameLoop)
 │       └── view/               # Presentation logic
 ├── app/                        # Impure layer (ZIO-dependent)
 │   └── src/main/scala/monadris/
 │       ├── config/             # ZIO Config loading
 │       ├── infrastructure/     # ZIO effect implementation
+│       │   ├── io/             # Terminal input + system services
+│       │   ├── render/         # Console rendering
+│       │   └── runtime/        # Loop, input stream, clock, commands
 │       └── Main.scala
 └── build.sbt
 ```

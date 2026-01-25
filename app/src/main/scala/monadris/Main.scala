@@ -5,7 +5,11 @@ import zio.logging.backend.SLF4J
 
 import monadris.domain.*
 import monadris.domain.config.AppConfig
-import monadris.infrastructure.*
+import monadris.infrastructure.io.ConsoleService
+import monadris.infrastructure.io.GameEnv
+import monadris.infrastructure.io.TerminalControl
+import monadris.infrastructure.io.TtyService
+import monadris.infrastructure.runtime.GameRunner
 
 object Main extends ZIOAppDefault:
 

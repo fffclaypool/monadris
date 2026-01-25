@@ -75,8 +75,7 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
   }
 
   "Collision.hasLanded" should "return true when tetromino cannot move down" in {
-    val grid = Grid.empty(10, 20)
-    // 床の1つ上に配置（T型の底が床に接する位置）
+    val grid      = Grid.empty(10, 20)
     val tetromino = Tetromino(TetrominoShape.T, Position(5, 19), Rotation.R0)
 
     Collision.hasLanded(tetromino, grid) shouldBe true
@@ -95,9 +94,7 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
 
     val dropped = Collision.hardDropPosition(tetromino, grid)
 
-    // ドロップ後は着地しているはず
     Collision.hasLanded(dropped, grid) shouldBe true
-    // 元の位置より下にあるはず
     dropped.position.y should be > tetromino.position.y
   }
 
@@ -109,7 +106,6 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
 
     val dropped = Collision.hardDropPosition(tetromino, grid)
 
-    // ブロックの上で止まるはず
     dropped.position.y should be < 15
   }
 

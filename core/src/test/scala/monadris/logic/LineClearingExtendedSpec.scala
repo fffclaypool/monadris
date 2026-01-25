@@ -18,10 +18,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   val gridWidth   = config.grid.width
   val gridHeight  = config.grid.height
 
-  // ============================================================
-  // clearLinesのエッジケース
-  // ============================================================
-
   "LineClearing.clearLines" should "return zero score when no lines cleared" in {
     val grid   = Grid.empty(gridWidth, gridHeight)
     val result = LineClearing.clearLines(grid, level = 1, scoreConfig)
@@ -34,7 +30,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear single line and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // 最下行を完全に埋める
     val grid = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
       g.place(Position(x, gridHeight - 1), filled)
     }
@@ -48,7 +43,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear double line and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // 下から2行を完全に埋める
     val grid = (for
       y <- (gridHeight - 2) until gridHeight
       x <- 0 until gridWidth
@@ -65,7 +59,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear triple line and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // 下から3行を完全に埋める
     val grid = (for
       y <- (gridHeight - 3) until gridHeight
       x <- 0 until gridWidth
@@ -82,7 +75,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
   it should "clear tetris (4 lines) and calculate correct score" in {
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // 下から4行を完全に埋める
     val grid = (for
       y <- (gridHeight - 4) until gridHeight
       x <- 0 until gridWidth
@@ -95,10 +87,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
     result.linesCleared shouldBe 4
     result.scoreGained shouldBe scoreConfig.tetris * 5
   }
-
-  // ============================================================
-  // calculateScoreのエッジケース
-  // ============================================================
 
   "LineClearing.calculateScore" should "return 0 for 0 lines" in {
     LineClearing.calculateScore(0, 1, scoreConfig) shouldBe 0
@@ -127,10 +115,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
     LineClearing.calculateScore(4, 1, scoreConfig) shouldBe scoreConfig.tetris
   }
 
-  // ============================================================
-  // calculateLevelのエッジケース
-  // ============================================================
-
   "LineClearing.calculateLevel" should "start at level 1 by default" in {
     LineClearing.calculateLevel(0, levelConfig) shouldBe 1
   }
@@ -151,10 +135,6 @@ class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
     LineClearing.calculateLevel(100, levelConfig) shouldBe 11
     LineClearing.calculateLevel(200, levelConfig) shouldBe 21
   }
-
-  // ============================================================
-  // dropIntervalのエッジケース
-  // ============================================================
 
   "LineClearing.dropInterval" should "start at base interval for level 1" in {
     LineClearing.dropInterval(1, speedConfig) shouldBe speedConfig.baseDropIntervalMs
