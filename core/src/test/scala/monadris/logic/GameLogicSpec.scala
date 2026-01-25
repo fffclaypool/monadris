@@ -28,8 +28,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "not move when blocked by wall" in {
-    val state = initialState
-    // 左端に移動
+    val state      = initialState
     val atLeftWall = (0 until gridWidth).foldLeft(state) { (s, _) =>
       GameLogic.update(s, Input.MoveLeft, nextShapeProvider, config)
     }
@@ -59,13 +58,11 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "lock tetromino and spawn new one when at bottom" in {
-    val state = initialState
-    // 床まで移動（グリッド高さより多く移動を試行）
+    val state    = initialState
     val atBottom = (0 until gridHeight + 5).foldLeft(state) { (s, _) =>
       GameLogic.update(s, Input.MoveDown, nextShapeProvider, config)
     }
 
-    // テトリミノが固定され、グリッドに配置されているはず
     val filledCells = for
       x <- 0 until gridWidth
       y <- 0 until gridHeight
@@ -99,8 +96,6 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
 
     val newState = GameLogic.update(state, Input.HardDrop, nextShapeProvider, config)
 
-    // ハードドロップ後は新しいテトリミノが生成される
-    // スコアが増加しているはず（ドロップボーナス）
     newState.score should be > state.score
   }
 
@@ -143,14 +138,12 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   }
 
   "GameLogic.update" should "increase score when clearing lines" in {
-    // 底の行をほぼ埋める
     val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
     val grid      = (0 until gridWidth - 1).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
 
-    // I型を右端に配置して落とすとラインが揃う
     val state = GameState(
       grid = grid,
       currentTetromino = Tetromino(TetrominoShape.I, Position(gridWidth - 1, bottomRow - 4), Rotation.R90),

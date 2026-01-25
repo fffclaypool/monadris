@@ -5,22 +5,14 @@ import org.scalatest.matchers.should.Matchers
 
 class ViewModelSpec extends AnyFlatSpec with Matchers:
 
-  // ============================================================
-  // テストバッファの寸法
-  // ============================================================
   val smallBufferWidth: Int  = 3
   val smallBufferHeight: Int = 2
   val mediumBufferSize: Int  = 5
   val largeBufferWidth: Int  = 10
   val largeBufferHeight: Int = 5
 
-  // 範囲外定数
   val outOfBoundsNegative: Int = -1
   val outOfBoundsLarge: Int    = 10
-
-  // ============================================================
-  // UiColor テスト
-  // ============================================================
 
   "UiColor" should "have all expected variants" in {
     UiColor.values should contain allOf (
@@ -35,10 +27,6 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     )
   }
 
-  // ============================================================
-  // Pixel テスト
-  // ============================================================
-
   "Pixel" should "store char and color" in {
     val pixel = Pixel('X', UiColor.Red)
     pixel.char shouldBe 'X'
@@ -49,10 +37,6 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     val pixel = Pixel('A')
     pixel.color shouldBe UiColor.Default
   }
-
-  // ============================================================
-  // ScreenBuffer.empty テスト
-  // ============================================================
 
   "ScreenBuffer.empty" should "create buffer with correct dimensions" in {
     val buffer = ScreenBuffer.empty(largeBufferWidth, largeBufferHeight)
@@ -75,10 +59,6 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     buffer.pixels.size shouldBe smallBufferWidth
     buffer.pixels.foreach(_.size shouldBe mediumBufferSize)
   }
-
-  // ============================================================
-  // ScreenBuffer.update テスト
-  // ============================================================
 
   "ScreenBuffer.update" should "update pixel at valid position" in {
     val buffer  = ScreenBuffer.empty(mediumBufferSize, mediumBufferSize)
@@ -127,10 +107,6 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     updated shouldBe buffer
   }
 
-  // ============================================================
-  // ScreenBuffer.drawChar テスト
-  // ============================================================
-
   "ScreenBuffer.drawChar" should "draw character at position" in {
     val buffer  = ScreenBuffer.empty(mediumBufferSize, mediumBufferSize)
     val drawX   = 1
@@ -149,10 +125,6 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
 
     updated.pixels(drawY)(drawX).color shouldBe UiColor.Default
   }
-
-  // ============================================================
-  // ScreenBuffer.drawText テスト
-  // ============================================================
 
   "ScreenBuffer.drawText" should "draw text horizontally" in {
     val buffer  = ScreenBuffer.empty(largeBufferWidth, largeBufferHeight)
@@ -191,12 +163,7 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
 
     updated.pixels(0)(startX).char shouldBe 'H'
     updated.pixels(0)(startX + 1).char shouldBe 'e'
-    // 範囲外の文字は無視される
   }
-
-  // ============================================================
-  // ScreenBuffer.getRow テスト
-  // ============================================================
 
   "ScreenBuffer.getRow" should "return row at valid index" in {
     val rowSize  = 3
@@ -220,10 +187,6 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     buffer.getRow(mediumBufferSize) shouldBe Vector.empty
     buffer.getRow(outOfBoundsLarge) shouldBe Vector.empty
   }
-
-  // ============================================================
-  // ScreenBuffer.drawPixels テスト
-  // ============================================================
 
   "ScreenBuffer.drawPixels" should "draw multiple pixels at once" in {
     val buffer = ScreenBuffer.empty(largeBufferWidth, largeBufferHeight)
@@ -268,15 +231,13 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     val pixels = Vector(
       Pixel('A', UiColor.Red),
       Pixel('B', UiColor.Green),
-      Pixel('C', UiColor.Blue),  // クリップされる
-      Pixel('D', UiColor.Yellow) // クリップされる
+      Pixel('C', UiColor.Blue),
+      Pixel('D', UiColor.Yellow)
     )
     val updated = buffer.drawPixels(startX, 0, pixels)
 
-    // 最初の2ピクセルのみ描画される
     updated.pixels(0)(startX).char shouldBe 'A'
     updated.pixels(0)(startX + 1).char shouldBe 'B'
-    // バッファの幅は変わらない
     updated.width shouldBe mediumBufferSize
   }
 
@@ -287,10 +248,8 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     val pixels  = Vector(Pixel('X', UiColor.Red), Pixel('Y', UiColor.Green))
     val updated = buffer.drawPixels(0, 1, pixels)
 
-    // 最初の行は変更されない
     updated.pixels(0)(0).char shouldBe 'F'
     updated.pixels(0)(1).char shouldBe 'i'
-    // 2番目の行には新しいピクセルがある
     updated.pixels(1)(0).char shouldBe 'X'
     updated.pixels(1)(1).char shouldBe 'Y'
   }

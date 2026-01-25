@@ -4,7 +4,7 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
-import monadris.infrastructure.TestServices
+import monadris.infrastructure.io.TestServices
 import monadris.logic.*
 
 /**
@@ -15,10 +15,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
 
   val gridWidth: Int  = TestServices.testConfig.grid.width
   val gridHeight: Int = TestServices.testConfig.grid.height
-
-  // ============================================================
-  // ジェネレータ
-  // ============================================================
 
   val genTetrominoShape: Gen[Any, TetrominoShape] =
     Gen.fromIterable(TetrominoShape.values)
@@ -82,10 +78,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       nextShape  <- genTetrominoShape
     yield GameState.initial(firstShape, nextShape, gridWidth, gridHeight)
 
-  // ============================================================
-  // グリッドのプロパティ
-  // ============================================================
-
   def spec = suite("Property-Based Tests")(
     suite("Grid Properties")(
       test("empty grid has all cells empty") {
@@ -117,15 +109,13 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       },
       test("clearing rows reduces or maintains block count") {
         check(genTetrominoShape) { shape =>
-          val grid   = Grid.empty(gridWidth, gridHeight)
-          val filled = Cell.Filled(shape)
-          // 最下行を完全に埋める
+          val grid       = Grid.empty(gridWidth, gridHeight)
+          val filled     = Cell.Filled(shape)
           val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
             g.place(Position(x, gridHeight - 1), filled)
           }
           val clearedGrid = filledGrid.clearRows(List(gridHeight - 1))
 
-          // 埋まったセルを数える
           def countFilled(g: Grid): Int =
             (for
               x <- 0 until g.width
@@ -147,10 +137,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         }
       }
     ),
-
-    // ============================================================
-    // テトリミノのプロパティ
-    // ============================================================
 
     suite("Tetromino Properties")(
       test("every tetromino has exactly 4 blocks") {
@@ -182,10 +168,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       }
     ),
 
-    // ============================================================
-    // 衝突のプロパティ
-    // ============================================================
-
     suite("Collision Properties")(
       test("spawned tetromino is always valid on empty grid") {
         check(genTetrominoShape) { shape =>
@@ -200,7 +182,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           val result  = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
           val isValid = result match
             case Some(rotated) => Collision.isValidPosition(rotated, grid)
-            case None          => true // Noneも許容される
+            case None          => true
           assertTrue(isValid)
         }
       },
@@ -214,18 +196,13 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       test("hard drop position cannot move down further") {
         check(genValidTetromino) { tetromino =>
           val grid = Grid.empty(gridWidth, gridHeight)
-          // 初期位置が有効な場合のみテスト（一部の回転は範囲外に広がる可能性がある）
           if Collision.isValidPosition(tetromino, grid) then
             val dropped = Collision.hardDropPosition(tetromino, grid)
             assertTrue(Collision.hasLanded(dropped, grid))
-          else assertTrue(true) // 無効な初期位置はスキップ
+          else assertTrue(true)
         }
       }
     ),
-
-    // ============================================================
-    // LineClearingのプロパティ
-    // ============================================================
 
     suite("LineClearing Properties")(
       test("score is always non-negative") {
@@ -284,10 +261,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       }
     ),
 
-    // ============================================================
-    // GameLogicのプロパティ（堅牢性）
-    // ============================================================
-
     suite("GameLogic Robustness")(
       test("any input sequence does not throw exception") {
         val config = TestServices.testConfig
@@ -300,7 +273,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
             else GameLogic.update(state, input, nextShape, config)
           }
 
-          // 例外なく完了したことを確認するだけ
           assertTrue(true)
         }
       },
@@ -371,10 +343,6 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         }
       }
     ),
-
-    // ============================================================
-    // 回転のプロパティ
-    // ============================================================
 
     suite("Rotation Properties")(
       test("clockwise and counter-clockwise are inverses") {

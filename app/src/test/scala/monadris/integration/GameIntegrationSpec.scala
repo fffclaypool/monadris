@@ -6,8 +6,8 @@ import zio.test.*
 
 import monadris.domain.*
 import monadris.domain.config.*
-import monadris.infrastructure.ConsoleRenderer
-import monadris.infrastructure.TestServices as Mocks
+import monadris.infrastructure.io.TestServices as Mocks
+import monadris.infrastructure.render.ConsoleRenderer
 import monadris.logic.GameLogic
 import monadris.view.GameView
 
@@ -17,19 +17,11 @@ import monadris.view.GameView
  */
 object GameIntegrationSpec extends ZIOSpecDefault:
 
-  // ============================================================
-  // テスト定数
-  // ============================================================
-
   private object TestConstants:
     val GridWidth          = 10
     val GridHeight         = 20
     val InitialTetrominoY  = 1
-    val TicksToReachBottom = GridHeight - 2 // 底に到達するまでのおおよそのTick数
-
-  // ============================================================
-  // ヘルパー関数
-  // ============================================================
+    val TicksToReachBottom = GridHeight - 2
 
   /** テスト用の固定シェイププロバイダー */
   private def fixedShapeProvider(shape: TetrominoShape): () => TetrominoShape =
@@ -66,10 +58,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       GameLogic.update(state, input, nextShapeProvider, config)
     }
 
-  // ============================================================
-  // テスト仕様
-  // ============================================================
-
   def spec = suite("Game Integration Tests")(
     gravityTestSuite,
     lineClearIntegrationSuite,
@@ -77,10 +65,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     pauseResumeSuite,
     existingScenarioSuite
   ) @@ TestAspect.tag("integration")
-
-  // ============================================================
-  // 1. 重力テストスイート - 時間経過による自動落下
-  // ============================================================
 
   private val gravityTestSuite = suite("Gravity Test - Auto Fall")(
     test("Tick input moves tetromino down by one row") {
@@ -121,7 +105,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val config       = Mocks.testConfig
       val initialState = createInitialState(TetrominoShape.O)
 
-      // Oテトリミノは十分なTick後に底に到達する
       val manyTicks  = Chunk.fill(TestConstants.GridHeight)(Input.Tick)
       val finalState = processInputs(
         initialState,
@@ -130,7 +113,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         fixedShapeProvider(TetrominoShape.T)
       )
 
-      // ロックして新しいテトリミノが生成されているはず
       assertTrue(
         finalState.currentTetromino.shape == TetrominoShape.O ||
           finalState.currentTetromino.shape == TetrominoShape.T
@@ -155,23 +137,17 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     }
   )
 
-  // ============================================================
-  // 2. Line Clear Integration Suite - ライン消去とスコア更新
-  // ============================================================
-
   private val lineClearIntegrationSuite = suite("Line Clear Integration")(
     test("Clearing one line adds score and updates state") {
       val config = Mocks.testConfig
 
-      // 底の行をほぼ完全に埋める（Iピース用にcolumn 4-5にギャップを残す）
       val bottomRow          = TestConstants.GridHeight - 1
       val almostCompleteGrid = (0 until TestConstants.GridWidth)
-        .filterNot(x => x >= 4 && x < 8) // Iピース用のギャップを残す
+        .filterNot(x => x >= 4 && x < 8)
         .foldLeft(Grid.empty(TestConstants.GridWidth, TestConstants.GridHeight)) { (g, x) =>
           g.place(Position(x, bottomRow), Cell.Filled(TetrominoShape.O))
         }
 
-      // Iピースをギャップを埋める位置に配置
       val iPiece = Tetromino(TetrominoShape.I, Position(5, bottomRow), Rotation.R0)
       val state  = GameState(
         grid = almostCompleteGrid,
@@ -183,7 +159,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         status = GameStatus.Playing
       )
 
-      // ハードドロップでピースをロック
       val finalState = GameLogic.update(
         state,
         Input.HardDrop,
@@ -193,13 +168,12 @@ object GameIntegrationSpec extends ZIOSpecDefault:
 
       assertTrue(
         finalState.score > 0,
-        finalState.linesCleared >= 0 // ラインが消去されるはず
+        finalState.linesCleared >= 0
       )
     },
     test("Clearing multiple lines gives higher score") {
       val config = Mocks.testConfig
 
-      // 4行をほぼ完全に埋めたグリッドを作成
       val bottomRows         = (TestConstants.GridHeight - 4 until TestConstants.GridHeight).toList
       val almostCompleteGrid = bottomRows.foldLeft(
         Grid.empty(TestConstants.GridWidth, TestConstants.GridHeight)
@@ -209,7 +183,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         }
       }
 
-      // Iピースを縦向きにして最後の列を埋める
       val iPiece = Tetromino(
         TetrominoShape.I,
         Position(TestConstants.GridWidth - 1, TestConstants.GridHeight - 3),
@@ -252,16 +225,10 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     }.provide(Mocks.console)
   )
 
-  // ============================================================
-  // 3. Game Over Flow Suite - ゲームオーバー判定
-  // ============================================================
-
   private val gameOverFlowSuite = suite("Game Over Flow")(
     test("Game transitions to GameOver when spawn position is blocked") {
       val config = Mocks.testConfig
 
-      // 上部の行を埋めてスポーンをブロック（ライン消去を避けるためギャップを残す）
-      // 行0-3を交互パターンで埋めてスポーンをブロックするが、ラインは消去しない
       val blockedGrid = (0 until TestConstants.GridWidth - 1).foldLeft(
         Grid.empty(TestConstants.GridWidth, TestConstants.GridHeight)
       ) { (g, x) =>
@@ -270,7 +237,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         }
       }
 
-      // 現在のピースを即座にロックする位置（底）に配置
       val tetromino = Tetromino(
         TetrominoShape.O,
         Position(4, TestConstants.GridHeight - 2),
@@ -279,7 +245,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val state = GameState(
         grid = blockedGrid,
         currentTetromino = tetromino,
-        nextTetromino = TetrominoShape.T, // Tは中央にスポーン、埋まった行によりブロック
+        nextTetromino = TetrominoShape.T,
         score = 1000,
         level = 5,
         linesCleared = 40,
@@ -303,7 +269,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val gameOverState = createInitialState().copy(status = GameStatus.GameOver)
       val initialY      = gameOverState.currentTetromino.position.y
 
-      // 様々な入力を試す
       val inputs     = Chunk(Input.MoveLeft, Input.MoveRight, Input.Tick, Input.HardDrop)
       val finalState = processInputs(
         gameOverState,
@@ -337,10 +302,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       )
     }.provide(Mocks.console)
   )
-
-  // ============================================================
-  // 4. Pause/Resume Suite - ポーズ機能
-  // ============================================================
 
   private val pauseResumeSuite = suite("Pause/Resume")(
     test("Pause input transitions game to Paused state") {
@@ -412,15 +373,14 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val initialScore = initialState.score
       val initialX     = initialState.currentTetromino.position.x
 
-      // ポーズ -> 移動を試みる -> 再開 -> 移動成功
       val pauseState       = GameLogic.update(initialState, Input.Pause, fixedShapeProvider(TetrominoShape.T), config)
       val stillPausedState = GameLogic.update(pauseState, Input.MoveLeft, fixedShapeProvider(TetrominoShape.T), config)
       val resumedState = GameLogic.update(stillPausedState, Input.Pause, fixedShapeProvider(TetrominoShape.T), config)
       val movedState   = GameLogic.update(resumedState, Input.MoveLeft, fixedShapeProvider(TetrominoShape.T), config)
 
       assertTrue(
-        stillPausedState.currentTetromino.position.x == initialX, // ポーズ中は移動が無視される
-        movedState.currentTetromino.position.x == initialX - 1,   // 再開後は移動が機能する
+        stillPausedState.currentTetromino.position.x == initialX,
+        movedState.currentTetromino.position.x == initialX - 1,
         movedState.status == GameStatus.Playing
       )
     },
@@ -437,10 +397,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       yield assertTrue(combined.contains("PAUSED"))
     }.provide(Mocks.console)
   )
-
-  // ============================================================
-  // 既存のシナリオ（更新版）
-  // ============================================================
 
   private val existingScenarioSuite = suite("Basic Scenarios")(
     test("Move Right and Hard Drop updates score and renders") {

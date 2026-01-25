@@ -1,4 +1,4 @@
-package monadris.infrastructure
+package monadris.infrastructure.io
 
 import monadris.domain.Input
 
@@ -6,10 +6,6 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class TerminalInputSpec extends AnyFlatSpec with Matchers:
-
-  // ============================================================
-  // keyToInput tests
-  // ============================================================
 
   "TerminalInput.keyToInput" should "return MoveLeft for 'h'" in {
     TerminalInput.keyToInput('h'.toInt) shouldBe Some(Input.MoveLeft)
@@ -69,10 +65,6 @@ class TerminalInputSpec extends AnyFlatSpec with Matchers:
     TerminalInput.keyToInput('@'.toInt) shouldBe None
   }
 
-  // ============================================================
-  // isQuitKey tests
-  // ============================================================
-
   "TerminalInput.isQuitKey" should "return true for 'q'" in {
     TerminalInput.isQuitKey('q'.toInt) shouldBe true
   }
@@ -88,17 +80,9 @@ class TerminalInputSpec extends AnyFlatSpec with Matchers:
     TerminalInput.isQuitKey(27) shouldBe false
   }
 
-  // ============================================================
-  // EscapeKeyCode constant tests
-  // ============================================================
-
   "TerminalInput.EscapeKeyCode" should "be 27" in {
     TerminalInput.EscapeKeyCode shouldBe 27
   }
-
-  // ============================================================
-  // toInput tests
-  // ============================================================
 
   "TerminalInput.toInput" should "extract input from Arrow result" in {
     val result = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
@@ -123,12 +107,7 @@ class TerminalInputSpec extends AnyFlatSpec with Matchers:
     TerminalInput.toInput(TerminalInput.ParseResult.Unknown) shouldBe None
   }
 
-  // ============================================================
-  // ParseResult enum coverage
-  // ============================================================
-
   "TerminalInput.ParseResult" should "have all expected variants" in {
-    // Just verify the enum variants exist
     val arrow   = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
     val regular = TerminalInput.ParseResult.Regular(65)
     val timeout = TerminalInput.ParseResult.Timeout
@@ -140,12 +119,7 @@ class TerminalInputSpec extends AnyFlatSpec with Matchers:
     unknown shouldBe TerminalInput.ParseResult.Unknown
   }
 
-  // ============================================================
-  // Edge cases for key mappings
-  // ============================================================
-
   "TerminalInput key mappings" should "handle all vim-style keys" in {
-    // h, j, k, l for movement
     TerminalInput.keyToInput('h'.toInt).isDefined shouldBe true
     TerminalInput.keyToInput('j'.toInt).isDefined shouldBe true
     TerminalInput.keyToInput('k'.toInt).isDefined shouldBe true

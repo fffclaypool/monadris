@@ -1,10 +1,10 @@
-package monadris.infrastructure
+package monadris.infrastructure.runtime
 
 import zio.test.*
 
 import monadris.domain.*
 import monadris.domain.config.AppConfig
-import monadris.infrastructure.TestServices as LocalTestServices
+import monadris.infrastructure.io.TestServices as LocalTestServices
 import monadris.logic.*
 
 object GameIntegrationSpec extends ZIOSpecDefault:
@@ -12,10 +12,6 @@ object GameIntegrationSpec extends ZIOSpecDefault:
   val config: AppConfig = LocalTestServices.testConfig
   val gridWidth: Int    = config.grid.width
   val gridHeight: Int   = config.grid.height
-
-  // ============================================================
-  // GameLogic integration tests (pure function tests)
-  // ============================================================
 
   override def spec = suite("GameIntegrationSpec")(
     test("GameLogic.update handles movement correctly") {

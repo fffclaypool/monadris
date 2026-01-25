@@ -11,10 +11,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
   val DefaultWidth  = 10
   val DefaultHeight = 20
 
-  // ============================================================
-  // Grid.empty with explicit parameters
-  // ============================================================
-
   "Grid.empty" should "create grid with specified dimensions" in {
     val grid = Grid.empty(DefaultWidth, DefaultHeight)
     grid.width shouldBe DefaultWidth
@@ -38,10 +34,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     grid.width shouldBe 12
     grid.height shouldBe 24
   }
-
-  // ============================================================
-  // place with out-of-bounds positions
-  // ============================================================
 
   "Grid.place" should "return unchanged grid for out-of-bounds position (negative x)" in {
     val grid    = Grid.empty(DefaultWidth, DefaultHeight)
@@ -71,10 +63,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     newGrid shouldBe grid
   }
 
-  // ============================================================
-  // isEmpty behavior
-  // ============================================================
-
   "Grid.isEmpty" should "return false for filled position" in {
     val grid    = Grid.empty(DefaultWidth, DefaultHeight)
     val filled  = Cell.Filled(TetrominoShape.I)
@@ -94,10 +82,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     grid.isEmpty(Position(DefaultWidth, 5)) shouldBe false
     grid.isEmpty(Position(5, DefaultHeight)) shouldBe false
   }
-
-  // ============================================================
-  // placeTetromino behavior
-  // ============================================================
 
   "Grid.placeTetromino" should "place all 4 blocks of a tetromino" in {
     val grid      = Grid.empty(DefaultWidth, DefaultHeight)
@@ -120,10 +104,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     }
   }
 
-  // ============================================================
-  // completedRows behavior
-  // ============================================================
-
   "Grid.completedRows" should "return empty list for empty grid" in {
     val grid = Grid.empty(DefaultWidth, DefaultHeight)
     grid.completedRows shouldBe empty
@@ -139,9 +119,8 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "detect non-consecutive completed rows" in {
-    val grid   = Grid.empty(DefaultWidth, DefaultHeight)
-    val filled = Cell.Filled(TetrominoShape.I)
-    // Fill rows 15 and 19 (with gap in between)
+    val grid       = Grid.empty(DefaultWidth, DefaultHeight)
+    val filled     = Cell.Filled(TetrominoShape.I)
     val filledGrid = (0 until DefaultWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, 15), filled).place(Position(x, 19), filled)
     }
@@ -150,24 +129,17 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     completed.size shouldBe 2
   }
 
-  // ============================================================
-  // clearRows behavior
-  // ============================================================
-
   "Grid.clearRows" should "preserve blocks above cleared rows" in {
     val grid   = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Place a block at row 10
     val gridWithBlock = grid.place(Position(5, 10), filled)
 
-    // Fill and clear bottom row
     val filledGrid = (0 until DefaultWidth).foldLeft(gridWithBlock) { (g, x) =>
       g.place(Position(x, DefaultHeight - 1), filled)
     }
     val clearedGrid = filledGrid.clearRows(List(DefaultHeight - 1))
 
-    // Block should have shifted down by 1
     clearedGrid.isEmpty(Position(5, 10)) shouldBe true
     clearedGrid.isEmpty(Position(5, 11)) shouldBe false
   }
@@ -176,14 +148,12 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     val grid   = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Fill bottom 2 rows
     val filledGrid = (0 until DefaultWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, DefaultHeight - 1), filled)
         .place(Position(x, DefaultHeight - 2), filled)
     }
     val clearedGrid = filledGrid.clearRows(List(DefaultHeight - 1, DefaultHeight - 2))
 
-    // Both rows should be empty now (filled with new empty rows from top)
     clearedGrid.isEmpty(Position(0, DefaultHeight - 1)) shouldBe true
     clearedGrid.isEmpty(Position(0, DefaultHeight - 2)) shouldBe true
   }
@@ -192,7 +162,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     val grid   = Grid.empty(DefaultWidth, DefaultHeight)
     val filled = Cell.Filled(TetrominoShape.I)
 
-    // Fill all rows
     val filledGrid = (for
       y <- 0 until DefaultHeight
       x <- 0 until DefaultWidth
@@ -203,7 +172,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
     val allRows     = (0 until DefaultHeight).toList
     val clearedGrid = filledGrid.clearRows(allRows)
 
-    // All cells should be empty
     val allEmpty = (for
       x <- 0 until DefaultWidth
       y <- 0 until DefaultHeight
@@ -211,10 +179,6 @@ class GridExtendedSpec extends AnyFlatSpec with Matchers:
 
     allEmpty shouldBe true
   }
-
-  // ============================================================
-  // Different cell types
-  // ============================================================
 
   "Grid" should "distinguish between different tetromino shapes in cells" in {
     val grid  = Grid.empty(DefaultWidth, DefaultHeight)

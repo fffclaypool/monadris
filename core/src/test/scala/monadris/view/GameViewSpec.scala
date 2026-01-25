@@ -16,10 +16,6 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
-  // ============================================================
-  // shapeToColor テスト
-  // ============================================================
-
   "GameView.shapeToColor" should "return Cyan for I-tetromino" in {
     GameView.shapeToColor(TetrominoShape.I) shouldBe UiColor.Cyan
   }
@@ -52,10 +48,6 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     TetrominoShape.values.foreach { shape =>
       GameView.shapeToColor(shape) shouldBe a[UiColor]
     }
-
-  // ============================================================
-  // toScreenBuffer テスト
-  // ============================================================
 
   "GameView.toScreenBuffer" should "create non-empty buffer" in {
     val buffer = GameView.toScreenBuffer(initialState, config)
@@ -128,13 +120,8 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
 
   it should "show empty cells" in {
     val buffer = GameView.toScreenBuffer(initialState, config)
-    // 空のセルが描画される
     buffer.pixels.exists(row => row.exists(p => p.char == '·')) shouldBe true
   }
-
-  // ============================================================
-  // titleScreen テスト
-  // ============================================================
 
   "GameView.titleScreen" should "create buffer with title content" in {
     val buffer  = GameView.titleScreen
@@ -172,10 +159,6 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     buffer.height should be > 0
   }
 
-  // ============================================================
-  // gameOverScreen テスト
-  // ============================================================
-
   "GameView.gameOverScreen" should "create buffer with GAME OVER message" in {
     val buffer  = GameView.gameOverScreen(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
@@ -209,10 +192,6 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     buffer.height should be > 0
   }
 
-  // ============================================================
-  // グリッド描画のエッジケース
-  // ============================================================
-
   "GameView grid rendering" should "handle all tetromino shapes" in
     TetrominoShape.values.foreach { shape =>
       val state  = GameState.initial(shape, TetrominoShape.I, gridWidth, gridHeight)
@@ -241,7 +220,5 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     val state  = initialState.copy(grid = grid)
     val buffer = GameView.toScreenBuffer(state, config)
 
-    // 両方のセルがロックされたブロックとして描画される
-    // （複雑なアサーションなしでは正確な色を検証しにくい）
     buffer.pixels.exists(row => row.exists(p => p.char == '▓')) shouldBe true
   }

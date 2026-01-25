@@ -15,21 +15,18 @@ class LineClearingSpec extends AnyFlatSpec with Matchers:
   val gridWidth   = config.grid.width
   val gridHeight  = config.grid.height
 
-  // Line count constants (domain-specific)
   val singleLine: Int = 1
   val doubleLine: Int = 2
   val tripleLine: Int = 3
-  val tetrisLine: Int = 4 // Max lines that can be cleared at once
+  val tetrisLine: Int = 4
   val noLines: Int    = 0
 
-  // Level constants
   val baseLevel: Int        = 1
   val midLevel: Int         = 5
   val highLevel: Int        = 10
   val veryHighLevel: Int    = 100
   val customStartLevel: Int = 5
 
-  // Test position
   val centerX: Int = gridWidth / 2
 
   "LineClearing.clearLines" should "return unchanged grid when no lines completed" in {
@@ -77,7 +74,6 @@ class LineClearingSpec extends AnyFlatSpec with Matchers:
     val secondBottomRow = gridHeight - 2
     val thirdBottomRow  = gridHeight - 3
 
-    // thirdBottomRow行目にブロックを置き、secondBottomRow-bottomRow行目を埋める
     val setupGrid = (0 until gridWidth)
       .foldLeft(grid) { (g, x) =>
         g.place(Position(x, secondBottomRow), filled)
@@ -87,7 +83,6 @@ class LineClearingSpec extends AnyFlatSpec with Matchers:
 
     val result = LineClearing.clearLines(setupGrid, level = baseLevel, scoreConfig)
 
-    // thirdBottomRow行目のブロックはbottomRow行目に落ちるはず
     result.grid.isEmpty(Position(centerX, bottomRow)) shouldBe false
   }
 

@@ -7,16 +7,13 @@ import org.scalatest.matchers.should.Matchers
 
 class GridSpec extends AnyFlatSpec with Matchers:
 
-  // Use configuration values instead of magic numbers
   val gridWidth: Int  = TestConfig.testConfig.grid.width
   val gridHeight: Int = TestConfig.testConfig.grid.height
 
-  // Test positions
   val origin: Position            = Position(0, 0)
   val centerPosition: Position    = Position(gridWidth / 2, gridHeight / 2)
   val lastValidPosition: Position = Position(gridWidth - 1, gridHeight - 1)
 
-  // Out-of-bounds constants
   val outOfBoundsNegative: Int = -1
 
   "Grid" should "create empty grid with correct dimensions" in {
@@ -61,7 +58,6 @@ class GridSpec extends AnyFlatSpec with Matchers:
 
     newGrid.get(centerPosition) shouldBe Some(filled)
     newGrid.isEmpty(centerPosition) shouldBe false
-    // Original grid should be unchanged (immutability)
     grid.isEmpty(centerPosition) shouldBe true
   }
 
@@ -80,7 +76,6 @@ class GridSpec extends AnyFlatSpec with Matchers:
     val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
 
-    // 最下行を埋める
     val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
@@ -94,7 +89,6 @@ class GridSpec extends AnyFlatSpec with Matchers:
     val bottomRow       = gridHeight - 1
     val secondBottomRow = gridHeight - 2
 
-    // 2行埋める
     val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, secondBottomRow), filled).place(Position(x, bottomRow), filled)
     }
@@ -107,15 +101,12 @@ class GridSpec extends AnyFlatSpec with Matchers:
     val filled    = Cell.Filled(TetrominoShape.I)
     val bottomRow = gridHeight - 1
 
-    // 最下行を埋める
     val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
       g.place(Position(x, bottomRow), filled)
     }
 
     val clearedGrid = filledGrid.clearRows(List(bottomRow))
 
-    // 最下行は空になるはず
     clearedGrid.isEmpty(Position(0, bottomRow)) shouldBe true
-    // 最上行も空
     clearedGrid.isEmpty(origin) shouldBe true
   }

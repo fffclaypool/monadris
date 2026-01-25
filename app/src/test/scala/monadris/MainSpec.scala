@@ -3,7 +3,7 @@ package monadris
 import zio.*
 import zio.test.*
 
-import monadris.infrastructure.TestServices as Mocks
+import monadris.infrastructure.io.TestServices as Mocks
 
 /**
  * Main.program の結合テスト
@@ -102,7 +102,6 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.config
     ),
     test("program handles arrow keys before quit") {
-      // ESC [ D (Left arrow) then q
       val inputs = Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)
       for _ <- Main.program
           .timeout(5.seconds)
