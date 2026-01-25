@@ -13,6 +13,7 @@ import monadris.infrastructure.io.TerminalControl
 import monadris.infrastructure.io.TerminalInput
 import monadris.infrastructure.io.TestServices as Mocks
 import monadris.infrastructure.io.TtyService
+import monadris.infrastructure.render.Renderer
 import monadris.logic.LineClearing
 import monadris.view.GameView
 
@@ -34,6 +35,20 @@ object GameSystemSpec extends ZIOSpecDefault:
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+
+  private def runEventLoop(
+    queue: Queue[GameRunner.GameCommand],
+    state: GameLoopRunner.LoopState,
+    intervalRef: Ref[Long]
+  ): ZIO[ConsoleService, Throwable, GameLoopRunner.LoopState] =
+    GameLoopRunner.eventLoop(
+      queue,
+      state,
+      Mocks.testConfig,
+      intervalRef,
+      Renderer.live,
+      GameRunner.RandomPieceGenerator
+    )
 
   def spec = suite("GameSystem Tests")(
     suite("TtyService")(
@@ -605,7 +620,7 @@ object GameSystemSpec extends ZIOSpecDefault:
       test("LoopState holds game state and previous buffer") {
         val state     = initialState
         val buffer    = GameView.toScreenBuffer(state, Mocks.testConfig)
-        val loopState = GameRunner.LoopState(state, Some(buffer))
+        val loopState = GameLoopRunner.LoopState(state, Some(buffer))
 
         assertTrue(
           loopState.gameState == state,
@@ -614,7 +629,7 @@ object GameSystemSpec extends ZIOSpecDefault:
         )
       },
       test("LoopState can hold None for previousBuffer") {
-        val loopState = GameRunner.LoopState(initialState, None)
+        val loopState = GameLoopRunner.LoopState(initialState, None)
         assertTrue(loopState.previousBuffer.isEmpty)
       }
     ),
@@ -662,9 +677,9 @@ object GameSystemSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](10)
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.Pause))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(pausedState, None)
+          loopState = GameLoopRunner.LoopState(pausedState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(pausedState.level, Mocks.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.gameState.status == GameStatus.Playing)
       }.provide(Mocks.console),
       test("eventLoop processes multiple Ticks") {
@@ -673,9 +688,9 @@ object GameSystemSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
+          loopState = GameLoopRunner.LoopState(initialState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, Mocks.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.gameState != null)
       }.provide(Mocks.console),
       test("eventLoop updates previousBuffer after each command") {
@@ -683,9 +698,9 @@ object GameSystemSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](10)
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
+          loopState = GameLoopRunner.LoopState(initialState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, Mocks.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, Mocks.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(Mocks.console)
     ),

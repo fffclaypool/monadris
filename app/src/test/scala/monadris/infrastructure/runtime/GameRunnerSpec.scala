@@ -7,6 +7,7 @@ import monadris.domain.*
 import monadris.domain.config.AppConfig
 import monadris.infrastructure.io.ConsoleService
 import monadris.infrastructure.io.TestServices as LocalTestServices
+import monadris.infrastructure.render.Renderer
 import monadris.logic.LineClearing
 import monadris.view.ScreenBuffer
 
@@ -18,6 +19,20 @@ object GameRunnerSpec extends ZIOSpecDefault:
   private val shapeSampleCount    = 100
   private val minimumUniqueShapes = 1
   private val tripleRenderCount   = 3
+
+  private def runEventLoop(
+    queue: Queue[GameRunner.GameCommand],
+    state: GameLoopRunner.LoopState,
+    intervalRef: Ref[Long]
+  ): ZIO[ConsoleService, Throwable, GameLoopRunner.LoopState] =
+    GameLoopRunner.eventLoop(
+      queue,
+      state,
+      LocalTestServices.testConfig,
+      intervalRef,
+      Renderer.live,
+      GameRunner.RandomPieceGenerator
+    )
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
@@ -193,9 +208,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
+          loopState = GameLoopRunner.LoopState(initialState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.gameState == initialState)
       }.provide(LocalTestServices.console),
       test("UserAction updates state and continues") {
@@ -203,9 +218,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveLeft))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
+          loopState = GameLoopRunner.LoopState(initialState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(
           result.gameState != null
         )
@@ -215,9 +230,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
+          loopState = GameLoopRunner.LoopState(initialState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.gameState != null)
       }.provide(LocalTestServices.console),
       test("UserAction game over exits loop") {
@@ -225,9 +240,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveDown))
-          loopState = GameRunner.LoopState(gameOverState, None)
+          loopState = GameLoopRunner.LoopState(gameOverState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(gameOverState.level, LocalTestServices.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.gameState.isGameOver)
       }.provide(LocalTestServices.console),
       test("TimeTick game over exits loop") {
@@ -235,9 +250,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
         for
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
-          loopState = GameRunner.LoopState(gameOverState, None)
+          loopState = GameLoopRunner.LoopState(gameOverState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(gameOverState.level, LocalTestServices.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.gameState.isGameOver)
       }.provide(LocalTestServices.console),
       test("multiple commands processed in order") {
@@ -247,9 +262,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.MoveRight))
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(initialState, None)
+          loopState = GameLoopRunner.LoopState(initialState, None)
           intervalRef <- Ref.make(LineClearing.dropInterval(initialState.level, LocalTestServices.testConfig.speed))
-          result      <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result      <- runEventLoop(queue, loopState, intervalRef)
         yield assertTrue(result.previousBuffer.isDefined)
       }.provide(LocalTestServices.console),
       test("game over transition exits on TimeTick") {
@@ -274,12 +289,11 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(nearGameOverState, None)
+          loopState = GameLoopRunner.LoopState(nearGameOverState, None)
           intervalRef <- Ref.make(
             LineClearing.dropInterval(nearGameOverState.level, LocalTestServices.testConfig.speed)
           )
-          result <- GameRunner
-            .eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result <- runEventLoop(queue, loopState, intervalRef)
             .timeout(testTimeoutDuration)
         yield assertTrue(result.exists(_.gameState.isGameOver))
       }.provide(LocalTestServices.console),
@@ -305,12 +319,11 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.UserAction(Input.HardDrop))
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(nearGameOverState, None)
+          loopState = GameLoopRunner.LoopState(nearGameOverState, None)
           intervalRef <- Ref.make(
             LineClearing.dropInterval(nearGameOverState.level, LocalTestServices.testConfig.speed)
           )
-          result <- GameRunner
-            .eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          result <- runEventLoop(queue, loopState, intervalRef)
             .timeout(testTimeoutDuration)
         yield assertTrue(result.exists(_.gameState.isGameOver))
       }.provide(LocalTestServices.console),
@@ -322,9 +335,9 @@ object GameRunnerSpec extends ZIOSpecDefault:
           queue <- Queue.bounded[GameRunner.GameCommand](eventLoopQueueCapacity)
           _     <- queue.offer(GameRunner.GameCommand.TimeTick)
           _     <- queue.offer(GameRunner.GameCommand.Quit)
-          loopState = GameRunner.LoopState(highLevelState, None)
+          loopState = GameLoopRunner.LoopState(highLevelState, None)
           intervalRef     <- Ref.make(level1Interval)
-          _               <- GameRunner.eventLoop(queue, loopState, LocalTestServices.testConfig, intervalRef)
+          _               <- runEventLoop(queue, loopState, intervalRef)
           updatedInterval <- intervalRef.get
         yield assertTrue(
           updatedInterval == expectedInterval,
