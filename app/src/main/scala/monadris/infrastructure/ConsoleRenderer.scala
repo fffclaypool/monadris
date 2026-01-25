@@ -8,7 +8,6 @@ import monadris.view.UiColor
 
 object ConsoleRenderer:
 
-  // ANSIカラーコード
   private val ANSI_RESET   = "\u001b[0m"
   private val ANSI_CYAN    = "\u001b[36m"
   private val ANSI_YELLOW  = "\u001b[33m"
@@ -18,14 +17,11 @@ object ConsoleRenderer:
   private val ANSI_BLUE    = "\u001b[34m"
   private val ANSI_WHITE   = "\u001b[37m"
 
-  // カーソル制御
   private val HIDE_CURSOR  = "\u001b[?25l"
   private val SHOW_CURSOR  = "\u001b[?25h"
   private val HOME         = "\u001b[H"
   private val CLEAR_SCREEN = "\u001b[2J\u001b[3J"
-
-  // raw modeでは \r\n が必要
-  private val NL = "\r\n"
+  private val NL           = "\r\n"
 
   private def colorToAnsi(color: UiColor): String = color match
     case UiColor.Cyan    => ANSI_CYAN
@@ -49,31 +45,19 @@ object ConsoleRenderer:
   def bufferToString(buffer: ScreenBuffer): String =
     buffer.pixels.map(rowToString).mkString(NL)
 
-  /**
-   * 初回描画や全描画用
-   * カーソルを隠し、ホームポジションに戻してから描画
-   */
   def render(buffer: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
     for
-      // カーソル非表示 -> ホーム -> 画面クリア
       _ <- ConsoleService.print(s"$HIDE_CURSOR$HOME$CLEAR_SCREEN")
       _ <- ConsoleService.print(bufferToString(buffer))
       _ <- ConsoleService.print(NL)
       _ <- ConsoleService.flush()
     yield ()
 
-  /**
-   * 差分描画対応
-   */
   def render(current: ScreenBuffer, previous: Option[ScreenBuffer]): ZIO[ConsoleService, Throwable, Unit] =
     previous match
       case None       => render(current)
       case Some(prev) => renderDiff(current, prev)
 
-  /**
-   * 差分のみ描画
-   * カーソル移動が多く発生するため、HIDE_CURSORがないとチラつきが酷くなる
-   */
   private def renderDiff(current: ScreenBuffer, previous: ScreenBuffer): ZIO[ConsoleService, Throwable, Unit] =
     val diffString = computeDiffString(current, previous)
     if diffString.isEmpty then ZIO.unit

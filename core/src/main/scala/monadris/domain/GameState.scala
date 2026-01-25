@@ -1,16 +1,10 @@
 package monadris.domain
 
-/**
- * ゲームの進行状態
- */
 enum GameStatus:
   case Playing
   case Paused
   case GameOver
 
-/**
- * ゲーム全体の状態を表す不変データ構造
- */
 final case class GameState(
   grid: Grid,
   currentTetromino: Tetromino,
@@ -24,9 +18,6 @@ final case class GameState(
   def isGameOver: Boolean = status == GameStatus.GameOver
 
 object GameState:
-  /**
-   * 初期状態を生成
-   */
   def initial(
     firstShape: TetrominoShape,
     nextShape: TetrominoShape,

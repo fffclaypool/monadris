@@ -5,23 +5,16 @@ import zio.*
 import monadris.domain.Input
 import monadris.domain.config.AppConfig
 
-/**
- * ターミナル入力のパース処理を集約
- * エスケープシーケンス解析を共通化し、ネストを削減
- */
 object TerminalInput:
 
-  /** キーコード定数 */
   final val EscapeKeyCode: Int = 27
 
-  /** エスケープシーケンスの解析結果 */
   enum ParseResult:
     case Arrow(input: Input)
     case Regular(key: Int)
     case Timeout
     case Unknown
 
-  /** 矢印キーのマッピング */
   private val arrowKeyMap: Map[Char, Input] = Map(
     'A' -> Input.RotateClockwise,
     'B' -> Input.MoveDown,
@@ -29,7 +22,6 @@ object TerminalInput:
     'D' -> Input.MoveLeft
   )
 
-  /** 通常キーのマッピング */
   private val regularKeyMap: Map[Char, Input] = Map(
     'h' -> Input.MoveLeft,
     'H' -> Input.MoveLeft,
@@ -46,27 +38,15 @@ object TerminalInput:
     'P' -> Input.Pause
   )
 
-  /**
-   * キーコードをInputに変換（純粋関数）
-   */
   def keyToInput(key: Int): Option[Input] =
     regularKeyMap.get(key.toChar)
 
-  /**
-   * 終了キーかどうか判定（純粋関数）
-   */
   def isQuitKey(key: Int): Boolean =
     key == 'q' || key == 'Q'
 
-  /**
-   * 矢印キーコードをInputに変換（純粋関数）
-   */
   def arrowToInput(key: Int): Option[Input] =
     arrowKeyMap.get(key.toChar)
 
-  /**
-   * エスケープシーケンスを解析（TtyService版）
-   */
   def parseEscapeSequenceZIO: ZIO[TtyService & AppConfig, Throwable, Option[Input]] =
     for
       config    <- ZIO.service[AppConfig]
@@ -95,9 +75,6 @@ object TerminalInput:
         else TtyService.read().map(key => arrowToInput(key))
     yield result
 
-  /**
-   * TtyServiceから1キーを読み取り（ZIO版）
-   */
   def readKeyZIO: ZIO[TtyService & AppConfig, Throwable, ParseResult] =
     for
       available <- TtyService.available()
@@ -120,9 +97,6 @@ object TerminalInput:
       }
     else ZIO.succeed(ParseResult.Regular(key))
 
-  /**
-   * ParseResultをOption[Input]に変換（純粋関数）
-   */
   def toInput(result: ParseResult): Option[Input] =
     result match
       case ParseResult.Arrow(input) => Some(input)
@@ -130,19 +104,10 @@ object TerminalInput:
       case ParseResult.Timeout      => None
       case ParseResult.Unknown      => None
 
-/**
- * ターミナルのraw/cookedモード制御
- */
 object TerminalControl:
 
-  /**
-   * ターミナルをrawモードに設定（CommandService版）
-   */
   def enableRawMode: ZIO[CommandService, Throwable, Unit] =
     CommandService.exec("stty raw -echo < /dev/tty")
 
-  /**
-   * ターミナルをcookedモードに戻す（CommandService版）
-   */
   def disableRawMode: ZIO[CommandService, Throwable, Unit] =
     CommandService.exec("stty cooked echo < /dev/tty")
