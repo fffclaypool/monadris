@@ -4,6 +4,7 @@ import zio.*
 
 import monadris.domain.*
 import monadris.domain.config.AppConfig
+import monadris.domain.replay.*
 import monadris.infrastructure.io.ConsoleService
 import monadris.infrastructure.io.TtyService
 import monadris.infrastructure.render.Renderer
@@ -12,70 +13,82 @@ import monadris.logic.GameLoop
 import monadris.logic.LineClearing
 import monadris.view.ScreenBuffer
 
-object GameLoopRunner:
+object RecordingGameLoopRunner:
 
-  final case class LoopState(
+  final case class RecordingLoopState(
     gameState: GameState,
-    previousBuffer: Option[ScreenBuffer]
+    previousBuffer: Option[ScreenBuffer],
+    replayBuilder: ReplayBuilder
   )
 
-  def interactiveGameLoop(
+  def recordingGameLoop(
     initialState: GameState,
     config: AppConfig,
     renderer: Renderer,
     randomPiece: GameRunner.RandomPiece
-  ): ZIO[TtyService & ConsoleService, Throwable, GameState] =
+  ): ZIO[TtyService & ConsoleService, Throwable, (GameState, ReplayData)] =
     for
+      startTime     <- Clock.currentTime(java.util.concurrent.TimeUnit.MILLISECONDS)
       commandQueue  <- Queue.bounded[GameCommand](EventLoop.CommandQueueCapacity)
       initialBuffer <- renderGame(renderer, initialState, config, None)
       initialInterval = LineClearing.dropInterval(initialState.level, config.speed)
       intervalRef <- Ref.make(initialInterval)
-      inputFiber  <- InputStream
+      initialBuilder = ReplayBuilder.create(
+        timestamp = startTime,
+        gridWidth = config.grid.width,
+        gridHeight = config.grid.height,
+        initialPiece = initialState.currentTetromino.shape,
+        nextPiece = initialState.nextTetromino
+      )
+      inputFiber <- InputStream
         .run(commandQueue, config.terminal.inputPollIntervalMs)
         .provideSome[TtyService](ZLayer.succeed(config))
         .fork
       tickFiber      <- GameClock.run(commandQueue, intervalRef).fork
       finalLoopState <- eventLoop(
         commandQueue,
-        LoopState(initialState, Some(initialBuffer)),
+        RecordingLoopState(initialState, Some(initialBuffer), initialBuilder),
         config,
         intervalRef,
         renderer,
         randomPiece
       )
-      _ <- inputFiber.interrupt
-      _ <- tickFiber.interrupt
-    yield finalLoopState.gameState
+      _       <- inputFiber.interrupt
+      _       <- tickFiber.interrupt
+      endTime <- Clock.currentTime(java.util.concurrent.TimeUnit.MILLISECONDS)
+      replayData = finalLoopState.replayBuilder.build(finalLoopState.gameState, endTime)
+    yield (finalLoopState.gameState, replayData)
 
   private object EventLoop:
     val CommandQueueCapacity = 100
 
-  def eventLoop(
+  private def eventLoop(
     queue: Queue[GameCommand],
-    state: LoopState,
+    state: RecordingLoopState,
     config: AppConfig,
     intervalRef: Ref[Long],
     renderer: Renderer,
     randomPiece: GameRunner.RandomPiece
-  ): ZIO[ConsoleService, Throwable, LoopState] =
+  ): ZIO[ConsoleService, Throwable, RecordingLoopState] =
     queue.take.flatMap {
       case GameCommand.Quit =>
         ZIO.succeed(state)
       case GameCommand.UserAction(input) =>
-        handleCommand(input, state, config, intervalRef, queue, renderer, randomPiece)
+        handleCommand(input, state, config, intervalRef, queue, renderer, randomPiece, recordInput = true)
       case GameCommand.TimeTick =>
-        handleCommand(Input.Tick, state, config, intervalRef, queue, renderer, randomPiece)
+        handleCommand(Input.Tick, state, config, intervalRef, queue, renderer, randomPiece, recordInput = true)
     }
 
   private def handleCommand(
     input: Input,
-    state: LoopState,
+    state: RecordingLoopState,
     config: AppConfig,
     intervalRef: Ref[Long],
     queue: Queue[GameCommand],
     renderer: Renderer,
-    randomPiece: GameRunner.RandomPiece
-  ): ZIO[ConsoleService, Throwable, LoopState] =
+    randomPiece: GameRunner.RandomPiece,
+    recordInput: Boolean
+  ): ZIO[ConsoleService, Throwable, RecordingLoopState] =
     for
       nextShape <- randomPiece.nextShape
       oldState = state.gameState
@@ -89,11 +102,27 @@ object GameLoopRunner:
         case Some(interval) => intervalRef.set(interval)
         case None           => ZIO.unit
       newBuffer <- renderGame(renderer, outcome.state, config, state.previousBuffer)
-      newLoopState = LoopState(outcome.state, Some(newBuffer))
+      updatedBuilder = recordEvents(state.replayBuilder, input, oldState, outcome.state, nextShape).advanceFrame
+      newLoopState   = RecordingLoopState(outcome.state, Some(newBuffer), updatedBuilder)
       result <-
         if outcome.shouldContinue then eventLoop(queue, newLoopState, config, intervalRef, renderer, randomPiece)
         else ZIO.succeed(newLoopState)
     yield result
+
+  private def recordEvents(
+    builder: ReplayBuilder,
+    input: Input,
+    oldState: GameState,
+    newState: GameState,
+    nextShape: TetrominoShape
+  ): ReplayBuilder =
+    val builderWithInput = builder.recordInput(input)
+    if pieceWasLocked(oldState, newState) then builderWithInput.recordPieceSpawn(nextShape)
+    else builderWithInput
+
+  private def pieceWasLocked(oldState: GameState, newState: GameState): Boolean =
+    oldState.currentTetromino.shape != newState.currentTetromino.shape ||
+      oldState.nextTetromino != newState.nextTetromino
 
   private def renderGame(
     renderer: Renderer,

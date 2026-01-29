@@ -13,5 +13,6 @@ object TestConfig:
     level = LevelConfig(linesPerLevel = 10),
     speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50),
     terminal = TerminalConfig(escapeSequenceWaitMs = 20, escapeSequenceSecondWaitMs = 5, inputPollIntervalMs = 20),
-    timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000)
+    timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000),
+    replay = ReplayConfig(defaultSpeed = 1.0, baseFrameIntervalMs = 50)
   )
