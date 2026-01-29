@@ -6,7 +6,8 @@ final case class AppConfig(
   level: LevelConfig,
   speed: SpeedConfig,
   terminal: TerminalConfig,
-  timing: TimingConfig
+  timing: TimingConfig,
+  replay: ReplayConfig
 )
 
 final case class GridConfig(
@@ -40,4 +41,9 @@ final case class TerminalConfig(
 final case class TimingConfig(
   titleDelayMs: Long,
   outroDelayMs: Long
+)
+
+final case class ReplayConfig(
+  defaultSpeed: Double,
+  baseFrameIntervalMs: Long
 )

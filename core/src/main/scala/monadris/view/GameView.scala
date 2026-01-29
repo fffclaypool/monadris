@@ -130,3 +130,56 @@ object GameView:
     lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
       buf.drawText(0, y, line)
     }
+
+  final case class MenuItem(key: Char, label: String)
+
+  object MenuItems:
+    val PlayGame: MenuItem      = MenuItem('1', "Play Game")
+    val PlayAndRecord: MenuItem = MenuItem('2', "Play & Record")
+    val WatchReplay: MenuItem   = MenuItem('3', "Watch Replay")
+    val ListReplays: MenuItem   = MenuItem('4', "List Replays")
+    val Quit: MenuItem          = MenuItem('Q', "Exit")
+
+    val all: Vector[MenuItem] = Vector(PlayGame, PlayAndRecord, WatchReplay, ListReplays, Quit)
+
+  def menuScreen(selectedIndex: Int): ScreenBuffer =
+    val menuWidth = 70
+
+    def menuItem(item: MenuItem, index: Int): String =
+      val isSelected = index == selectedIndex
+      val prefix     = if isSelected then "▶ " else "  "
+      val suffix     = if isSelected then " ◀" else "  "
+      val content    = s"$prefix[${item.key}] ${item.label}$suffix"
+      val padding    = menuWidth - 2 - content.length
+      s"║$content${" " * padding}║"
+
+    val lines = List(
+      "╔════════════════════════════════════════════════════════════════════╗",
+      "║                                                                    ║",
+      "║  ███╗   ███╗ ██████╗ ███╗   ██╗ █████╗ ██████╗ ██████╗ ██╗███████╗ ║",
+      "║  ████╗ ████║██╔═══██╗████╗  ██║██╔══██╗██╔══██╗██╔══██╗██║██╔════╝ ║",
+      "║  ██╔████╔██║██║   ██║██╔██╗ ██║███████║██║  ██║██████╔╝██║███████╗ ║",
+      "║  ██║╚██╔╝██║██║   ██║██║╚██╗██║██╔══██║██║  ██║██╔══██╗██║╚════██║ ║",
+      "║  ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║  ██║██████╔╝██║  ██║██║███████║ ║",
+      "║  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝╚══════╝ ║",
+      "║                                                                    ║",
+      "║                      Functional Tetris in Scala                    ║",
+      "║                                                                    ║",
+      "╠════════════════════════════════════════════════════════════════════╣",
+      "║                                                                    ║"
+    ) ++ MenuItems.all.zipWithIndex.map { case (item, idx) =>
+      menuItem(item, idx)
+    } ++ List(
+      "║                                                                    ║",
+      "╠════════════════════════════════════════════════════════════════════╣",
+      "║            ↑/↓ or K/J: Navigate    Enter: Select    Q: Quit        ║",
+      "╚════════════════════════════════════════════════════════════════════╝"
+    )
+
+    val width  = lines.map(_.length).maxOption.getOrElse(menuWidth)
+    val height = lines.length + 1
+
+    lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
+      val color = if line.contains("▶") then UiColor.Cyan else UiColor.Default
+      buf.drawText(0, y, line, color)
+    }

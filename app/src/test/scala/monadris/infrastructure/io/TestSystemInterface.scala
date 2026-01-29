@@ -16,9 +16,11 @@ object TestServices:
         queue <- Queue.unbounded[Int]
         _     <- queue.offerAll(inputs)
       yield new TtyService:
-        def available(): Task[Int]      = queue.size
-        def read(): Task[Int]           = queue.take
-        def sleep(ms: Long): Task[Unit] = ZIO.unit
+        def available(): Task[Int]                                 = queue.size
+        def read(): Task[Int]                                      = queue.take
+        def sleep(ms: Long): Task[Unit]                            = ZIO.unit
+        def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]] =
+          queue.poll.map(_.map(_.toInt))
     }
 
   case class TestConsoleService(buffer: Ref[List[String]]) extends ConsoleService:
@@ -44,7 +46,8 @@ object TestServices:
     level = LevelConfig(linesPerLevel = 10),
     speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50),
     terminal = TerminalConfig(escapeSequenceWaitMs = 20, escapeSequenceSecondWaitMs = 5, inputPollIntervalMs = 20),
-    timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000)
+    timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000),
+    replay = ReplayConfig(defaultSpeed = 1.0, baseFrameIntervalMs = 50)
   )
 
   val config: ULayer[AppConfig] = ZLayer.succeed(testConfig)

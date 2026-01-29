@@ -63,8 +63,7 @@ object GameLogic:
     val droppedTetromino = Collision.hardDropPosition(state.currentTetromino, state.grid)
     val dropDistance     = droppedTetromino.position.y - state.currentTetromino.position.y
     val bonusScore       = dropDistance * 2
-
-    val newState = state.copy(
+    val newState         = state.copy(
       currentTetromino = droppedTetromino,
       score = state.score + bonusScore
     )
