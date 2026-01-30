@@ -3,9 +3,9 @@ package monadris
 import zio.*
 import zio.test.*
 
-import monadris.domain.replay.ReplayData
-import monadris.infrastructure.io.TestServices as Mocks
-import monadris.infrastructure.replay.ReplayRepository
+import monadris.infrastructure.persistence.ReplayRepository
+import monadris.infrastructure.terminal.TestServices as Mocks
+import monadris.replay.ReplayData
 
 /**
  * Main.program の結合テスト

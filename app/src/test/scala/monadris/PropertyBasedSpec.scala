@@ -4,8 +4,8 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
-import monadris.infrastructure.io.TestServices
-import monadris.logic.*
+import monadris.game.*
+import monadris.infrastructure.terminal.TestServices
 
 /**
  * 純粋関数のプロパティベーステスト

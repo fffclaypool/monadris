@@ -41,16 +41,21 @@ monadris/
 ├── core/                 # Pure logic (ZIO-independent)
 │   └── src/
 │       ├── main/scala/monadris/
-│       │   ├── domain/       # Pure data structures
-│       │   │   └── config/   # Pure config case classes
-│       │   ├── logic/        # Pure game logic
-│       │   └── view/         # Pure view transformation
+│       │   ├── config/       # Pure config case classes (AppConfig)
+│       │   ├── domain/       # Pure data structures (GameState, Grid, Tetromino)
+│       │   ├── game/         # Pure game logic (GameLogic, GameLoop, Collision)
+│       │   ├── input/        # Input processing (KeyMapping, GameCommand)
+│       │   ├── replay/       # Replay system (ReplayBuilder, ReplayPlayer)
+│       │   └── view/         # Pure view transformation (GameView, AnsiRenderer)
 │       └── test/scala/monadris/
 ├── app/                  # Impure layer (ZIO-dependent)
 │   └── src/
 │       ├── main/scala/monadris/
 │       │   ├── config/       # ZIO Config loading (ConfigLayer)
 │       │   └── infrastructure/
+│       │       ├── game/         # Game runtime (GameRunner, GameSession)
+│       │       ├── persistence/  # Replay storage (FileReplayRepository)
+│       │       └── terminal/     # Console I/O (ConsoleRenderer, TerminalInput)
 │       └── test/scala/monadris/
 │       └── resources/        # application.conf, logback.xml
 └── build.sbt
@@ -62,9 +67,11 @@ monadris/
 - **No ZIO dependency** - pure Scala only
 - **WartRemover enforced** - `var`, `null`, `throw`, `return` are compile errors
 - Contains:
+  - `config/` - Pure `case class` definitions (`AppConfig`, etc.)
   - `domain/` - Pure data structures (`GameState`, `Grid`, `Tetromino`, `Input`)
-  - `domain/config/` - Pure `case class` definitions (`AppConfig`, etc.)
-  - `logic/` - Pure functions: `(State, Input) => State`
+  - `game/` - Pure functions: `(State, Input) => State` (`GameLogic`, `GameLoop`, `Collision`)
+  - `input/` - Input processing (`KeyMapping`, `GameCommand`)
+  - `replay/` - Replay system (`ReplayBuilder`, `ReplayPlayer`, `ReplayData`)
   - `view/` - Pure transformation: `State => ScreenBuffer`
 
 #### `app` Project (Impure Layer)
@@ -73,7 +80,9 @@ monadris/
 - WartRemover disabled (allows ZIO-style patterns)
 - Contains:
   - `config/ConfigLayer` - ZIO Config loading from `application.conf`
-  - `infrastructure/` - `ConsoleRenderer`, `TerminalInput`, `GameRunner`
+  - `infrastructure/game/` - Game runtime (`GameRunner`, `GameSession`, `ReplayRunner`)
+  - `infrastructure/persistence/` - Replay storage (`FileReplayRepository`, `JsonReplayCodec`)
+  - `infrastructure/terminal/` - Console I/O (`ConsoleRenderer`, `TerminalInput`)
   - `Main.scala` - Application entry point
 
 ### WartRemover (Purity Enforcement)

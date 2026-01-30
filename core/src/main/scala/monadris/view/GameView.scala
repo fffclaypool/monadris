@@ -2,8 +2,8 @@ package monadris.view
 
 import scala.util.chaining.*
 
+import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.domain.config.AppConfig
 
 object GameView:
 
@@ -182,4 +182,23 @@ object GameView:
     lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
       val color = if line.contains("▶") then UiColor.Cyan else UiColor.Default
       buf.drawText(0, y, line, color)
+    }
+
+  def goodbyeScreen: ScreenBuffer =
+    val lines = List(
+      "",
+      "╔════════════════════════════════════════════════════════════════════╗",
+      "║                                                                    ║",
+      "║                      Thanks for playing!                           ║",
+      "║                                                                    ║",
+      "║                        See you again!                              ║",
+      "║                                                                    ║",
+      "╚════════════════════════════════════════════════════════════════════╝",
+      ""
+    )
+    val width  = lines.map(_.length).maxOption.getOrElse(Layout.DefaultTitleWidth)
+    val height = lines.length
+
+    lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
+      buf.drawText(0, y, line)
     }
