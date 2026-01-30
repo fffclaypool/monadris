@@ -13,7 +13,7 @@ class ArchitectureSpec extends AnyFlatSpec with Matchers:
   private object Packages:
     val root: String           = "monadris"
     val domain: String         = "..domain.."
-    val logic: String          = "..logic.."
+    val game: String           = "..game.."
     val view: String           = "..view.."
     val javaSql: String        = "java.sql.."
     val javaFileIo: String     = "java.nio.file.."
@@ -30,14 +30,14 @@ class ArchitectureSpec extends AnyFlatSpec with Matchers:
 
   private val classes = new ClassFileImporter().importPackages(Packages.root)
 
-  "Domain layer" should "not depend on logic layer" in:
+  "Domain layer" should "not depend on game layer" in:
     val rule = noClasses()
       .that()
       .resideInAPackage(Packages.domain)
       .should()
       .dependOnClassesThat()
-      .resideInAPackage(Packages.logic)
-      .because("Domain models should not depend on logic layer")
+      .resideInAPackage(Packages.game)
+      .because("Domain models should not depend on game layer")
 
     rule.check(classes)
 
@@ -52,24 +52,24 @@ class ArchitectureSpec extends AnyFlatSpec with Matchers:
 
     rule.check(classes)
 
-  "Logic layer" should "not depend on view layer" in:
+  "Game layer" should "not depend on view layer" in:
     val rule = noClasses()
       .that()
-      .resideInAPackage(Packages.logic)
+      .resideInAPackage(Packages.game)
       .should()
       .dependOnClassesThat()
       .resideInAPackage(Packages.view)
-      .because("Logic should not know about presentation details")
+      .because("Game logic should not know about presentation details")
 
     rule.check(classes)
 
-  "View layer" should "not depend on logic layer" in:
+  "View layer" should "not depend on game layer" in:
     val rule = noClasses()
       .that()
       .resideInAPackage(Packages.view)
       .should()
       .dependOnClassesThat()
-      .resideInAPackage(Packages.logic)
+      .resideInAPackage(Packages.game)
       .because("View should only transform state to screen buffer, not execute logic")
 
     rule.check(classes)

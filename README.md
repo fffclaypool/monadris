@@ -97,9 +97,12 @@ graph TD
 | Layer | Project | ZIO Dependency | Description |
 |-------|---------|----------------|-------------|
 | **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`) |
-| **Logic** | `core` | **No** | Pure state transitions (`GameLogic`, `GameLoop`) |
+| **Config** | `core` | **No** | Pure configuration definitions (`AppConfig`) |
+| **Game** | `core` | **No** | Pure state transitions (`GameLogic`, `GameLoop`, `Collision`) |
+| **Input** | `core` | **No** | Input processing (`KeyMapping`, `GameCommand`) |
+| **Replay** | `core` | **No** | Replay recording/playback (`ReplayBuilder`, `ReplayPlayer`) |
 | **View** | `core` | **No** | Pure transformation (`State => ScreenBuffer`) |
-| **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Loop |
+| **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Persistence |
 
 ### 3. Runtime Event Loop
 How ZIO handles concurrent inputs and serializes them into the game loop.
@@ -190,19 +193,19 @@ sbt compile
 monadris/
 ├── core/                       # Pure logic (ZIO-independent / WartRemover enforced)
 │   └── src/main/scala/monadris/
-│       ├── domain/             # Immutable data models
-│       │   ├── config/         # Pure config definition
-│       │   ├── GameState.scala
-│       │   └── ...
-│       ├── logic/              # Pure game rules (GameLogic, GameLoop)
-│       └── view/               # Presentation logic
+│       ├── config/             # Pure config definition (AppConfig)
+│       ├── domain/             # Immutable data models (GameState, Grid, Tetromino)
+│       ├── game/               # Pure game rules (GameLogic, GameLoop, Collision)
+│       ├── input/              # Input processing (KeyMapping, GameCommand)
+│       ├── replay/             # Replay system (ReplayBuilder, ReplayPlayer)
+│       └── view/               # Presentation logic (GameView, AnsiRenderer)
 ├── app/                        # Impure layer (ZIO-dependent)
 │   └── src/main/scala/monadris/
-│       ├── config/             # ZIO Config loading
+│       ├── config/             # ZIO Config loading (ConfigLayer)
 │       ├── infrastructure/     # ZIO effect implementation
-│       │   ├── io/             # Terminal input + system services
-│       │   ├── render/         # Console rendering
-│       │   └── runtime/        # Loop, input stream, clock, commands
+│       │   ├── game/           # Game runtime (GameRunner, GameSession, ReplayRunner)
+│       │   ├── persistence/    # Replay storage (FileReplayRepository, JsonReplayCodec)
+│       │   └── terminal/       # Console I/O (ConsoleRenderer, TerminalInput)
 │       └── Main.scala
 └── build.sbt
 ```
@@ -221,7 +224,10 @@ sbt stressTest
 ```
 
 ### Test Coverage
-- **Domain & Logic**: Invariants, state transitions, collision detection.
+- **Domain**: Immutable data structures, grid operations, tetromino transformations.
+- **Game**: State transitions, collision detection, line clearing, scoring.
+- **Input**: Key mapping, command parsing.
+- **Replay**: Recording, playback, serialization.
 - **View**: Layout generation and ViewModel construction.
 - **Stress Testing**: Validates memory safety and stack safety by running 100,000 game frames in a simulated environment (`StressTest.scala`).
 
@@ -230,8 +236,8 @@ sbt stressTest
 This project uses **ArchUnit** to automatically verify architectural rules. Any violation will cause `sbt test` to fail.
 
 **Enforced Rules:**
-- **Domain Isolation**: Domain layer (`monadris.domain`) must not depend on upper layers (Logic, View).
-- **Logic/View Separation**: Logic layer must not depend on View layer, and vice versa.
+- **Domain Isolation**: Domain layer (`monadris.domain`) must not depend on upper layers (Game, View).
+- **Game/View Separation**: Game layer must not depend on View layer, and vice versa.
 - **Purity**: Core module must not depend on impure infrastructure APIs (`java.io`, `java.sql`, `java.net`, `java.util.concurrent`) or effect systems (ZIO).
 - **No Cycles**: Package dependencies must be free of cycles.
 
