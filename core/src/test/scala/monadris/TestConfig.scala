@@ -1,6 +1,6 @@
 package monadris
 
-import monadris.domain.config.*
+import monadris.config.*
 
 /**
  * Core用テスト設定

@@ -1,8 +1,8 @@
 package monadris.view
 
 import monadris.TestConfig
+import monadris.config.*
 import monadris.domain.*
-import monadris.domain.config.*
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

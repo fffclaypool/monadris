@@ -5,8 +5,6 @@ import zio.config.*
 import zio.config.magnolia.*
 import zio.config.typesafe.*
 
-import monadris.domain.config.AppConfig
-
 object ConfigLayer:
   private val configDescriptor: Config[AppConfig] =
     deriveConfig[AppConfig].nested("monadris")

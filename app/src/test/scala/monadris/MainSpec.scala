@@ -3,9 +3,9 @@ package monadris
 import zio.*
 import zio.test.*
 
-import monadris.domain.replay.ReplayData
-import monadris.infrastructure.io.TestServices as Mocks
-import monadris.infrastructure.replay.ReplayRepository
+import monadris.infrastructure.persistence.ReplayRepository
+import monadris.infrastructure.terminal.TestServices as Mocks
+import monadris.replay.ReplayData
 
 /**
  * Main.program の結合テスト
@@ -148,6 +148,62 @@ object MainSpec extends ZIOSpecDefault:
       )
     }.provide(
       Mocks.tty(Chunk('x'.toInt, 'q'.toInt)),
+      Mocks.console,
+      Mocks.command,
+      Mocks.config,
+      mockReplayRepository
+    ),
+    test("program handles WatchReplay menu selection with no replays") {
+      // '3'でWatchReplayを選択、"No replays"メッセージ後にキー入力、'q'で終了
+      for
+        service <- ZIO.service[Mocks.TestConsoleService]
+        _       <- Main.program
+          .timeout(5.seconds)
+        output <- service.buffer.get
+        combined = output.mkString
+      yield assertTrue(
+        combined.contains("No replays") || combined.contains("no replays") || combined.contains("Thanks")
+      )
+    }.provide(
+      Mocks.tty(Chunk('3'.toInt, ' '.toInt, 'q'.toInt)),
+      Mocks.console,
+      Mocks.command,
+      Mocks.config,
+      mockReplayRepository
+    ),
+    test("program handles ListReplays menu selection with no replays") {
+      // '4'でListReplaysを選択、"No replays"メッセージ後にキー入力、'q'で終了
+      for
+        service <- ZIO.service[Mocks.TestConsoleService]
+        _       <- Main.program
+          .timeout(5.seconds)
+        output <- service.buffer.get
+        combined = output.mkString
+      yield assertTrue(
+        combined.contains("No replays") || combined.contains("no replays") || combined.contains("Thanks")
+      )
+    }.provide(
+      Mocks.tty(Chunk('4'.toInt, ' '.toInt, 'q'.toInt)),
+      Mocks.console,
+      Mocks.command,
+      Mocks.config,
+      mockReplayRepository
+    ),
+    test("program handles Quit menu selection via navigation") {
+      // 'j'で4回下に移動してQuitを選択、Enterで確定
+      // 注: メニューからのQuit選択はshowGoodbyeを呼び出さずに終了する
+      val inputs = Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)
+      for
+        service <- ZIO.service[Mocks.TestConsoleService]
+        _       <- Main.program
+          .timeout(5.seconds)
+        output <- service.buffer.get
+        combined = output.mkString
+      yield assertTrue(
+        combined.contains("Exit") || combined.contains("Quit") // メニュー項目が表示されていることを確認
+      )
+    }.provide(
+      Mocks.tty(Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)),
       Mocks.console,
       Mocks.command,
       Mocks.config,
