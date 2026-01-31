@@ -128,7 +128,7 @@ final class PostgresReplayRepository(
       .fromOption(TetrominoShape.values.find(_.toString == s))
       .orElseFail(new RuntimeException(s"Unknown tetromino shape: $s"))
 
-  // JSON codecs for ReplayEvent
+  // ReplayEvent用JSONコーデック
   private given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
   private given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail { s =>
     TetrominoShape.values.find(_.toString == s).toRight(s"Unknown shape: $s")
