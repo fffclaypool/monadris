@@ -14,6 +14,14 @@ import monadris.replay.*
 
 import io.getquill.*
 import io.getquill.jdbczio.Quill
+import org.postgresql.util.PGobject
+
+// JSONB型のラッパー
+opaque type JsonbString = String
+
+object JsonbString:
+  def apply(s: String): JsonbString            = s
+  extension (j: JsonbString) def value: String = j
 
 final case class GameResultRow(
   id: UUID,
@@ -34,7 +42,7 @@ final case class ReplayRow(
   gameResultId: UUID,
   initialPiece: String,
   nextPiece: String,
-  events: String,
+  events: JsonbString,
   eventCount: Int,
   createdAt: OffsetDateTime
 )
@@ -44,6 +52,18 @@ final class PostgresReplayRepository(
 ) extends ReplayRepository:
 
   import quill.*
+
+  // JSONBカラム用のカスタムエンコーダ・デコーダ
+  private given jsonbEncoder: Encoder[JsonbString] = encoder(
+    java.sql.Types.OTHER,
+    (index, value, row) =>
+      val pgObj = new PGobject()
+      pgObj.setType("jsonb")
+      pgObj.setValue(value.value)
+      row.setObject(index, pgObj)
+  )
+
+  private given jsonbDecoder: Decoder[JsonbString] = decoder(row => index => JsonbString(row.getObject(index).toString))
 
   private inline def gameResults = quote(querySchema[GameResultRow]("game_results"))
   private inline def replays     = quote(querySchema[ReplayRow]("replays"))
@@ -71,7 +91,7 @@ final class PostgresReplayRepository(
         gameResultId = gameResultId,
         initialPiece = replay.metadata.initialPiece.toString,
         nextPiece = replay.metadata.nextPiece.toString,
-        events = eventsJson,
+        events = JsonbString(eventsJson),
         eventCount = replay.eventCount,
         createdAt = now
       )
@@ -89,7 +109,7 @@ final class PostgresReplayRepository(
       gameResult    <- ZIO.fromOption(gameResultOpt).orElseFail(new RuntimeException(s"Replay not found: $name"))
       replayRowOpt  <- run(replays.filter(_.gameResultId == lift(gameResult.id))).map(_.headOption)
       replayRow     <- ZIO.fromOption(replayRowOpt).orElseFail(new RuntimeException(s"Replay data not found: $name"))
-      events        <- decodeEvents(replayRow.events)
+      events        <- decodeEvents(replayRow.events.value)
       initialPiece  <- parseShape(replayRow.initialPiece)
       nextPiece     <- parseShape(replayRow.nextPiece)
       metadata = ReplayMetadata(

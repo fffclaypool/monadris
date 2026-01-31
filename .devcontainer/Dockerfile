@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/java:1-21-bullseye
 
-RUN apt-get update \
+RUN rm -f /etc/apt/sources.list.d/yarn.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends gnupg2 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && mkdir -p /etc/apt/keyrings \
@@ -11,6 +12,7 @@ RUN apt-get update \
         chromium \
         ffmpeg \
         nodejs \
+        postgresql-client \
         python3-pip \
         vhs \
     && npm install -g @anthropic-ai/claude-code repomix \
@@ -20,6 +22,8 @@ RUN apt-get update \
 
 USER vscode
 WORKDIR /home/vscode
+
+RUN mkdir -p /home/vscode/.ivy2
 
 ARG TARGETARCH
 RUN CS_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64") \
