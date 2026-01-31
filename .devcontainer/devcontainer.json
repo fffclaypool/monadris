@@ -1,34 +1,19 @@
 {
     "name": "Scala Dev Environment",
-    "build": {
-      "dockerfile": "Dockerfile"
-    },
-    "features": {
-      "ghcr.io/devcontainers/features/git:1": {},
-      "ghcr.io/devcontainers/features/common-utils:2": {
-        "installZsh": true,
-        "configureZshAsDefaultShell": true,
-        "username": "vscode"
-      }
-    },
+    "dockerComposeFile": "docker-compose.yaml",
+    "service": "app",
+    "workspaceFolder": "/workspaces/monadris",
     "customizations": {
       "vscode": {
         "settings": {
-          // targetフォルダ（ビルド生成物）を監視対象外にする（CPU負荷軽減に必須）
           "files.watcherExclude": {
               "**/target": true
           },
-          // 暗黙の引数（implicit parameters）をエディタ上に表示する
           "metals.inlayHints.implicitArguments.enable": true,
-          // 推論された型（val x = ... の : Int とか）を表示する
           "metals.showInferredType": true,
-          // 保存時に自動フォーマットを実行
           "editor.formatOnSave": true,
-          // フォーマッターとしてMetals（Scalafmt）を使用
           "editor.defaultFormatter": "scalameta.metals",
-          // ファイル末尾に必ず改行を入れる
           "files.insertFinalNewline": true,
-          // 行末の不要な空白を削除
           "files.trimTrailingWhitespace": true
         },
         "extensions": [

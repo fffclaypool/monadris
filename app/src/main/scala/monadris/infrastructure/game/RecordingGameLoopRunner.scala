@@ -117,9 +117,10 @@ object RecordingGameLoopRunner:
     newState: GameState,
     nextShape: TetrominoShape
   ): ReplayBuilder =
-    val builderWithInput = builder.recordInput(input)
-    if pieceWasLocked(oldState, newState) then builderWithInput.recordPieceSpawn(nextShape)
-    else builderWithInput
+    val builderWithSpawn =
+      if pieceWasLocked(oldState, newState) then builder.recordPieceSpawn(nextShape)
+      else builder
+    builderWithSpawn.recordInput(input)
 
   private def pieceWasLocked(oldState: GameState, newState: GameState): Boolean =
     oldState.currentTetromino.shape != newState.currentTetromino.shape ||

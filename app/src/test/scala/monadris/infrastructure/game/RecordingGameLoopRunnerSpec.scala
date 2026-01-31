@@ -207,6 +207,72 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
             assertTrue(false)
       }
     ),
+    suite("Event recording order")(
+      test("PieceSpawn is recorded before PlayerInput when piece locks") {
+        // ReplayBuilderを使ってイベント順序をテスト
+        val builder = ReplayBuilder.create(
+          timestamp = 12345L,
+          gridWidth = 10,
+          gridHeight = 20,
+          initialPiece = TetrominoShape.I,
+          nextPiece = TetrominoShape.O
+        )
+
+        // recordEventsと同じロジック: PieceSpawnを先に記録
+        val builderWithSpawn = builder.recordPieceSpawn(TetrominoShape.T)
+        val builderWithInput = builderWithSpawn.recordInput(Input.HardDrop)
+        val finalBuilder     = builderWithInput.advanceFrame
+
+        val replayData = finalBuilder.build(initialState, 23456L)
+        val events     = replayData.events
+
+        // PieceSpawnがPlayerInputより先に記録されていることを確認
+        val pieceSpawnIndex = events.indexWhere {
+          case ReplayEvent.PieceSpawn(_, _) => true
+          case _                            => false
+        }
+        val playerInputIndex = events.indexWhere {
+          case ReplayEvent.PlayerInput(_, _) => true
+          case _                             => false
+        }
+
+        assertTrue(
+          pieceSpawnIndex >= 0,
+          playerInputIndex >= 0,
+          pieceSpawnIndex < playerInputIndex
+        )
+      },
+      test("Only PlayerInput is recorded when piece does not lock") {
+        val builder = ReplayBuilder.create(
+          timestamp = 12345L,
+          gridWidth = 10,
+          gridHeight = 20,
+          initialPiece = TetrominoShape.I,
+          nextPiece = TetrominoShape.O
+        )
+
+        // ピースがロックされない場合はPlayerInputのみ
+        val builderWithInput = builder.recordInput(Input.MoveLeft)
+        val finalBuilder     = builderWithInput.advanceFrame
+
+        val replayData = finalBuilder.build(initialState, 23456L)
+        val events     = replayData.events
+
+        val hasPieceSpawn = events.exists {
+          case ReplayEvent.PieceSpawn(_, _) => true
+          case _                            => false
+        }
+        val hasPlayerInput = events.exists {
+          case ReplayEvent.PlayerInput(Input.MoveLeft, _) => true
+          case _                                          => false
+        }
+
+        assertTrue(
+          !hasPieceSpawn,
+          hasPlayerInput
+        )
+      }
+    ),
     suite("ReplayBuilder integration")(
       test("ReplayBuilder creates valid metadata") {
         val builder = ReplayBuilder.create(

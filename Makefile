@@ -1,4 +1,4 @@
-.PHONY: all build build-core build-app test test-core test-app stress-test run clean help
+.PHONY: all build build-core build-app test test-all test-core test-app stress-test integration-test run clean help
 .PHONY: fmt fmt-check lint lint-check coverage check fix
 
 all: build
@@ -24,6 +24,11 @@ test-app:
 stress-test:
 	sbt stressTest
 
+integration-test:
+	sbt integrationTest
+
+test-all: test stress-test integration-test
+
 run:
 	sbt app/run
 
@@ -43,7 +48,7 @@ lint-check:
 	sbt "scalafix --check; Test/scalafix --check"
 
 coverage:
-	sbt "coverage; test; coverageReport"
+	sbt "coverage; test; integrationTest; coverageReport"
 
 check: fmt-check lint-check
 	@echo "All checks passed"
@@ -60,11 +65,13 @@ help:
 	@echo "  build-app    - Build app project only"
 	@echo ""
 	@echo "Test:"
-	@echo "  test         - Run all tests"
+	@echo "  test         - Run unit tests"
+	@echo "  test-all     - Run all tests (unit + stress + integration)"
 	@echo "  test-core    - Run core tests only"
 	@echo "  test-app     - Run app tests only"
 	@echo "  stress-test  - Run stress tests only"
-	@echo "  coverage     - Run tests with coverage report"
+	@echo "  integration-test - Run integration tests (requires Docker)"
+	@echo "  coverage     - Run all tests with coverage report (requires Docker)"
 	@echo ""
 	@echo "Lint/Format:"
 	@echo "  fmt          - Format code with scalafmt"

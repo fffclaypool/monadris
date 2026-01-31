@@ -11,7 +11,11 @@
       "Bash(sbt:*)",
       "Bash(grep:*)",
       "Bash(git branch:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(RUN_INTEGRATION_TESTS=true sbt:*)",
+      "Bash(make test:*)",
+      "Bash(make integration-test:*)",
+      "Bash(PGPASSWORD=monadris psql:*)"
     ]
   }
 }
