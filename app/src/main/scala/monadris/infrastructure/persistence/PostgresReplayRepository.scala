@@ -143,21 +143,22 @@ final class PostgresReplayRepository(
       .fromEither(json.fromJson[Vector[ReplayEvent]])
       .mapError(msg => new RuntimeException(s"Failed to decode events: $msg"))
 
+  // 共通パース関数（Either版）
+  private def parseShapeEither(s: String): Either[String, TetrominoShape] =
+    TetrominoShape.values.find(_.toString == s).toRight(s"Unknown shape: $s")
+
+  private def parseInputEither(s: String): Either[String, Input] =
+    Input.values.find(_.toString == s).toRight(s"Unknown input: $s")
+
   private def parseShape(s: String): Task[TetrominoShape] =
-    ZIO
-      .fromOption(TetrominoShape.values.find(_.toString == s))
-      .orElseFail(new RuntimeException(s"Unknown tetromino shape: $s"))
+    ZIO.fromEither(parseShapeEither(s)).mapError(msg => new RuntimeException(msg))
 
   // ReplayEvent用JSONコーデック
   private given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
-  private given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail { s =>
-    TetrominoShape.values.find(_.toString == s).toRight(s"Unknown shape: $s")
-  }
+  private given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail(parseShapeEither)
 
   private given JsonEncoder[Input] = JsonEncoder[String].contramap(_.toString)
-  private given JsonDecoder[Input] = JsonDecoder[String].mapOrFail { s =>
-    Input.values.find(_.toString == s).toRight(s"Unknown input: $s")
-  }
+  private given JsonDecoder[Input] = JsonDecoder[String].mapOrFail(parseInputEither)
 
   final private case class PlayerInputJson(input: String, frameNumber: Long)
   private given JsonCodec[PlayerInputJson] = DeriveJsonCodec.gen[PlayerInputJson]
@@ -180,13 +181,9 @@ final class PostgresReplayRepository(
 
   private given JsonDecoder[ReplayEvent] = JsonDecoder[ReplayEventJson].mapOrFail {
     case ReplayEventJson(Some(pi), _) =>
-      Input.values.find(_.toString == pi.input) match
-        case Some(input) => Right(ReplayEvent.PlayerInput(input, pi.frameNumber))
-        case None        => Left(s"Unknown input: ${pi.input}")
+      parseInputEither(pi.input).map(input => ReplayEvent.PlayerInput(input, pi.frameNumber))
     case ReplayEventJson(_, Some(ps)) =>
-      TetrominoShape.values.find(_.toString == ps.shape) match
-        case Some(shape) => Right(ReplayEvent.PieceSpawn(shape, ps.frameNumber))
-        case None        => Left(s"Unknown shape: ${ps.shape}")
+      parseShapeEither(ps.shape).map(shape => ReplayEvent.PieceSpawn(shape, ps.frameNumber))
     case _ => Left("Invalid replay event: missing PlayerInput or PieceSpawn")
   }
 

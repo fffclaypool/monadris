@@ -1,5 +1,6 @@
 FROM mcr.microsoft.com/devcontainers/java:1-21-bullseye
 
+USER root
 RUN rm -f /etc/apt/sources.list.d/yarn.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends gnupg2 \
@@ -15,10 +16,13 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
         postgresql-client \
         python3-pip \
         vhs \
+        docker.io \
     && npm install -g @anthropic-ai/claude-code repomix \
     && pip3 install --no-cache-dir pre-commit \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+RUN usermod -aG docker vscode
 
 USER vscode
 WORKDIR /home/vscode

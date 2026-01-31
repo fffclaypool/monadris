@@ -17,11 +17,11 @@ object DatabaseLayer:
     ZLayer.scoped {
       for
         config     <- ZIO.service[DatabaseConfig]
-        dataSource <- makeDataSource(config)
+        dataSource <- makeDataSourceScoped(config)
       yield dataSource
     }
 
-  private def makeDataSource(config: DatabaseConfig): ZIO[Scope, Throwable, HikariDataSource] =
+  def makeDataSourceScoped(config: DatabaseConfig): ZIO[Scope, Throwable, HikariDataSource] =
     ZIO.acquireRelease {
       ZIO.attemptBlocking {
         val hikariConfig = new HikariConfig()

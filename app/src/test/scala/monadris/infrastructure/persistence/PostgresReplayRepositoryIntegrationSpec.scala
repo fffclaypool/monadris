@@ -1,29 +1,35 @@
 package monadris.infrastructure.persistence
 
-import javax.sql.DataSource
-
 import zio.*
 import zio.test.*
 
+import monadris.config.DatabaseConfig
 import monadris.domain.Input
 import monadris.domain.TetrominoShape
 import monadris.replay.*
 
 import io.getquill.*
 import io.getquill.jdbczio.Quill
-import org.flywaydb.core.Flyway
-import org.testcontainers.containers.PostgreSQLContainer
 
 object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
 
   private object TestValues:
-    val Timestamp: Long   = 1706500000000L
-    val GridWidth: Int    = 10
-    val GridHeight: Int   = 20
-    val FinalScore: Int   = 500
-    val FinalLevel: Int   = 2
-    val LinesCleared: Int = 5
-    val DurationMs: Long  = 60000L
+    val Timestamp: Long           = 1706500000000L
+    val GridWidth: Int            = 10
+    val GridHeight: Int           = 20
+    val FinalScore: Int           = 500
+    val FinalLevel: Int           = 2
+    val LinesCleared: Int         = 5
+    val DurationMs: Long          = 60000L
+    val PoolSize: Int             = 2
+    val ConnectionTimeoutMs: Long = 5000L
+
+  private object DbConfig:
+    val Host: String     = sys.env.getOrElse("POSTGRES_HOST", "postgres")
+    val Port: String     = sys.env.getOrElse("POSTGRES_PORT", "5432")
+    val Database: String = sys.env.getOrElse("POSTGRES_DB", "monadris_test")
+    val Username: String = sys.env.getOrElse("POSTGRES_USER", "monadris")
+    val Password: String = sys.env.getOrElse("POSTGRES_PASSWORD", "monadris")
 
   private def createReplayData(
     name: String = "test",
@@ -48,56 +54,33 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
     )
     ReplayData(metadata, events)
 
-  private class PostgresContainer:
-    private val container: PostgreSQLContainer[?] =
-      val c = new PostgreSQLContainer("postgres:16-alpine")
-      c.withDatabaseName("monadris_test")
-      c.withUsername("test")
-      c.withPassword("test")
-      c
+  private def dbConfig: DatabaseConfig =
+    DatabaseConfig(
+      url = s"jdbc:postgresql://${DbConfig.Host}:${DbConfig.Port}/${DbConfig.Database}",
+      username = DbConfig.Username,
+      password = DbConfig.Password,
+      poolSize = TestValues.PoolSize,
+      connectionTimeoutMs = TestValues.ConnectionTimeoutMs
+    )
 
-    def start(): Unit = container.start()
-    def stop(): Unit  = container.stop()
-
-    def jdbcUrl: String  = container.getJdbcUrl
-    def username: String = container.getUsername
-    def password: String = container.getPassword
-
-  private def createDataSource(container: PostgresContainer): DataSource =
-    val ds = new com.zaxxer.hikari.HikariDataSource()
-    ds.setJdbcUrl(container.jdbcUrl)
-    ds.setUsername(container.username)
-    ds.setPassword(container.password)
-    ds.setMaximumPoolSize(2)
-    ds
-
-  private def runMigrations(ds: DataSource): Unit =
-    Flyway
-      .configure()
-      .dataSource(ds)
-      .locations("classpath:db/migration")
-      .load()
-      .migrate()
+  private def deleteAllReplays(repo: ReplayRepository): Task[Unit] =
+    for
+      names <- repo.list
+      _     <- ZIO.foreachDiscard(names)(repo.delete)
+    yield ()
 
   private def withPostgresRepo[A](
     test: ReplayRepository => Task[A]
   ): Task[A] =
     ZIO.scoped {
       for
-        container <- ZIO.acquireRelease(
-          ZIO.attempt {
-            val c = new PostgresContainer()
-            c.start()
-            c
-          }
-        )(c => ZIO.attempt(c.stop()).ignore)
-        ds <- ZIO.acquireRelease(
-          ZIO.attempt(createDataSource(container))
-        )(ds => ZIO.attempt(ds.asInstanceOf[com.zaxxer.hikari.HikariDataSource].close()).ignore)
-        _ <- ZIO.attempt(runMigrations(ds))
-        quill = new Quill.Postgres(SnakeCase, ds)
+        _          <- FlywayMigration.migrate.provide(ZLayer.succeed(dbConfig))
+        dataSource <- DatabaseLayer.makeDataSourceScoped(dbConfig)
+        quill = new Quill.Postgres(SnakeCase, dataSource)
         repo  = new PostgresReplayRepository(quill)
+        _      <- deleteAllReplays(repo)
         result <- test(repo)
+        _      <- deleteAllReplays(repo)
       yield result
     }
 
@@ -312,4 +295,4 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
         }
       }
     )
-  ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.ifEnvSet("RUN_INTEGRATION_TESTS")
+  ) @@ TestAspect.sequential @@ TestAspect.withLiveClock

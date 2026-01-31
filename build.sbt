@@ -21,22 +21,19 @@ lazy val core = project
   .settings(commonSettings)
   .settings(
     name := "monadris-core",
-    // WartRemover: 純粋関数型を強制する (Compile スコープのみ)
     Compile / wartremoverErrors ++= Warts.unsafe.filterNot(_ == Wart.DefaultArguments), // DefaultArgumentsのみ許容
     Compile / wartremoverErrors ++= Seq(Wart.Var, Wart.Null, Wart.Return, Wart.Throw),
-    // テストコードではWartRemoverを除外
     wartremoverExcluded += (Test / sourceDirectory).value
   )
 
-// ストレステスト用の設定スコープ
-lazy val Stress = config("stress") extend Test
+lazy val Stress      = config("stress") extend Test
+lazy val Integration = config("integration") extend Test
 
-// アプリケーション本体 (Coreに依存 + ZIO)
 lazy val app = project
   .in(file("app"))
   .dependsOn(core)
   .enablePlugins(JavaAppPackaging)
-  .configs(Stress)
+  .configs(Stress, Integration)
   .settings(commonSettings)
   .settings(
     inConfig(Stress)(Defaults.testSettings),
@@ -44,31 +41,35 @@ lazy val app = project
     Stress / envVars         := Map("RUN_STRESS_TESTS" -> "1"),
     Stress / fork            := true,
     Stress / testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    name := "monadris-app",
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / sourceDirectory := (Test / sourceDirectory).value,
+    Integration / fork            := true,
+    Integration / testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Integration / testOptions := Seq.empty,
+    name                      := "monadris-app",
     libraryDependencies ++= Seq(
-      "dev.zio"           %% "zio"                        % "2.1.24",
-      "dev.zio"           %% "zio-streams"                % "2.1.24",
-      "dev.zio"           %% "zio-logging"                % "2.1.17",
-      "dev.zio"           %% "zio-logging-slf4j"          % "2.1.17",
-      "dev.zio"           %% "zio-config"                 % "4.0.0-RC16",
-      "dev.zio"           %% "zio-config-typesafe"        % "4.0.0-RC16",
-      "dev.zio"           %% "zio-config-magnolia"        % "4.0.0-RC16",
-      "dev.zio"           %% "zio-json"                   % "0.7.3",
-      "ch.qos.logback"     % "logback-classic"            % "1.5.26",
-      "io.getquill"       %% "quill-jdbc-zio"             % "4.8.6",
-      "org.postgresql"     % "postgresql"                 % "42.7.4",
-      "org.flywaydb"       % "flyway-core"                % "10.7.1",
-      "org.flywaydb"       % "flyway-database-postgresql" % "10.7.1",
-      "dev.zio"           %% "zio-test"                   % "2.1.24" % Test,
-      "dev.zio"           %% "zio-test-sbt"               % "2.1.24" % Test,
-      "dev.zio"           %% "zio-test-magnolia"          % "2.1.24" % Test,
-      "org.testcontainers" % "testcontainers"             % "1.19.3" % Test,
-      "org.testcontainers" % "postgresql"                 % "1.19.3" % Test
+      "dev.zio"       %% "zio"                        % "2.1.24",
+      "dev.zio"       %% "zio-streams"                % "2.1.24",
+      "dev.zio"       %% "zio-logging"                % "2.1.17",
+      "dev.zio"       %% "zio-logging-slf4j"          % "2.1.17",
+      "dev.zio"       %% "zio-config"                 % "4.0.0-RC16",
+      "dev.zio"       %% "zio-config-typesafe"        % "4.0.0-RC16",
+      "dev.zio"       %% "zio-config-magnolia"        % "4.0.0-RC16",
+      "dev.zio"       %% "zio-json"                   % "0.7.3",
+      "ch.qos.logback" % "logback-classic"            % "1.5.26",
+      "io.getquill"   %% "quill-jdbc-zio"             % "4.8.6",
+      "org.postgresql" % "postgresql"                 % "42.7.4",
+      "org.flywaydb"   % "flyway-core"                % "10.7.1",
+      "org.flywaydb"   % "flyway-database-postgresql" % "10.7.1",
+      "dev.zio"       %% "zio-test"                   % "2.1.24" % Test,
+      "dev.zio"       %% "zio-test-sbt"               % "2.1.24" % Test,
+      "dev.zio"       %% "zio-test-magnolia"          % "2.1.24" % Test
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    fork         := true,
-    connectInput := true,
-    // app層ではWartRemoverは無効化
+    Test / testOptions += Tests
+      .Exclude(Seq("monadris.infrastructure.persistence.PostgresReplayRepositoryIntegrationSpec")),
+    fork                                   := true,
+    connectInput                           := true,
     wartremoverErrors                      := Seq.empty,
     Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false
@@ -85,3 +86,4 @@ lazy val root = project
   )
 
 addCommandAlias("stressTest", "app/Stress/testOnly *StressTest")
+addCommandAlias("integrationTest", "app/Integration/testOnly *PostgresReplayRepositoryIntegrationSpec")

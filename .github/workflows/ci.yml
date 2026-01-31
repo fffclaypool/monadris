@@ -9,6 +9,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: monadris
+          POSTGRES_PASSWORD: monadris
+          POSTGRES_DB: monadris_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: monadris_test
+      POSTGRES_USER: monadris
+      POSTGRES_PASSWORD: monadris
     steps:
     - uses: actions/checkout@v4
 
@@ -26,7 +46,7 @@ jobs:
       run: sbt scalafmtCheckAll scalafmtSbtCheck "scalafixAll --check" compile
 
     - name: Run tests with coverage
-      run: sbt coverage test coverageReport
+      run: sbt "coverage; test; integrationTest; coverageReport"
 
     - name: SonarCloud Scan
       uses: sonarsource/sonarqube-scan-action@v5
