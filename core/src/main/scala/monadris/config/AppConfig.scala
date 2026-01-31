@@ -7,7 +7,8 @@ final case class AppConfig(
   speed: SpeedConfig,
   terminal: TerminalConfig,
   timing: TimingConfig,
-  replay: ReplayConfig
+  replay: ReplayConfig,
+  database: DatabaseConfig
 )
 
 final case class GridConfig(
@@ -46,4 +47,12 @@ final case class TimingConfig(
 final case class ReplayConfig(
   defaultSpeed: Double,
   baseFrameIntervalMs: Long
+)
+
+final case class DatabaseConfig(
+  url: String,
+  username: String,
+  password: String,
+  poolSize: Int,
+  connectionTimeoutMs: Long
 )

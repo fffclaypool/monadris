@@ -3,10 +3,14 @@ package monadris
 import zio.*
 import zio.logging.backend.SLF4J
 
+import monadris.config.ConfigLayer
+import monadris.config.DatabaseConfig
 import monadris.infrastructure.game.GameSession
 import monadris.infrastructure.game.MenuController
 import monadris.infrastructure.game.ReplaySelector
-import monadris.infrastructure.persistence.FileReplayRepository
+import monadris.infrastructure.persistence.DatabaseLayer
+import monadris.infrastructure.persistence.FlywayMigration
+import monadris.infrastructure.persistence.PostgresReplayRepository
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.GameEnv
 import monadris.infrastructure.terminal.TerminalControl
@@ -16,13 +20,28 @@ object Main extends ZIOAppDefault:
 
   override def run: Task[Unit] =
     program
-      .provideLayer(Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ GameEnv.live ++ FileReplayRepository.layer)
+      .provideLayer(
+        Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
+          GameEnv.live ++
+          databaseLayer
+      )
       .catchAll {
         case error: Config.Error =>
           ZIO.logError(s"Configuration error: ${error.getMessage}")
         case error =>
           ZIO.logError(s"Application failed: $error")
       }
+
+  private val databaseConfigLayer: ZLayer[Any, Config.Error, DatabaseConfig] =
+    ConfigLayer.live.project(_.database)
+
+  private val migrationLayer: ZLayer[DatabaseConfig, Throwable, Unit] =
+    ZLayer.fromZIO(FlywayMigration.migrate.unit)
+
+  private val databaseLayer: ZLayer[Any, Throwable, ReplayRepository] =
+    databaseConfigLayer >>>
+      (migrationLayer ++ DatabaseLayer.live) >>>
+      PostgresReplayRepository.layer
 
   val program: ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
     ZIO.scoped {
