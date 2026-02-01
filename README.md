@@ -94,7 +94,7 @@ graph TD
     Main --> Terminal
     Main --> Persistence
     GameInfra --> Logic
-    GameInfra --> View
+    GameInfra --> Terminal
     GameInfra --> Replay
     Terminal --> View
     Persistence --> Replay
