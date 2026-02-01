@@ -3,7 +3,7 @@
 [![CI](https://github.com/fffclaypool/monadris/actions/workflows/ci.yml/badge.svg)](https://github.com/fffclaypool/monadris/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/fffclaypool/monadris/graph/badge.svg)](https://codecov.io/gh/fffclaypool/monadris)
 ![Scala](https://img.shields.io/badge/scala-3.3.5-dc322f.svg?logo=scala&logoColor=white)
-![ZIO](https://img.shields.io/badge/ZIO-2.0-1a237e.svg?logo=scala&logoColor=white)
+![ZIO](https://img.shields.io/badge/ZIO-2.1-1a237e.svg?logo=scala&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 [![Scalafmt](https://img.shields.io/badge/code_style-scalafmt-c22d40.svg?logo=scala&logoColor=white)](.scalafmt.conf)
@@ -25,6 +25,7 @@ https://github.com/user-attachments/assets/4d8b7920-68e7-45d8-9a86-fbe476922b3c
 - **Event-Driven**: Utilizing **ZIO Queue** for non-blocking, thread-safe event handling.
 - **Effect Isolation**: Rendering, input, and time are wrapped in ZIO effects.
 - **Configurable**: Game settings are loaded from HOCON configuration files.
+- **Replay System**: Record and playback game sessions with file or PostgreSQL persistence.
 
 ## Architecture
 
@@ -73,7 +74,9 @@ graph TD
     subgraph AppProject ["App Project (Impure / ZIO)"]
         direction TB
         Main["Main / ZIO App"]:::impure
-        Infra["Infrastructure"]:::impure
+        GameInfra["Game Runtime"]:::impure
+        Terminal["Terminal I/O"]:::impure
+        Persistence["Persistence"]:::impure
         ConfigLoader["Config Loader"]:::impure
     end
 
@@ -83,26 +86,36 @@ graph TD
             Logic["Game Logic"]:::pure
             Domain["Domain Models"]:::pure
             View["View Logic"]:::pure
+            Replay["Replay Logic"]:::pure
         end
     end
 
-    Main --> Infra
-    Infra --> Logic
-    Infra --> View
+    Main --> GameInfra
+    Main --> Terminal
+    Main --> Persistence
+    GameInfra --> Logic
+    GameInfra --> View
+    GameInfra --> Replay
+    Terminal --> View
+    Persistence --> Replay
     Logic --> Domain
     View --> Domain
+    Replay --> Domain
     ConfigLoader --> Domain
 ```
 
 | Layer | Project | ZIO Dependency | Description |
 |-------|---------|----------------|-------------|
-| **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`) |
+| **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`, `Position`) |
 | **Config** | `core` | **No** | Pure configuration definitions (`AppConfig`) |
-| **Game** | `core` | **No** | Pure state transitions (`GameLogic`, `GameLoop`, `Collision`) |
+| **Game** | `core` | **No** | Pure state transitions (`GameLogic`, `GameLoop`, `Collision`, `LineClearing`) |
 | **Input** | `core` | **No** | Input processing (`KeyMapping`, `GameCommand`) |
-| **Replay** | `core` | **No** | Replay recording/playback (`ReplayBuilder`, `ReplayPlayer`) |
-| **View** | `core` | **No** | Pure transformation (`State => ScreenBuffer`) |
-| **Infrastructure** | `app` | **Yes** | ZIO effects, Console I/O, Queues, Persistence |
+| **Replay** | `core` | **No** | Replay recording/playback (`ReplayBuilder`, `ReplayPlayer`, `ReplayData`) |
+| **View** | `core` | **No** | Pure transformation (`GameView`, `AnsiRenderer`, `ViewModel`) |
+| **Game Runtime** | `app` | **Yes** | Game loop execution (`GameRunner`, `GameSession`, `ReplayRunner`, `MenuController`) |
+| **Terminal** | `app` | **Yes** | Console I/O (`ConsoleRenderer`, `TerminalInput`, `LineReader`) |
+| **Persistence** | `app` | **Yes** | Replay storage (`FileReplayRepository`, `PostgresReplayRepository`, `FlywayMigration`) |
+| **Config Loader** | `app` | **Yes** | ZIO Config loading (`ConfigLayer`, `DatabaseLayer`) |
 
 ### 3. Runtime Event Loop
 How ZIO handles concurrent inputs and serializes them into the game loop.
@@ -194,18 +207,18 @@ monadris/
 ├── core/                       # Pure logic (ZIO-independent / WartRemover enforced)
 │   └── src/main/scala/monadris/
 │       ├── config/             # Pure config definition (AppConfig)
-│       ├── domain/             # Immutable data models (GameState, Grid, Tetromino)
-│       ├── game/               # Pure game rules (GameLogic, GameLoop, Collision)
+│       ├── domain/             # Immutable data models (GameState, Grid, Tetromino, Position)
+│       ├── game/               # Pure game rules (GameLogic, GameLoop, Collision, LineClearing)
 │       ├── input/              # Input processing (KeyMapping, GameCommand)
-│       ├── replay/             # Replay system (ReplayBuilder, ReplayPlayer)
-│       └── view/               # Presentation logic (GameView, AnsiRenderer)
+│       ├── replay/             # Replay system (ReplayBuilder, ReplayPlayer, ReplayData)
+│       └── view/               # Presentation logic (GameView, AnsiRenderer, ViewModel)
 ├── app/                        # Impure layer (ZIO-dependent)
 │   └── src/main/scala/monadris/
 │       ├── config/             # ZIO Config loading (ConfigLayer)
 │       ├── infrastructure/     # ZIO effect implementation
-│       │   ├── game/           # Game runtime (GameRunner, GameSession, ReplayRunner)
-│       │   ├── persistence/    # Replay storage (FileReplayRepository, JsonReplayCodec)
-│       │   └── terminal/       # Console I/O (ConsoleRenderer, TerminalInput)
+│       │   ├── game/           # Game runtime (GameRunner, GameSession, ReplayRunner, MenuController)
+│       │   ├── persistence/    # Replay storage (FileReplayRepository, PostgresReplayRepository, FlywayMigration)
+│       │   └── terminal/       # Console I/O (ConsoleRenderer, TerminalInput, LineReader)
 │       └── Main.scala
 └── build.sbt
 ```
@@ -221,6 +234,9 @@ sbt test
 
 # Run stress tests only (Slow: 100,000 iterations)
 sbt stressTest
+
+# Run integration tests (Requires PostgreSQL)
+sbt integrationTest
 ```
 
 ### Test Coverage
@@ -229,6 +245,7 @@ sbt stressTest
 - **Input**: Key mapping, command parsing.
 - **Replay**: Recording, playback, serialization.
 - **View**: Layout generation and ViewModel construction.
+- **Persistence**: File and PostgreSQL replay repository (integration tests).
 - **Stress Testing**: Validates memory safety and stack safety by running 100,000 game frames in a simulated environment (`StressTest.scala`).
 
 ### Architecture Testing
