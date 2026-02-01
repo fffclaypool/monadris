@@ -23,6 +23,52 @@ object TestServices:
           queue.poll.map(_.map(_.toInt))
     }
 
+  def terminalSession(inputs: Chunk[Int]): ZLayer[Any, Nothing, TerminalSession] =
+    ZLayer.fromZIO {
+      for
+        queue  <- Queue.unbounded[Int]
+        _      <- queue.offerAll(inputs)
+        output <- Ref.make(List.empty[String])
+      yield new TerminalSession:
+        def showMessage(message: String): Task[Unit] =
+          output.update(_ :+ message)
+
+        def prompt(message: String): Task[String] =
+          for
+            _    <- output.update(_ :+ message)
+            line <- readLineLoop(new StringBuilder)
+          yield line
+
+        def waitForKeypress(): Task[Int] =
+          queue.take
+
+        def showMessageAndWait(message: String): Task[Unit] =
+          for
+            _ <- output.update(_ :+ message)
+            _ <- output.update(_ :+ "Press any key to continue...")
+            _ <- queue.take
+          yield ()
+
+        def withRawMode[A](effect: Task[A]): Task[A] =
+          effect
+
+        def withCooked[A](effect: Task[A]): Task[A] =
+          effect
+
+        def enableRawMode: Task[Unit]  = ZIO.unit
+        def disableRawMode: Task[Unit] = ZIO.unit
+
+        private def readLineLoop(acc: StringBuilder): Task[String] =
+          queue.take.flatMap { ch =>
+            ch match
+              case 13 | 10 => ZIO.succeed(acc.toString)
+              case 127 | 8 =>
+                if acc.nonEmpty then readLineLoop(acc.deleteCharAt(acc.length - 1))
+                else readLineLoop(acc)
+              case _ => readLineLoop(acc.append(ch.toChar))
+          }
+    }
+
   case class TestConsoleService(buffer: Ref[List[String]]) extends ConsoleService:
     def print(text: String): Task[Unit] = buffer.update(_ :+ text)
     def flush(): Task[Unit]             = ZIO.unit

@@ -91,7 +91,6 @@ graph TD
     end
 
     Main --> GameInfra
-    Main --> Terminal
     Main --> Persistence
     GameInfra --> Logic
     GameInfra --> Terminal
@@ -113,7 +112,7 @@ graph TD
 | **Replay** | `core` | **No** | Replay recording/playback (`ReplayBuilder`, `ReplayPlayer`, `ReplayData`) |
 | **View** | `core` | **No** | Pure transformation (`GameView`, `AnsiRenderer`, `ViewModel`) |
 | **Game Runtime** | `app` | **Yes** | Game loop execution (`GameRunner`, `GameSession`, `ReplayRunner`, `MenuController`) |
-| **Terminal** | `app` | **Yes** | Console I/O (`ConsoleRenderer`, `TerminalInput`, `LineReader`) |
+| **Terminal** | `app` | **Yes** | Console I/O (`ConsoleRenderer`, `TerminalInput`, `TerminalSession`) |
 | **Persistence** | `app` | **Yes** | Replay storage (`FileReplayRepository`, `PostgresReplayRepository`, `FlywayMigration`) |
 | **Config Loader** | `app` | **Yes** | ZIO Config loading (`ConfigLayer`, `DatabaseLayer`) |
 

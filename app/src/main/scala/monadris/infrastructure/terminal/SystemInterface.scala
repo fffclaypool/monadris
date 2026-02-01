@@ -79,8 +79,11 @@ object CommandService:
       }.unit
   }
 
-type GameEnv = TtyService & ConsoleService & CommandService & AppConfig
+type GameEnv = TtyService & ConsoleService & CommandService & AppConfig & TerminalSession
 
 object GameEnv:
+  private val terminalServices: ZLayer[Any, Nothing, TtyService & ConsoleService & CommandService] =
+    TtyService.live ++ ConsoleService.live ++ CommandService.live
+
   val live: ZLayer[Any, Config.Error, GameEnv] =
-    TtyService.live ++ ConsoleService.live ++ CommandService.live ++ ConfigLayer.live
+    terminalServices ++ ConfigLayer.live ++ (terminalServices >>> TerminalSession.live)

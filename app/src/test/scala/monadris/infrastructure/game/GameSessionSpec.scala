@@ -24,7 +24,8 @@ object GameSessionSpec extends ZIOSpecDefault:
               LocalTestServices.tty(Chunk.empty),
               ZLayer.succeed(service),
               LocalTestServices.command,
-              LocalTestServices.config
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk.empty)
             )
             .timeout(Duration.fromMillis(500))
           output <- service.buffer.get
@@ -39,7 +40,8 @@ object GameSessionSpec extends ZIOSpecDefault:
               LocalTestServices.tty(Chunk.empty),
               LocalTestServices.console,
               LocalTestServices.command,
-              LocalTestServices.config
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk.empty)
             )
             .timeout(Duration.fromMillis(500))
         yield assertTrue(true)
