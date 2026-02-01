@@ -33,6 +33,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('q'.toInt)),
       mockReplayRepository
     ),
     test("program runs and exits with lowercase q") {
@@ -44,6 +45,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('q'.toInt)),
       mockReplayRepository
     ),
     test("program runs and exits with uppercase Q") {
@@ -55,6 +57,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('Q'.toInt)),
       mockReplayRepository
     ),
     test("program shows title screen") {
@@ -73,6 +76,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('q'.toInt)),
       mockReplayRepository
     ),
     test("program shows menu after title") {
@@ -94,6 +98,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('q'.toInt)),
       mockReplayRepository
     ),
     test("program outputs goodbye message on quit") {
@@ -109,6 +114,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('q'.toInt)),
       mockReplayRepository
     ),
     test("program handles movement before quit") {
@@ -121,6 +127,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)),
       mockReplayRepository
     ),
     test("program handles arrow keys before quit") {
@@ -133,6 +140,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)),
       mockReplayRepository
     ),
     test("program ignores unknown keys and continues") {
@@ -151,6 +159,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('x'.toInt, 'q'.toInt)),
       mockReplayRepository
     ),
     test("program handles WatchReplay menu selection with no replays") {
@@ -169,6 +178,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('3'.toInt, ' '.toInt, 'q'.toInt)),
       mockReplayRepository
     ),
     test("program handles ListReplays menu selection with no replays") {
@@ -187,6 +197,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('4'.toInt, ' '.toInt, 'q'.toInt)),
       mockReplayRepository
     ),
     test("program handles Quit menu selection via navigation") {
@@ -207,6 +218,7 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.console,
       Mocks.command,
       Mocks.config,
+      Mocks.terminalSession(Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)),
       mockReplayRepository
     )
   )
