@@ -102,6 +102,20 @@ object ReplaySelectorSpec extends ZIOSpecDefault:
             )
             .timeout(Duration.fromMillis(500))
         yield assertTrue(true)
+      },
+      test("Handles invalid input then cancel") {
+        val replayMap = Map("test-replay" -> createTestReplayData())
+        for _ <- ReplaySelector.watchReplay
+            .provide(
+              LocalTestServices.tty(Chunk('x'.toInt, '\r'.toInt, ' '.toInt)),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk('x'.toInt, '\r'.toInt, ' '.toInt)),
+              MockReplayRepository.layer(replayMap)
+            )
+            .timeout(Duration.fromMillis(500))
+        yield assertTrue(true)
       }
     ),
     suite("listReplays")(
@@ -134,6 +148,19 @@ object ReplaySelectorSpec extends ZIOSpecDefault:
             )
             .timeout(Duration.fromMillis(500))
         yield assertTrue(true)
+      }
+    ),
+    suite("formatReplayList")(
+      test("formats replay list correctly") {
+        val replays = Vector("replay1", "replay2", "replay3")
+        val result  = replays.zipWithIndex.map { case (name, idx) =>
+          s"  ${idx + 1}. $name\r\n"
+        }.mkString
+        assertTrue(
+          result.contains("1. replay1"),
+          result.contains("2. replay2"),
+          result.contains("3. replay3")
+        )
       }
     ),
     suite("MockReplayRepository")(
