@@ -58,7 +58,7 @@ lazy val app = project
       "dev.zio"       %% "zio-json"                   % "0.7.3",
       "ch.qos.logback" % "logback-classic"            % "1.5.26",
       "io.getquill"   %% "quill-jdbc-zio"             % "4.8.6",
-      "org.postgresql" % "postgresql"                 % "42.7.4",
+      "org.postgresql" % "postgresql"                 % "42.7.10",
       "org.flywaydb"   % "flyway-core"                % "10.7.1",
       "org.flywaydb"   % "flyway-database-postgresql" % "10.7.1",
       "dev.zio"       %% "zio-test"                   % "2.1.24" % Test,
