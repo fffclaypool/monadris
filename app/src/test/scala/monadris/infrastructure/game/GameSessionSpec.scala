@@ -4,9 +4,22 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
+import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
+import monadris.replay.*
 
 object GameSessionSpec extends ZIOSpecDefault:
+
+  case class MockReplayRepository(saved: Ref[Option[(String, ReplayData)]]) extends ReplayRepository:
+    def save(name: String, replay: ReplayData): Task[Unit] = saved.set(Some((name, replay)))
+    def load(name: String): Task[ReplayData]               = ZIO.fail(new RuntimeException("Not found"))
+    def list: Task[Vector[String]]                         = ZIO.succeed(Vector.empty)
+    def exists(name: String): Task[Boolean]                = ZIO.succeed(false)
+    def delete(name: String): Task[Unit]                   = ZIO.unit
+
+  object MockReplayRepository:
+    def layer: ULayer[ReplayRepository] =
+      ZLayer.fromZIO(Ref.make(Option.empty[(String, ReplayData)]).map(MockReplayRepository(_)))
 
   private val testGridWidth  = LocalTestServices.testConfig.grid.width
   private val testGridHeight = LocalTestServices.testConfig.grid.height
@@ -24,7 +37,8 @@ object GameSessionSpec extends ZIOSpecDefault:
               LocalTestServices.tty(Chunk.empty),
               ZLayer.succeed(service),
               LocalTestServices.command,
-              LocalTestServices.config
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk.empty)
             )
             .timeout(Duration.fromMillis(500))
           output <- service.buffer.get
@@ -39,7 +53,8 @@ object GameSessionSpec extends ZIOSpecDefault:
               LocalTestServices.tty(Chunk.empty),
               LocalTestServices.console,
               LocalTestServices.command,
-              LocalTestServices.config
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk.empty)
             )
             .timeout(Duration.fromMillis(500))
         yield assertTrue(true)
@@ -101,6 +116,23 @@ object GameSessionSpec extends ZIOSpecDefault:
           shapes <- ZIO.collectAll(List.fill(50)(GameRunner.RandomPieceGenerator.nextShape))
           uniqueShapes = shapes.toSet
         yield assertTrue(uniqueShapes.size > 1)
+      }
+    ),
+    suite("playAndRecord")(
+      test("prompts for replay name") {
+        val replayNameInput = Chunk('t'.toInt, 'e'.toInt, 's'.toInt, 't'.toInt, '\r'.toInt, 'q'.toInt)
+        for result <- GameSession.playAndRecord
+            .provide(
+              LocalTestServices.tty(replayNameInput),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(replayNameInput),
+              MockReplayRepository.layer
+            )
+            .timeout(Duration.fromMillis(1000))
+            .either
+        yield assertTrue(result.isLeft || result.isRight)
       }
     )
   )

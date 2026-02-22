@@ -5,11 +5,9 @@ import zio.*
 import monadris.config.AppConfig
 import monadris.domain.*
 import monadris.infrastructure.persistence.ReplayRepository
-import monadris.infrastructure.terminal.ConsoleService
 import monadris.infrastructure.terminal.GameEnv
-import monadris.infrastructure.terminal.LineReader
 import monadris.infrastructure.terminal.Renderer
-import monadris.infrastructure.terminal.TerminalControl
+import monadris.infrastructure.terminal.TerminalSession
 import monadris.infrastructure.terminal.TtyService
 
 object GameSession:
@@ -31,10 +29,7 @@ object GameSession:
 
   def playAndRecord: ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
     for
-      _            <- TerminalControl.disableRawMode
-      _            <- ConsoleService.print("\r\n\r\nEnter replay name: ")
-      name         <- LineReader.readLine
-      _            <- TerminalControl.enableRawMode
+      name         <- TerminalSession.prompt("\r\n\r\nEnter replay name: ")
       initialState <- initializeGame
       config       <- ZIO.service[AppConfig]
       result       <- RecordingGameLoopRunner.recordingGameLoop(
@@ -46,11 +41,7 @@ object GameSession:
       (finalState, replayData) = result
       _ <- ReplayRepository.save(name, replayData)
       _ <- showOutro(finalState)
-      _ <- TerminalControl.disableRawMode
-      _ <- ConsoleService.print(s"\r\nReplay saved as: $name\r\n")
-      _ <- ConsoleService.print("Press any key to continue...")
-      _ <- TerminalControl.enableRawMode
-      _ <- TtyService.read()
+      _ <- TerminalSession.showMessageAndWait(s"\r\nReplay saved as: $name\r\n")
     yield ()
 
   private def initializeGame: ZIO[AppConfig, Nothing, GameState] =
