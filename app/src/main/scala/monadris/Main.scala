@@ -13,7 +13,7 @@ import monadris.infrastructure.persistence.FlywayMigration
 import monadris.infrastructure.persistence.PostgresReplayRepository
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.GameEnv
-import monadris.infrastructure.terminal.TerminalControl
+import monadris.infrastructure.terminal.TerminalSession
 import monadris.view.GameView
 
 object Main extends ZIOAppDefault:
@@ -47,8 +47,9 @@ object Main extends ZIOAppDefault:
     ZIO.scoped {
       for
         _ <- GameSession.showIntro
-        _ <- TerminalControl.enableRawMode
-        _ <- MenuController.run(executeMenuItem).ensuring(TerminalControl.disableRawMode.ignore)
+        _ <- TerminalSession.withRawMode {
+          MenuController.run(executeMenuItem)
+        }
         _ <- ZIO.logInfo("Monadris shutting down...")
       yield ()
     }
