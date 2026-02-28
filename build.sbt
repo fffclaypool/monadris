@@ -1,8 +1,9 @@
 val scala3Version = "3.3.5"
 
 val commonSettings = Seq(
-  version      := "0.1.0",
-  scalaVersion := scala3Version,
+  libraryDependencySchemes += "dev.zio" %% "zio-json" % VersionScheme.Always,
+  version                               := "0.1.0",
+  scalaVersion                          := scala3Version,
   scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:imports", "-Xfatal-warnings"),
   libraryDependencies ++= Seq(
     "org.scalatest"       %% "scalatest" % "3.2.19" % Test,
@@ -55,7 +56,7 @@ lazy val app = project
       "dev.zio"       %% "zio-config"                 % "4.0.0-RC16",
       "dev.zio"       %% "zio-config-typesafe"        % "4.0.0-RC16",
       "dev.zio"       %% "zio-config-magnolia"        % "4.0.0-RC16",
-      "dev.zio"       %% "zio-json"                   % "0.7.45",
+      "dev.zio"       %% "zio-json"                   % "0.9.0",
       "ch.qos.logback" % "logback-classic"            % "1.5.32",
       "io.getquill"   %% "quill-jdbc-zio"             % "4.8.6",
       "org.postgresql" % "postgresql"                 % "42.7.10",
