@@ -1,8 +1,9 @@
 val scala3Version = "3.3.5"
 
 val commonSettings = Seq(
-  version      := "0.1.0",
-  scalaVersion := scala3Version,
+  libraryDependencySchemes += "dev.zio" %% "zio-json" % VersionScheme.Always,
+  version                               := "0.1.0",
+  scalaVersion                          := scala3Version,
   scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:imports", "-Xfatal-warnings"),
   libraryDependencies ++= Seq(
     "org.scalatest"       %% "scalatest" % "3.2.19" % Test,
