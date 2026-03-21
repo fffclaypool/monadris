@@ -222,3 +222,104 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
 
     buffer.pixels.exists(row => row.exists(p => p.char == '▓')) shouldBe true
   }
+
+  "Ghost piece rendering" should "show ghost blocks in the buffer" in {
+    val buffer = GameView.toScreenBuffer(initialState, config)
+    buffer.pixels.exists(row => row.exists(p => p.char == '░')) shouldBe true
+  }
+
+  it should "use the same color as the current piece" in {
+    val buffer        = GameView.toScreenBuffer(initialState, config)
+    val expectedColor = GameView.shapeToColor(TetrominoShape.T)
+    val ghostPixels   = buffer.pixels.flatMap(_.filter(_.char == '░'))
+    ghostPixels should not be empty
+    all(ghostPixels.map(_.color)) shouldBe expectedColor
+  }
+
+  it should "render ghost below the current piece" in {
+    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val ghostYs = for
+      (row, y) <- buffer.pixels.zipWithIndex
+      pixel    <- row
+      if pixel.char == '░'
+    yield y
+    val filledYs = for
+      (row, y) <- buffer.pixels.zipWithIndex
+      pixel    <- row
+      if pixel.char == '█'
+    yield y
+    ghostYs should not be empty
+    filledYs should not be empty
+    ghostYs.min should be >= filledYs.max
+  }
+
+  it should "stop ghost above filled cells on the grid" in {
+    val bottomRow = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
+      g.place(Position(x, gridHeight - 1), Cell.Filled(TetrominoShape.I))
+    }
+    val state   = initialState.copy(grid = bottomRow)
+    val buffer  = GameView.toScreenBuffer(state, config)
+    val ghostYs = for
+      (row, y) <- buffer.pixels.zipWithIndex
+      pixel    <- row
+      if pixel.char == '░'
+    yield y
+    ghostYs should not be empty
+    // ゴーストは底のロック済み行(gridHeight-1)より上にいるべき
+    // バッファ上ではy座標は+1オフセット（上枠線分）
+    val lockedRowBufferY = gridHeight - 1 + 1
+    all(ghostYs) should be < lockedRowBufferY
+  }
+
+  it should "not show ghost when piece is already at landing position" in {
+    // ピースを底まで手動で移動（moveDownを繰り返す）
+    val tetromino = (0 until gridHeight).foldLeft(initialState.currentTetromino) { (t, _) =>
+      val next  = t.moveDown
+      val valid = next.currentBlocks.forall(p => p.x >= 0 && p.x < gridWidth && p.y >= 0 && p.y < gridHeight)
+      if valid then next else t
+    }
+    val stateAtBottom = initialState.copy(currentTetromino = tetromino)
+    val buffer        = GameView.toScreenBuffer(stateAtBottom, config)
+    // ゴーストはピースと重なるので '░' は表示されない（FilledBlock が優先）
+    val ghostPixels = buffer.pixels.flatMap(_.filter(_.char == '░'))
+    ghostPixels shouldBe empty
+  }
+
+  "Next piece graphic rendering" should "show filled blocks in the info panel" in {
+    val buffer          = GameView.toScreenBuffer(initialState, config)
+    val infoPanelStartX = gridWidth + 4
+    val nextPieceBlocks = for
+      (row, y)   <- buffer.pixels.zipWithIndex
+      (pixel, x) <- row.zipWithIndex
+      if pixel.char == '█' && x >= infoPanelStartX
+    yield pixel
+    nextPieceBlocks should not be empty
+  }
+
+  it should "render graphic for all tetromino shapes" in
+    TetrominoShape.values.foreach { shape =>
+      val state           = GameState.initial(TetrominoShape.T, shape, gridWidth, gridHeight)
+      val buffer          = GameView.toScreenBuffer(state, config)
+      val infoPanelStartX = gridWidth + 4
+      val nextPieceBlocks = for
+        (row, y)   <- buffer.pixels.zipWithIndex
+        (pixel, x) <- row.zipWithIndex
+        if pixel.char == '█' && x >= infoPanelStartX
+      yield pixel
+      nextPieceBlocks should not be empty
+    }
+
+  it should "use correct color for next piece graphic" in
+    TetrominoShape.values.foreach { shape =>
+      val state           = GameState.initial(TetrominoShape.T, shape, gridWidth, gridHeight)
+      val buffer          = GameView.toScreenBuffer(state, config)
+      val expectedColor   = GameView.shapeToColor(shape)
+      val infoPanelStartX = gridWidth + 4
+      val nextPiecePixels = for
+        (row, y)   <- buffer.pixels.zipWithIndex
+        (pixel, x) <- row.zipWithIndex
+        if pixel.char == '█' && x >= infoPanelStartX
+      yield pixel
+      nextPiecePixels should not be empty
+      all(nextPiecePixels.map(_.color)) shouldBe expectedColor
+    }
