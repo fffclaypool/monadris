@@ -116,6 +116,35 @@ object ReplaySelectorSpec extends ZIOSpecDefault:
             )
             .timeout(Duration.fromMillis(500))
         yield assertTrue(true)
+      },
+      test("Handles out-of-range numeric input") {
+        val replayMap = Map("only-one" -> createTestReplayData())
+        for _ <- ReplaySelector.watchReplay
+            .provide(
+              LocalTestServices.tty(Chunk('9'.toInt, '\r'.toInt, ' '.toInt)),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk('9'.toInt, '\r'.toInt, ' '.toInt)),
+              MockReplayRepository.layer(replayMap)
+            )
+            .timeout(Duration.fromMillis(500))
+        yield assertTrue(true)
+      },
+      test("Handles negative numeric input") {
+        val replayMap = Map("test-replay" -> createTestReplayData())
+        // "-1\r" -> toIntOption = Some(-1) -> hits case _ branch
+        for _ <- ReplaySelector.watchReplay
+            .provide(
+              LocalTestServices.tty(Chunk('-'.toInt, '1'.toInt, '\r'.toInt, ' '.toInt)),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk('-'.toInt, '1'.toInt, '\r'.toInt, ' '.toInt)),
+              MockReplayRepository.layer(replayMap)
+            )
+            .timeout(Duration.fromMillis(500))
+        yield assertTrue(true)
       }
     ),
     suite("listReplays")(

@@ -8,8 +8,8 @@ import monadris.infrastructure.terminal.TestServices as Mocks
 import monadris.replay.ReplayData
 
 /**
- * Main.program の結合テスト
- * TestServices のモック実装を使用してアプリケーション全体をテスト
+ * Integration tests for Main.program.
+ * Tests the entire application using TestServices mock implementations.
  */
 object MainSpec extends ZIOSpecDefault:
 
@@ -163,7 +163,7 @@ object MainSpec extends ZIOSpecDefault:
       mockReplayRepository
     ),
     test("program handles WatchReplay menu selection with no replays") {
-      // '3'でWatchReplayを選択、"No replays"メッセージ後にキー入力、'q'で終了
+      // Select WatchReplay with '3', press key after "No replays" message, quit with 'q'
       for
         service <- ZIO.service[Mocks.TestConsoleService]
         _       <- Main.program
@@ -182,7 +182,7 @@ object MainSpec extends ZIOSpecDefault:
       mockReplayRepository
     ),
     test("program handles ListReplays menu selection with no replays") {
-      // '4'でListReplaysを選択、"No replays"メッセージ後にキー入力、'q'で終了
+      // Select ListReplays with '4', press key after "No replays" message, quit with 'q'
       for
         service <- ZIO.service[Mocks.TestConsoleService]
         _       <- Main.program
@@ -201,8 +201,8 @@ object MainSpec extends ZIOSpecDefault:
       mockReplayRepository
     ),
     test("program handles Quit menu selection via navigation") {
-      // 'j'で4回下に移動してQuitを選択、Enterで確定
-      // 注: メニューからのQuit選択はshowGoodbyeを呼び出さずに終了する
+      // Navigate down 4 times with 'j' to select Quit, confirm with Enter
+      // Note: Quit selection from menu exits without calling showGoodbye
       val inputs = Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)
       for
         service <- ZIO.service[Mocks.TestConsoleService]
@@ -211,7 +211,7 @@ object MainSpec extends ZIOSpecDefault:
         output <- service.buffer.get
         combined = output.mkString
       yield assertTrue(
-        combined.contains("Exit") || combined.contains("Quit") // メニュー項目が表示されていることを確認
+        combined.contains("Exit") || combined.contains("Quit") // Verify menu item is displayed
       )
     }.provide(
       Mocks.tty(Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)),
@@ -219,6 +219,30 @@ object MainSpec extends ZIOSpecDefault:
       Mocks.command,
       Mocks.config,
       Mocks.terminalSession(Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)),
+      mockReplayRepository
+    ),
+    // NOTE: PlayGame/PlayAndRecord integration tests are not feasible because
+    // GameClock.run uses ZIO.sleep (requires TestClock.adjust) and the
+    // InputStream fiber competes with MenuController for TtyService input.
+    // These paths are covered by GameSession/GameLoopRunner unit tests instead.
+    // Quit via number key is also not possible since MenuController only maps '1'-'4'.
+    test("program handles escape key as quit") {
+      // Escape with no follow-up input is interpreted as Quit by MenuController
+      for
+        service <- ZIO.service[Mocks.TestConsoleService]
+        _       <- Main.program
+          .timeout(5.seconds)
+        output <- service.buffer.get
+        combined = output.mkString
+      yield assertTrue(
+        combined.contains("Thanks for playing!")
+      )
+    }.provide(
+      Mocks.tty(Chunk(27)),
+      Mocks.console,
+      Mocks.command,
+      Mocks.config,
+      Mocks.terminalSession(Chunk(27)),
       mockReplayRepository
     )
   )

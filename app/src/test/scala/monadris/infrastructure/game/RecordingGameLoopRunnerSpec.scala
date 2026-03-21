@@ -205,11 +205,56 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
             assertTrue(hasPlayerInputs || replayData.events.isEmpty)
           case None =>
             assertTrue(false)
+      },
+      test("Records multiple movement inputs before quit") {
+        val renderer = MockRenderer()
+        val inputs   = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'k'.toInt, 'q'.toInt)
+        for result <- RecordingGameLoopRunner
+            .recordingGameLoop(
+              initialState,
+              LocalTestServices.testConfig,
+              renderer,
+              FixedPieceGenerator
+            )
+            .provide(
+              LocalTestServices.tty(inputs),
+              LocalTestServices.console
+            )
+            .timeout(Duration.fromMillis(1000))
+        yield result match
+          case Some((_, replayData)) =>
+            assertTrue(replayData.events.nonEmpty)
+          case None =>
+            assertTrue(false)
+      },
+      test("Recording captures final score in metadata") {
+        val renderer = MockRenderer()
+        for result <- RecordingGameLoopRunner
+            .recordingGameLoop(
+              initialState,
+              LocalTestServices.testConfig,
+              renderer,
+              FixedPieceGenerator
+            )
+            .provide(
+              LocalTestServices.tty(Chunk('q'.toInt)),
+              LocalTestServices.console
+            )
+            .timeout(Duration.fromMillis(1000))
+        yield result match
+          case Some((finalState, replayData)) =>
+            assertTrue(
+              replayData.metadata.finalScore == finalState.score,
+              replayData.metadata.finalLevel == finalState.level,
+              replayData.metadata.finalLinesCleared == finalState.linesCleared
+            )
+          case None =>
+            assertTrue(false)
       }
     ),
     suite("Event recording order")(
       test("PieceSpawn is recorded before PlayerInput when piece locks") {
-        // ReplayBuilderを使ってイベント順序をテスト
+        // Test event ordering using ReplayBuilder
         val builder = ReplayBuilder.create(
           timestamp = 12345L,
           gridWidth = 10,
@@ -218,7 +263,7 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
           nextPiece = TetrominoShape.O
         )
 
-        // recordEventsと同じロジック: PieceSpawnを先に記録
+        // Same logic as recordEvents: record PieceSpawn first
         val builderWithSpawn = builder.recordPieceSpawn(TetrominoShape.T)
         val builderWithInput = builderWithSpawn.recordInput(Input.HardDrop)
         val finalBuilder     = builderWithInput.advanceFrame
@@ -226,7 +271,7 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
         val replayData = finalBuilder.build(initialState, 23456L)
         val events     = replayData.events
 
-        // PieceSpawnがPlayerInputより先に記録されていることを確認
+        // Verify PieceSpawn is recorded before PlayerInput
         val pieceSpawnIndex = events.indexWhere {
           case ReplayEvent.PieceSpawn(_, _) => true
           case _                            => false
@@ -251,7 +296,7 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
           nextPiece = TetrominoShape.O
         )
 
-        // ピースがロックされない場合はPlayerInputのみ
+        // Only PlayerInput is recorded when piece does not lock
         val builderWithInput = builder.recordInput(Input.MoveLeft)
         val finalBuilder     = builderWithInput.advanceFrame
 

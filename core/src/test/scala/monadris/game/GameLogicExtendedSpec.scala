@@ -8,7 +8,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /**
- * ブランチカバレッジを向上させるためのGameLogic拡張テスト
+ * Extended GameLogic tests for improving branch coverage.
  */
 class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
 

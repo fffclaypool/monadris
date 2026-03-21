@@ -8,8 +8,8 @@ import monadris.game.*
 import monadris.infrastructure.terminal.TestServices
 
 /**
- * 純粋関数のプロパティベーステスト
- * 任意の有効な入力に対して成立すべき不変条件をテスト
+ * Property-based tests for pure functions.
+ * Tests invariants that should hold for any valid input.
  */
 object PropertyBasedSpec extends ZIOSpecDefault:
 

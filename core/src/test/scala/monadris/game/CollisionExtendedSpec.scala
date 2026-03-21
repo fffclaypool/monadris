@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /**
- * ブランチカバレッジを向上させるためのCollision拡張テスト
+ * Extended Collision tests for improving branch coverage.
  */
 class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
 

@@ -44,7 +44,7 @@ object GameView:
     val gridWidth  = config.grid.width
     val gridHeight = config.grid.height
 
-    // グリッド + 枠線 + 情報欄用の幅と高さを計算
+    // Calculate width and height for grid + borders + info panel
     val totalWidth  = gridWidth + Layout.HorizontalBorder + Layout.InfoPanelWidth
     val totalHeight = gridHeight + Layout.VerticalBorder + Layout.ControlsAreaHeight
 

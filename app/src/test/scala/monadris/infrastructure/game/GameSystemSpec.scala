@@ -18,8 +18,8 @@ import monadris.infrastructure.terminal.TtyService
 import monadris.view.GameView
 
 /**
- * IO抽象化レイヤーのテスト
- * TestServices のモック実装を使用
+ * Tests for the IO abstraction layer.
+ * Uses TestServices mock implementations.
  */
 object GameSystemSpec extends ZIOSpecDefault:
 

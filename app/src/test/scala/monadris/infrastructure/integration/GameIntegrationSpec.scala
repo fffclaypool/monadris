@@ -12,8 +12,8 @@ import monadris.infrastructure.terminal.TestServices as Mocks
 import monadris.view.GameView
 
 /**
- * ゲームの結合テストスイート
- * アプリケーション層（Queue, Loop）とドメイン層（Logic）の連携を検証
+ * Game integration test suite.
+ * Verifies coordination between app layer (Queue, Loop) and domain layer (Logic).
  */
 object GameIntegrationSpec extends ZIOSpecDefault:
 
@@ -23,18 +23,18 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     val InitialTetrominoY  = 1
     val TicksToReachBottom = GridHeight - 2
 
-  /** テスト用の固定シェイププロバイダー */
+  /** Fixed shape provider for testing */
   private def fixedShapeProvider(shape: TetrominoShape): () => TetrominoShape =
     () => shape
 
-  /** 初期ゲーム状態を生成 */
+  /** Create initial game state */
   private def createInitialState(
     firstShape: TetrominoShape = TetrominoShape.I,
     nextShape: TetrominoShape = TetrominoShape.O
   ): GameState =
     GameState.initial(firstShape, nextShape, TestConstants.GridWidth, TestConstants.GridHeight)
 
-  /** 指定行を埋めたGridを作成（ライン消去テスト用） */
+  /** Create a Grid with specified rows filled (for line clearing tests) */
   private def createGridWithFilledRows(
     rowIndices: List[Int],
     gapColumn: Option[Int] = None
@@ -47,7 +47,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       }
     }
 
-  /** ゲーム状態を入力ストリームで更新 */
+  /** Update game state with an input stream */
   private def processInputs(
     initialState: GameState,
     inputs: Chunk[Input],

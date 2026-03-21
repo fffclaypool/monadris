@@ -16,7 +16,7 @@ import io.getquill.*
 import io.getquill.jdbczio.Quill
 import org.postgresql.util.PGobject
 
-// JSONB型のラッパー
+// Wrapper for JSONB type
 opaque type JsonbString = String
 
 object JsonbString:
@@ -53,7 +53,7 @@ final class PostgresReplayRepository(
 
   import quill.*
 
-  // JSONBカラム用のカスタムエンコーダ・デコーダ
+  // Custom encoder/decoder for JSONB columns
   private given jsonbEncoder: Encoder[JsonbString] = encoder(
     java.sql.Types.OTHER,
     (index, value, row) =>
@@ -143,7 +143,7 @@ final class PostgresReplayRepository(
       .fromEither(json.fromJson[Vector[ReplayEvent]])
       .mapError(msg => new RuntimeException(s"Failed to decode events: $msg"))
 
-  // 共通パース関数（Either版）
+  // Common parse functions (Either-based)
   private def parseShapeEither(s: String): Either[String, TetrominoShape] =
     TetrominoShape.values.find(_.toString == s).toRight(s"Unknown shape: $s")
 
@@ -153,7 +153,7 @@ final class PostgresReplayRepository(
   private def parseShape(s: String): Task[TetrominoShape] =
     ZIO.fromEither(parseShapeEither(s)).mapError(msg => new RuntimeException(msg))
 
-  // ReplayEvent用JSONコーデック
+  // JSON codecs for ReplayEvent
   private given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
   private given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail(parseShapeEither)
 

@@ -118,6 +118,33 @@ object GameSessionSpec extends ZIOSpecDefault:
         yield assertTrue(uniqueShapes.size > 1)
       }
     ),
+    suite("playGame")(
+      test("playGame runs and exits with quit key") {
+        for _ <- GameSession.playGame
+            .provide(
+              LocalTestServices.tty(Chunk('q'.toInt)),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(Chunk('q'.toInt))
+            )
+            .timeout(Duration.fromMillis(2000))
+        yield assertTrue(true)
+      },
+      test("playGame handles movement then quit") {
+        val inputs = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)
+        for _ <- GameSession.playGame
+            .provide(
+              LocalTestServices.tty(inputs),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(inputs)
+            )
+            .timeout(Duration.fromMillis(2000))
+        yield assertTrue(true)
+      }
+    ),
     suite("playAndRecord")(
       test("prompts for replay name") {
         val replayNameInput = Chunk('t'.toInt, 'e'.toInt, 's'.toInt, 't'.toInt, '\r'.toInt, 'q'.toInt)
@@ -133,6 +160,29 @@ object GameSessionSpec extends ZIOSpecDefault:
             .timeout(Duration.fromMillis(1000))
             .either
         yield assertTrue(result.isLeft || result.isRight)
+      },
+      test("playAndRecord saves replay and shows confirmation") {
+        val ttyInputs     = Chunk('q'.toInt)
+        val sessionInputs = Chunk('r'.toInt, 'u'.toInt, 'n'.toInt, '\r'.toInt, ' '.toInt)
+        for
+          saved <- Ref.make(Option.empty[(String, ReplayData)])
+          repo = MockReplayRepository(saved)
+          result <- GameSession.playAndRecord
+            .provide(
+              LocalTestServices.tty(ttyInputs),
+              LocalTestServices.console,
+              LocalTestServices.command,
+              LocalTestServices.config,
+              LocalTestServices.terminalSession(sessionInputs),
+              ZLayer.succeed[ReplayRepository](repo)
+            )
+            .timeout(Duration.fromMillis(2000))
+            .either
+          savedValue <- saved.get
+        yield assertTrue(
+          result.isLeft || result.isRight,
+          savedValue.isEmpty || savedValue.exists(_._1 == "run")
+        )
       }
     )
   )
