@@ -4,11 +4,11 @@ coverage:
   status:
     project:
       default:
-        target: 80%
-        threshold: 2%
+        target: auto
+        threshold: 0%
     patch:
       default:
-        target: 80%
+        target: 100%
 
 parsers:
   gcov:
