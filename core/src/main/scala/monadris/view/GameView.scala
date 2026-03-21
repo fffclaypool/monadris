@@ -19,7 +19,17 @@ object GameView:
 
   private val FilledBlock = '█'
   private val LockedBlock = '▓'
+  private val GhostBlock  = '░'
   private val EmptyCell   = '·'
+
+  private def isValidPosition(tetromino: Tetromino, grid: Grid): Boolean =
+    tetromino.currentBlocks.forall(pos => grid.isInBounds(pos) && grid.isEmpty(pos))
+
+  @annotation.tailrec
+  private def dropToBottom(tetromino: Tetromino, grid: Grid): Tetromino =
+    val next = tetromino.moveDown
+    if isValidPosition(next, grid) then dropToBottom(next, grid)
+    else tetromino
 
   def shapeToColor(shape: TetrominoShape): UiColor = shape match
     case TetrominoShape.I => UiColor.Cyan
@@ -54,6 +64,10 @@ object GameView:
     val fallingBlocks = state.currentTetromino.currentBlocks.toSet
     val fallingColor  = shapeToColor(state.currentTetromino.shape)
 
+    val ghostTetromino = dropToBottom(state.currentTetromino, state.grid)
+    val ghostBlocks    = ghostTetromino.currentBlocks.toSet
+    val ghostColor     = fallingColor
+
     val topBorder     = "┌" + "─" * gridWidth + "┐"
     val withTopBorder = buffer.drawText(0, 0, topBorder)
 
@@ -64,7 +78,9 @@ object GameView:
         else
           grid.get(pos) match
             case Some(Cell.Filled(shape)) => Pixel(LockedBlock, shapeToColor(shape))
-            case _                        => Pixel(EmptyCell, UiColor.Default)
+            case _                        =>
+              if ghostBlocks.contains(pos) then Pixel(GhostBlock, ghostColor)
+              else Pixel(EmptyCell, UiColor.Default)
       }.toVector
 
       buf
@@ -81,8 +97,21 @@ object GameView:
       .drawText(startX, 1, s"Score: ${state.score}")
       .drawText(startX, 2, s"Level: ${state.level}")
       .drawText(startX, 3, s"Lines: ${state.linesCleared}")
-      .drawText(startX, 5, s"Next: ${state.nextTetromino}")
-      .drawText(startX, 7, if state.status == GameStatus.Paused then "** PAUSED **" else "")
+      .drawText(startX, 5, "Next:")
+      .pipe(renderNextPiece(_, state.nextTetromino, startX, 6))
+      .drawText(startX, 9, if state.status == GameStatus.Paused then "** PAUSED **" else "")
+
+  private def renderNextPiece(buffer: ScreenBuffer, shape: TetrominoShape, startX: Int, startY: Int): ScreenBuffer =
+    val blocks     = shape.blocks
+    val minX       = blocks.foldLeft(Int.MaxValue)((acc, p) => if p.x < acc then p.x else acc)
+    val minY       = blocks.foldLeft(Int.MaxValue)((acc, p) => if p.y < acc then p.y else acc)
+    val normalized = blocks.map(p => Position(p.x - minX, p.y - minY))
+    val color      = shapeToColor(shape)
+    normalized.foldLeft(buffer) { (buf, pos) =>
+      buf
+        .drawChar(startX + pos.x * 2, startY + pos.y, FilledBlock, color)
+        .drawChar(startX + pos.x * 2 + 1, startY + pos.y, FilledBlock, color)
+    }
 
   private def renderControls(buffer: ScreenBuffer, startY: Int): ScreenBuffer =
     buffer
