@@ -8,9 +8,9 @@ import monadris.game.GameLogic
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
 
 /**
- * メモリ負荷とリークをチェックするストレステスト
- * GameLogicを使用して大量のゲームループを実行し、
- * メモリ使用量の推移を監視する
+ * Stress test for checking memory pressure and leaks.
+ * Runs a large number of game loop iterations using GameLogic
+ * and monitors memory usage over time.
  */
 object StressTest extends ZIOSpecDefault:
 
@@ -50,8 +50,8 @@ object StressTest extends ZIOSpecDefault:
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
   /**
-   * 決定的なテトリミノ形状プロバイダー
-   * ランダム性を排除してテストを再現可能にする
+   * Deterministic tetromino shape provider.
+   * Eliminates randomness to make tests reproducible.
    */
   private def deterministicShapeProvider(counter: Int): () => TetrominoShape =
     val shapes = TetrominoShape.values
@@ -74,8 +74,8 @@ object StressTest extends ZIOSpecDefault:
   )
 
   /**
-   * ゲームループを指定回数実行
-   * 純粋関数GameLogic.updateを繰り返し呼び出す
+   * Run the game loop for a specified number of iterations.
+   * Repeatedly calls the pure function GameLogic.update.
    */
   private def runGameLoop(
     initialState: GameState,
@@ -108,8 +108,8 @@ object StressTest extends ZIOSpecDefault:
     }
 
   /**
-   * テスト用の入力シーケンスを生成
-   * 様々な操作を含むパターン
+   * Generate an input sequence for testing.
+   * Contains a pattern of various operations.
    */
   private def createInputSequence: Vector[Input] =
     Vector(

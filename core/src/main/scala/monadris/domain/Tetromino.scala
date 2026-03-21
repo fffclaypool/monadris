@@ -18,7 +18,7 @@ enum Rotation:
 enum TetrominoShape:
   case I, O, T, S, Z, J, L
 
-  /** SRS準拠のR0状態での相対座標 */
+  /** Relative coordinates in R0 state (SRS compliant) */
   def blocks: List[Position] = this match
     case I => List(Position(-1, 0), Position(0, 0), Position(1, 0), Position(2, 0))
     case O => List(Position(0, 0), Position(1, 0), Position(0, 1), Position(1, 1))

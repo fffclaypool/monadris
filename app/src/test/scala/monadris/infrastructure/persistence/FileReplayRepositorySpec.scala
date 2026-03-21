@@ -166,6 +166,22 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
         }
       }
     ),
+    suite("list edge cases")(
+      test("returns empty when directory does not exist") {
+        ZIO.acquireReleaseWith(
+          ZIO.attemptBlocking(Files.createTempDirectory("monadris-test-nodir"))
+        )(dir =>
+          ZIO.attemptBlocking {
+            Files.walk(dir).sorted(java.util.Comparator.reverseOrder()).forEach(Files.delete(_))
+          }.ignore
+        ) { parentDir =>
+          val nonExistentDir = parentDir.resolve("does-not-exist")
+          val repo           = FileReplayRepository.make(nonExistentDir)
+          for replays <- repo.list
+          yield assertTrue(replays.isEmpty)
+        }
+      }
+    ),
     suite("integration")(
       test("full workflow: save, list, load, delete") {
         withTempRepo { repo =>
@@ -181,6 +197,39 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
             loaded.metadata == replay.metadata,
             !replays2.contains("my-game")
           )
+        }
+      },
+      test("save creates directory if it does not exist") {
+        ZIO.acquireReleaseWith(
+          ZIO.attemptBlocking(Files.createTempDirectory("monadris-test-parent"))
+        )(dir =>
+          ZIO.attemptBlocking {
+            Files.walk(dir).sorted(java.util.Comparator.reverseOrder()).forEach(Files.delete(_))
+          }.ignore
+        ) { parentDir =>
+          val nestedDir = parentDir.resolve("nested").resolve("replays")
+          val repo      = FileReplayRepository.make(nestedDir)
+          val replay    = createReplayData()
+          for
+            _      <- repo.save("nested-test", replay)
+            exists <- repo.exists("nested-test")
+            loaded <- repo.load("nested-test")
+          yield assertTrue(
+            exists,
+            loaded.metadata == replay.metadata
+          )
+        }
+      },
+      test("multiple saves and deletes maintain consistency") {
+        withTempRepo { repo =>
+          val replay = createReplayData()
+          for
+            _       <- repo.save("a", replay)
+            _       <- repo.save("b", replay)
+            _       <- repo.save("c", replay)
+            _       <- repo.delete("b")
+            replays <- repo.list
+          yield assertTrue(replays == Vector("a", "c"))
         }
       }
     )

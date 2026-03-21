@@ -23,7 +23,7 @@ object LineClearing:
       val scoreGained = calculateScore(linesCleared, level, config)
       ClearResult(newGrid, linesCleared, scoreGained)
 
-  /** baseScore × level (baseScoreは1〜4ラインで100/300/500/800) */
+  /** baseScore x level (baseScore is 100/300/500/800 for 1-4 lines) */
   def calculateScore(linesCleared: Int, level: Int, config: ScoreConfig): Int =
     val baseScore = linesCleared match
       case 1 => config.singleLine

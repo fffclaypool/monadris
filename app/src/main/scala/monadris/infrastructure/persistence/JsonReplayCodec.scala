@@ -8,27 +8,27 @@ import monadris.replay.*
 
 object JsonReplayCodec extends ReplayCodec:
 
-  // TetrominoShape用コーデック
+  // Codec for TetrominoShape
   given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
   given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail { s =>
     TetrominoShape.values.find(_.toString == s).toRight(s"Unknown shape: $s")
   }
 
-  // Input用コーデック
+  // Codec for Input
   given JsonEncoder[Input] = JsonEncoder[String].contramap(_.toString)
   given JsonDecoder[Input] = JsonDecoder[String].mapOrFail { s =>
     Input.values.find(_.toString == s).toRight(s"Unknown input: $s")
   }
 
-  // JSON用PlayerInputヘルパーケースクラス
+  // Helper case class for PlayerInput JSON serialization
   final private case class PlayerInputJson(input: String, frameNumber: Long)
   private given JsonCodec[PlayerInputJson] = DeriveJsonCodec.gen[PlayerInputJson]
 
-  // JSON用PieceSpawnヘルパーケースクラス
+  // Helper case class for PieceSpawn JSON serialization
   final private case class PieceSpawnJson(shape: String, frameNumber: Long)
   private given JsonCodec[PieceSpawnJson] = DeriveJsonCodec.gen[PieceSpawnJson]
 
-  // 判別共用体用ReplayEventラッパーケースクラス
+  // Wrapper case class for ReplayEvent discriminated union
   final private case class ReplayEventJson(
     PlayerInput: Option[PlayerInputJson] = None,
     PieceSpawn: Option[PieceSpawnJson] = None
@@ -54,10 +54,10 @@ object JsonReplayCodec extends ReplayCodec:
     case _ => Left("Invalid replay event: missing PlayerInput or PieceSpawn")
   }
 
-  // ReplayMetadata用コーデック
+  // Codec for ReplayMetadata
   given JsonCodec[ReplayMetadata] = DeriveJsonCodec.gen[ReplayMetadata]
 
-  // ReplayData用コーデック
+  // Codec for ReplayData
   given JsonCodec[ReplayData] = DeriveJsonCodec.gen[ReplayData]
 
   override def encode(replay: ReplayData): Either[String, String] =

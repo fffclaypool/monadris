@@ -28,7 +28,7 @@ object Collision:
     else if blocks.exists(p => !grid.isEmpty(p)) then CollisionType.Block
     else CollisionType.None
 
-  /** 現在位置は有効だが、1つ下に移動すると衝突する場合にtrue */
+  /** Returns true if current position is valid but moving one step down would collide */
   def hasLanded(tetromino: Tetromino, grid: Grid): Boolean =
     isValidPosition(tetromino, grid) &&
       !isValidPosition(tetromino.moveDown, grid)
@@ -41,7 +41,7 @@ object Collision:
       else t
     drop(tetromino)
 
-  /** SRSウォールキック: 回転が直接できない場合、位置をずらして試行 */
+  /** SRS wall kick: tries offset positions when direct rotation fails */
   def tryRotateWithWallKick(
     tetromino: Tetromino,
     grid: Grid,

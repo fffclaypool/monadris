@@ -3,8 +3,8 @@ package monadris
 import monadris.config.*
 
 /**
- * Core用テスト設定
- * ZIOに依存しない純粋な設定値
+ * Test configuration for the core project.
+ * Pure config values with no ZIO dependency.
  */
 object TestConfig:
   val testConfig: AppConfig = AppConfig(

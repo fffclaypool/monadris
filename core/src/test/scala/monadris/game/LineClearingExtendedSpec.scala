@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /**
- * ブランチカバレッジを向上させるためのLineClearing拡張テスト
+ * Extended LineClearing tests for improving branch coverage.
  */
 class LineClearingExtendedSpec extends AnyFlatSpec with Matchers:
 

@@ -5,8 +5,8 @@ import zio.*
 import monadris.config.*
 
 /**
- * テスト専用のモック実装
- * 本番コードには含まれない
+ * Mock implementations for testing only.
+ * Not included in production code.
  */
 object TestServices:
 

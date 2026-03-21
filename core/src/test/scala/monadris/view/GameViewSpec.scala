@@ -265,14 +265,14 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
       if pixel.char == '░'
     yield y
     ghostYs should not be empty
-    // ゴーストは底のロック済み行(gridHeight-1)より上にいるべき
-    // バッファ上ではy座標は+1オフセット（上枠線分）
+    // Ghost should be above the locked bottom row (gridHeight-1)
+    // In buffer coordinates, y is offset by +1 for the top border
     val lockedRowBufferY = gridHeight - 1 + 1
     all(ghostYs) should be < lockedRowBufferY
   }
 
   it should "not show ghost when piece is already at landing position" in {
-    // ピースを底まで手動で移動（moveDownを繰り返す）
+    // Manually move piece to the bottom by repeating moveDown
     val tetromino = (0 until gridHeight).foldLeft(initialState.currentTetromino) { (t, _) =>
       val next  = t.moveDown
       val valid = next.currentBlocks.forall(p => p.x >= 0 && p.x < gridWidth && p.y >= 0 && p.y < gridHeight)
@@ -280,7 +280,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     }
     val stateAtBottom = initialState.copy(currentTetromino = tetromino)
     val buffer        = GameView.toScreenBuffer(stateAtBottom, config)
-    // ゴーストはピースと重なるので '░' は表示されない（FilledBlock が優先）
+    // Ghost overlaps with the piece, so '░' is not shown (FilledBlock takes priority)
     val ghostPixels = buffer.pixels.flatMap(_.filter(_.char == '░'))
     ghostPixels shouldBe empty
   }
