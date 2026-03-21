@@ -1,5 +1,5 @@
 .PHONY: all build build-core build-app test test-all test-core test-app stress-test integration-test run clean help
-.PHONY: fmt fmt-check lint lint-check coverage check fix
+.PHONY: fmt fmt-check lint lint-check coverage coverage-check coverage-baseline check fix
 
 all: build
 
@@ -50,6 +50,16 @@ lint-check:
 coverage:
 	sbt "coverage; test; integrationTest; coverageReport"
 
+coverage-check:
+	scripts/check-coverage.sh
+
+coverage-baseline: coverage-check
+	@SCALA_VERSION=3.3.5; \
+	CORE_RATE=$$(grep -oP 'statement-rate="\K[0-9.]+' core/target/scala-$$SCALA_VERSION/scoverage-report/scoverage.xml | head -1); \
+	APP_RATE=$$(grep -oP 'statement-rate="\K[0-9.]+' app/target/scala-$$SCALA_VERSION/scoverage-report/scoverage.xml | head -1); \
+	printf '{\n  "core": %s,\n  "app": %s\n}\n' "$$CORE_RATE" "$$APP_RATE" > .coverage-baseline.json; \
+	echo "Baseline updated: core=$$CORE_RATE%, app=$$APP_RATE%"
+
 check: fmt-check lint-check
 	@echo "All checks passed"
 
@@ -72,6 +82,8 @@ help:
 	@echo "  stress-test  - Run stress tests only"
 	@echo "  integration-test - Run integration tests (requires Docker)"
 	@echo "  coverage     - Run all tests with coverage report (requires Docker)"
+	@echo "  coverage-check    - Check coverage against baseline (unit tests only)"
+	@echo "  coverage-baseline - Update baseline with current coverage"
 	@echo ""
 	@echo "Lint/Format:"
 	@echo "  fmt          - Format code with scalafmt"

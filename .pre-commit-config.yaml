@@ -20,3 +20,10 @@ repos:
         files: \.(scala|sbt)$
         language: system
         pass_filenames: false
+
+      - id: coverage-check
+        name: Coverage regression check
+        entry: scripts/check-coverage.sh
+        language: script
+        stages: [pre-push]
+        pass_filenames: false
