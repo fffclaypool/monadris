@@ -6,6 +6,8 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
     && apt-get install -y --no-install-recommends gnupg2 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /etc/apt/keyrings/githubcli.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list \
     && curl -fsSL https://repo.charm.sh/apt/gpg.key | gpg --dearmor -o /etc/apt/keyrings/charm.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | tee /etc/apt/sources.list.d/charm.list \
     && apt-get update \
@@ -17,6 +19,7 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
         python3-pip \
         vhs \
         docker.io \
+        gh \
     && npm install -g @anthropic-ai/claude-code repomix \
     && pip3 install --no-cache-dir pre-commit \
     && apt-get clean \
