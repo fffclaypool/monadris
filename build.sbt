@@ -60,8 +60,8 @@ lazy val app = project
       "ch.qos.logback" % "logback-classic"            % "1.5.32",
       "io.getquill"   %% "quill-jdbc-zio"             % "4.8.6",
       "org.postgresql" % "postgresql"                 % "42.7.10",
-      "org.flywaydb"   % "flyway-core"                % "12.1.1",
-      "org.flywaydb"   % "flyway-database-postgresql" % "12.1.1",
+      "org.flywaydb"   % "flyway-core"                % "12.3.0",
+      "org.flywaydb"   % "flyway-database-postgresql" % "12.3.0",
       "dev.zio"       %% "zio-test"                   % "2.1.24" % Test,
       "dev.zio"       %% "zio-test-sbt"               % "2.1.24" % Test,
       "dev.zio"       %% "zio-test-magnolia"          % "2.1.24" % Test
