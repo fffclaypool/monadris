@@ -56,7 +56,7 @@ lazy val app = project
       "dev.zio"       %% "zio-config"                 % "4.0.7",
       "dev.zio"       %% "zio-config-typesafe"        % "4.0.7",
       "dev.zio"       %% "zio-config-magnolia"        % "4.0.7",
-      "dev.zio"       %% "zio-json"                   % "0.9.0",
+      "dev.zio"       %% "zio-json"                   % "0.9.1",
       "ch.qos.logback" % "logback-classic"            % "1.5.32",
       "io.getquill"   %% "quill-jdbc-zio"             % "4.8.6",
       "org.postgresql" % "postgresql"                 % "42.7.10",
