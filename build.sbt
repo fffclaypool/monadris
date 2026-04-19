@@ -7,7 +7,7 @@ val commonSettings = Seq(
   scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:imports", "-Xfatal-warnings"),
   libraryDependencies ++= Seq(
     "org.scalatest"       %% "scalatest" % "3.2.20" % Test,
-    "com.tngtech.archunit" % "archunit"  % "1.4.1"  % Test
+    "com.tngtech.archunit" % "archunit"  % "1.4.2"  % Test
   ),
   semanticdbEnabled       := true,
   semanticdbVersion       := scalafixSemanticdb.revision,
