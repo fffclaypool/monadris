@@ -1,4 +1,4 @@
-val scala3Version = "3.3.5"
+val scala3Version = "3.3.8"
 
 val commonSettings = Seq(
   libraryDependencySchemes += "dev.zio" %% "zio-json" % VersionScheme.Always,
