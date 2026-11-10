@@ -51,8 +51,8 @@ lazy val app = project
     libraryDependencies ++= Seq(
       "dev.zio"       %% "zio"                        % "2.1.25",
       "dev.zio"       %% "zio-streams"                % "2.1.25",
-      "dev.zio"       %% "zio-logging"                % "2.1.17",
-      "dev.zio"       %% "zio-logging-slf4j"          % "2.1.17",
+      "dev.zio"       %% "zio-logging"                % "2.5.4",
+      "dev.zio"       %% "zio-logging-slf4j"          % "2.5.4",
       "dev.zio"       %% "zio-config"                 % "4.0.7",
       "dev.zio"       %% "zio-config-typesafe"        % "4.0.7",
       "dev.zio"       %% "zio-config-magnolia"        % "4.0.7",
