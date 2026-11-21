@@ -44,54 +44,6 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
     Collision.isValidPosition(tetromino, grid) shouldBe true
   }
 
-  "Collision.detectCollision" should "detect collision with filled cells" in {
-    val filled = Cell.Filled(TetrominoShape.I)
-    val grid   = Grid.empty(gridWidth, gridHeight).place(Position(5, 10), filled)
-
-    val tetromino = Tetromino(TetrominoShape.O, Position(4, 9), Rotation.R0)
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Block
-  }
-
-  it should "detect wall collision" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val tetromino = Tetromino(TetrominoShape.I, Position(-5, 10), Rotation.R0)
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Wall
-  }
-
-  it should "detect floor collision" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val tetromino = Tetromino(TetrominoShape.I, Position(5, gridHeight + 5), Rotation.R0)
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Floor
-  }
-
-  it should "detect ceiling collision" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val tetromino = Tetromino(TetrominoShape.I, Position(5, -5), Rotation.R0)
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Ceiling
-  }
-
-  it should "return None for valid position" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val tetromino = Tetromino(TetrominoShape.O, Position(5, 10), Rotation.R0)
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.None
-  }
-
-  "Collision.hasLanded" should "return true when touching filled block below" in {
-    val filled = Cell.Filled(TetrominoShape.I)
-    val grid   = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
-      g.place(Position(x, 15), filled)
-    }
-
-    val tetromino = Tetromino(TetrominoShape.O, Position(4, 13), Rotation.R0)
-    Collision.hasLanded(tetromino, grid) shouldBe true
-  }
-
-  it should "return false when there is space below" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val tetromino = Tetromino(TetrominoShape.O, Position(4, 10), Rotation.R0)
-    Collision.hasLanded(tetromino, grid) shouldBe false
-  }
-
   "Collision.hardDropPosition" should "stop at filled blocks" in {
     val filled = Cell.Filled(TetrominoShape.I)
     val grid   = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
@@ -228,22 +180,7 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
     Collision.isWithinVerticalBounds(Position(5, gridHeight), grid) shouldBe false
   }
 
-  "Collision" should "handle all tetromino shapes correctly" in {
-    val grid = Grid.empty(gridWidth, gridHeight)
-
-    TetrominoShape.values.foreach { shape =>
-      val tetromino = Tetromino.spawn(shape, gridWidth)
-
-      Collision.isValidPosition(tetromino, grid) shouldBe true
-
-      Collision.hasLanded(tetromino, grid) shouldBe false
-
-      val dropped = Collision.hardDropPosition(tetromino, grid)
-      Collision.hasLanded(dropped, grid) shouldBe true
-    }
-  }
-
-  it should "handle all rotation states" in {
+  "Collision" should "handle all rotation states" in {
     val grid  = Grid.empty(gridWidth, gridHeight)
     val shape = TetrominoShape.T
 
@@ -318,20 +255,4 @@ class CollisionExtendedSpec extends AnyFlatSpec with Matchers:
         case Some(r) => Collision.isValidPosition(r, grid) shouldBe true
         case None    => succeed
     }
-  }
-
-  "Collision.hasLanded" should "return false for invalid current position" in {
-    val grid      = Grid.empty(gridWidth, gridHeight)
-    val tetromino = Tetromino(TetrominoShape.O, Position(-5, 10), Rotation.R0)
-    Collision.hasLanded(tetromino, grid) shouldBe false
-  }
-
-  it should "return true when exactly at landing position" in {
-    val filled = Cell.Filled(TetrominoShape.I)
-    val grid   = (0 until gridWidth).foldLeft(Grid.empty(gridWidth, gridHeight)) { (g, x) =>
-      g.place(Position(x, 15), filled)
-    }
-
-    val tetromino = Tetromino(TetrominoShape.O, Position(4, 13), Rotation.R0)
-    Collision.hasLanded(tetromino, grid) shouldBe true
   }

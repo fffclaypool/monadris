@@ -198,7 +198,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           val grid = Grid.empty(gridWidth, gridHeight)
           if Collision.isValidPosition(tetromino, grid) then
             val dropped = Collision.hardDropPosition(tetromino, grid)
-            assertTrue(Collision.hasLanded(dropped, grid))
+            assertTrue(Collision.isValidPosition(dropped, grid), !Collision.isValidPosition(dropped.moveDown, grid))
           else assertTrue(true)
         }
       }
@@ -266,7 +266,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = () => TetrominoShape.O
+          val nextShape    = TetrominoShape.O
 
           val finalState = inputs.foldLeft(initialState) { (state, input) =>
             if state.isGameOver then state
@@ -280,7 +280,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = () => TetrominoShape.O
+          val nextShape    = TetrominoShape.O
 
           val scores = inputs
             .scanLeft(initialState) { (state, input) =>
@@ -300,7 +300,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = () => TetrominoShape.O
+          val nextShape    = TetrominoShape.O
 
           val levels = inputs
             .scanLeft(initialState) { (state, input) =>
@@ -319,7 +319,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       test("pause toggle is idempotent after two presses") {
         val config = TestServices.testConfig
         check(genGameState) { state =>
-          val nextShape   = () => TetrominoShape.O
+          val nextShape   = TetrominoShape.O
           val pausedOnce  = GameLogic.update(state, Input.Pause, nextShape, config)
           val pausedTwice = GameLogic.update(pausedOnce, Input.Pause, nextShape, config)
           assertTrue(pausedTwice.status == state.status)
@@ -329,7 +329,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         val config = TestServices.testConfig
         check(genInputSequence) { inputs =>
           val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = () => TetrominoShape.O
+          val nextShape    = TetrominoShape.O
 
           val finalState = inputs.foldLeft(initialState) { (state, input) =>
             if state.isGameOver then state

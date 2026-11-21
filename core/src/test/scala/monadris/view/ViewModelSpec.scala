@@ -253,3 +253,25 @@ class ViewModelSpec extends AnyFlatSpec with Matchers:
     updated.pixels(1)(0).char shouldBe 'X'
     updated.pixels(1)(1).char shouldBe 'Y'
   }
+
+  "ScreenBuffer.overlay" should "draw another buffer at the given offset" in {
+    val base    = ScreenBuffer.empty(5, 4)
+    val patch   = ScreenBuffer.empty(2, 2).drawText(0, 0, "ab").drawText(0, 1, "cd")
+    val overlay = base.overlay(2, 1, patch)
+
+    overlay.getRow(1).map(_.char).mkString shouldBe "  ab "
+    overlay.getRow(2).map(_.char).mkString shouldBe "  cd "
+    overlay.getRow(0) shouldBe base.getRow(0)
+    overlay.width shouldBe base.width
+    overlay.height shouldBe base.height
+  }
+
+  it should "clip a buffer that does not fit" in {
+    val base    = ScreenBuffer.empty(3, 2)
+    val patch   = ScreenBuffer.empty(4, 3).drawText(0, 0, "wxyz")
+    val overlay = base.overlay(1, 1, patch)
+
+    overlay.width shouldBe base.width
+    overlay.height shouldBe base.height
+    overlay.getRow(1).map(_.char).mkString shouldBe " wx"
+  }

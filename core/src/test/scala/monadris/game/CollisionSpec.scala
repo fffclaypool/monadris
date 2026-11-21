@@ -44,61 +44,7 @@ class CollisionSpec extends AnyFlatSpec with Matchers:
     Collision.isValidPosition(tetromino, grid) shouldBe false
   }
 
-  "Collision.detectCollision" should "return None for valid position" in {
-    val grid      = Grid.empty(10, 20)
-    val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
-
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.None
-  }
-
-  it should "detect wall collision" in {
-    val grid      = Grid.empty(10, 20)
-    val tetromino = Tetromino(TetrominoShape.I, Position(-2, 5), Rotation.R0)
-
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Wall
-  }
-
-  it should "detect floor collision" in {
-    val grid      = Grid.empty(10, 20)
-    val tetromino = Tetromino(TetrominoShape.T, Position(5, 20), Rotation.R0)
-
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Floor
-  }
-
-  it should "detect block collision" in {
-    val grid = Grid
-      .empty(10, 20)
-      .place(Position(5, 10), Cell.Filled(TetrominoShape.I))
-    val tetromino = Tetromino(TetrominoShape.T, Position(5, 10), Rotation.R0)
-
-    Collision.detectCollision(tetromino, grid) shouldBe Collision.CollisionType.Block
-  }
-
-  "Collision.hasLanded" should "return true when tetromino cannot move down" in {
-    val grid      = Grid.empty(10, 20)
-    val tetromino = Tetromino(TetrominoShape.T, Position(5, 19), Rotation.R0)
-
-    Collision.hasLanded(tetromino, grid) shouldBe true
-  }
-
-  it should "return false when tetromino can move down" in {
-    val grid      = Grid.empty(10, 20)
-    val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
-
-    Collision.hasLanded(tetromino, grid) shouldBe false
-  }
-
-  "Collision.hardDropPosition" should "drop tetromino to lowest valid position" in {
-    val grid      = Grid.empty(10, 20)
-    val tetromino = Tetromino.spawn(TetrominoShape.T, 10)
-
-    val dropped = Collision.hardDropPosition(tetromino, grid)
-
-    Collision.hasLanded(dropped, grid) shouldBe true
-    dropped.position.y should be > tetromino.position.y
-  }
-
-  it should "stop at filled blocks" in {
+  "Collision.hardDropPosition" should "stop at filled blocks" in {
     val grid = Grid
       .empty(10, 20)
       .place(Position(5, 15), Cell.Filled(TetrominoShape.I))

@@ -233,8 +233,7 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
           Input.RotateCounterClockwise,
           Input.HardDrop,
           Input.Pause,
-          Input.Tick,
-          Input.Quit
+          Input.Tick
         )
         val events = inputs.zipWithIndex.map { case (input, i) =>
           ReplayEvent.PlayerInput(input, i.toLong)

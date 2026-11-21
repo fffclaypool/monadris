@@ -105,7 +105,7 @@ object ReplayPlayer:
       case ReplayEvent.PlayerInput(input, _, _) =>
         val nextShape    = state.nextShapeQueue.headOption.getOrElse(state.gameState.nextTetromino)
         val newQueue     = state.nextShapeQueue.drop(1)
-        val newGameState = GameLogic.update(state.gameState, input, () => nextShape, config)
+        val newGameState = GameLogic.update(state.gameState, input, nextShape, config)
         state.copy(gameState = newGameState, nextShapeQueue = newQueue)
       case ReplayEvent.PieceSpawn(shape, _, _) =>
         state.copy(nextShapeQueue = state.nextShapeQueue :+ shape)

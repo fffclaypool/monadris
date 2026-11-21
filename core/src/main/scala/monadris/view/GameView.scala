@@ -2,7 +2,6 @@ package monadris.view
 
 import scala.util.chaining.*
 
-import monadris.config.AppConfig
 import monadris.domain.*
 
 object GameView:
@@ -16,20 +15,23 @@ object GameView:
     val ControlsAreaHeight   = 4
     val DefaultTitleWidth    = 40
     val DefaultGameOverWidth = 30
+    val MenuWidth            = 70
+
+    // Rows of the info panel, relative to the top of the screen
+    val ScoreRow     = 1
+    val LevelRow     = 2
+    val LinesRow     = 3
+    val NextLabelRow = 5
+    val NextPieceRow = 6
+    val StatusRow    = 9
+
+    /** Each block of the preview piece is drawn two characters wide */
+    val PreviewBlockWidth = 2
 
   private val FilledBlock = '█'
   private val LockedBlock = '▓'
   private val GhostBlock  = '░'
   private val EmptyCell   = '·'
-
-  private def isValidPosition(tetromino: Tetromino, grid: Grid): Boolean =
-    tetromino.currentBlocks.forall(pos => grid.isInBounds(pos) && grid.isEmpty(pos))
-
-  @annotation.tailrec
-  private def dropToBottom(tetromino: Tetromino, grid: Grid): Tetromino =
-    val next = tetromino.moveDown
-    if isValidPosition(next, grid) then dropToBottom(next, grid)
-    else tetromino
 
   def shapeToColor(shape: TetrominoShape): UiColor = shape match
     case TetrominoShape.I => UiColor.Cyan
@@ -40,9 +42,10 @@ object GameView:
     case TetrominoShape.J => UiColor.Blue
     case TetrominoShape.L => UiColor.White
 
-  def toScreenBuffer(state: GameState, config: AppConfig): ScreenBuffer =
-    val gridWidth  = config.grid.width
-    val gridHeight = config.grid.height
+  /** The screen is sized from the state's own grid, so replays recorded with another grid size render correctly. */
+  def toScreenBuffer(state: GameState): ScreenBuffer =
+    val gridWidth  = state.grid.width
+    val gridHeight = state.grid.height
 
     // Calculate width and height for grid + borders + info panel
     val totalWidth  = gridWidth + Layout.HorizontalBorder + Layout.InfoPanelWidth
@@ -64,7 +67,7 @@ object GameView:
     val fallingBlocks = state.currentTetromino.currentBlocks.toSet
     val fallingColor  = shapeToColor(state.currentTetromino.shape)
 
-    val ghostTetromino = dropToBottom(state.currentTetromino, state.grid)
+    val ghostTetromino = state.grid.dropToBottom(state.currentTetromino)
     val ghostBlocks    = ghostTetromino.currentBlocks.toSet
     val ghostColor     = fallingColor
 
@@ -94,12 +97,12 @@ object GameView:
 
   private def renderInfo(buffer: ScreenBuffer, state: GameState, startX: Int): ScreenBuffer =
     buffer
-      .drawText(startX, 1, s"Score: ${state.score}")
-      .drawText(startX, 2, s"Level: ${state.level}")
-      .drawText(startX, 3, s"Lines: ${state.linesCleared}")
-      .drawText(startX, 5, "Next:")
-      .pipe(renderNextPiece(_, state.nextTetromino, startX, 6))
-      .drawText(startX, 9, if state.status == GameStatus.Paused then "** PAUSED **" else "")
+      .drawText(startX, Layout.ScoreRow, s"Score: ${state.score}")
+      .drawText(startX, Layout.LevelRow, s"Level: ${state.level}")
+      .drawText(startX, Layout.LinesRow, s"Lines: ${state.linesCleared}")
+      .drawText(startX, Layout.NextLabelRow, "Next:")
+      .pipe(renderNextPiece(_, state.nextTetromino, startX, Layout.NextPieceRow))
+      .drawText(startX, Layout.StatusRow, if state.status == GameStatus.Paused then "** PAUSED **" else "")
 
   private def renderNextPiece(buffer: ScreenBuffer, shape: TetrominoShape, startX: Int, startY: Int): ScreenBuffer =
     val blocks     = shape.blocks
@@ -108,9 +111,8 @@ object GameView:
     val normalized = blocks.map(p => Position(p.x - minX, p.y - minY))
     val color      = shapeToColor(shape)
     normalized.foldLeft(buffer) { (buf, pos) =>
-      buf
-        .drawChar(startX + pos.x * 2, startY + pos.y, FilledBlock, color)
-        .drawChar(startX + pos.x * 2 + 1, startY + pos.y, FilledBlock, color)
+      val blockPixels = Vector.fill(Layout.PreviewBlockWidth)(Pixel(FilledBlock, color))
+      buf.drawPixels(startX + pos.x * Layout.PreviewBlockWidth, startY + pos.y, blockPixels)
     }
 
   private def renderControls(buffer: ScreenBuffer, startY: Int): ScreenBuffer =
@@ -142,9 +144,12 @@ object GameView:
       buf.drawText(0, y, line)
     }
 
+  /**
+   * The final game screen with the result box drawn over the middle of it.
+   * Being a complete screen, it can be rendered at a fixed position like any other.
+   */
   def gameOverScreen(state: GameState): ScreenBuffer =
     val lines = List(
-      "",
       "╔═══════════════════════╗",
       "║      GAME OVER!       ║",
       "╠═══════════════════════╣",
@@ -153,12 +158,16 @@ object GameView:
       s"║  Level: ${"%6d".format(state.level)}        ║",
       "╚═══════════════════════╝"
     )
-    val width  = lines.map(_.length).maxOption.getOrElse(Layout.DefaultGameOverWidth)
-    val height = lines.length + 1
-
-    lines.zipWithIndex.foldLeft(ScreenBuffer.empty(width, height)) { case (buf, (line, y)) =>
+    val boxWidth = lines.map(_.length).maxOption.getOrElse(Layout.DefaultGameOverWidth)
+    val box      = lines.zipWithIndex.foldLeft(ScreenBuffer.empty(boxWidth, lines.length)) { case (buf, (line, y)) =>
       buf.drawText(0, y, line)
     }
+
+    val screen       = toScreenBuffer(state)
+    val playfieldRow = state.grid.height + Layout.VerticalBorder
+    val x            = Math.max(0, (screen.width - box.width) / 2)
+    val y            = Math.max(0, (playfieldRow - box.height) / 2)
+    screen.overlay(x, y, box)
 
   final case class MenuItem(key: Char, label: String)
 
@@ -172,7 +181,7 @@ object GameView:
     val all: Vector[MenuItem] = Vector(PlayGame, PlayAndRecord, WatchReplay, ListReplays, Quit)
 
   def menuScreen(selectedIndex: Int): ScreenBuffer =
-    val menuWidth = 70
+    val menuWidth = Layout.MenuWidth
 
     def menuItem(item: MenuItem, index: Int): String =
       val isSelected = index == selectedIndex

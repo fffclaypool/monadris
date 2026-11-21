@@ -7,7 +7,8 @@ object GameLoop:
 
   final case class Outcome(
     state: GameState,
-    nextIntervalMs: Option[Long]
+    nextIntervalMs: Option[Long],
+    pieceLocked: Boolean
   ):
     def shouldContinue: Boolean = !state.isGameOver
 
@@ -17,7 +18,8 @@ object GameLoop:
     nextShape: TetrominoShape,
     config: AppConfig
   ): Outcome =
-    val newState     = GameLogic.update(state, input, () => nextShape, config)
+    val result       = GameLogic.step(state, input, nextShape, config)
+    val newState     = result.state
     val interval     = LineClearing.dropInterval(newState.level, config.speed)
     val nextInterval = if newState.isGameOver then None else Some(interval)
-    Outcome(newState, nextInterval)
+    Outcome(newState, nextInterval, result.pieceLocked)

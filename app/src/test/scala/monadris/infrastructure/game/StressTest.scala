@@ -53,9 +53,9 @@ object StressTest extends ZIOSpecDefault:
    * Deterministic tetromino shape provider.
    * Eliminates randomness to make tests reproducible.
    */
-  private def deterministicShapeProvider(counter: Int): () => TetrominoShape =
+  private def deterministicShapeProvider(counter: Int): TetrominoShape =
     val shapes = TetrominoShape.values
-    () => shapes(counter % shapes.length)
+    shapes(counter % shapes.length)
 
   def spec = suite("StressTest")(
     test("GameLogic handles 100,000 iterations without memory leak") {

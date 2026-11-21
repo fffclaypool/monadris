@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import zio.*
 
 import monadris.config.AppConfig
-import monadris.domain.*
+import monadris.domain.GameState
 import monadris.infrastructure.terminal.ConsoleService
 import monadris.infrastructure.terminal.Renderer
 import monadris.infrastructure.terminal.TtyService
@@ -43,10 +43,6 @@ object RecordingGameLoopRunner:
   private[game] def recordStep(builder: ReplayBuilder, step: GameLoopRunner.Step, elapsedMs: Long): ReplayBuilder =
     val timedBuilder     = builder.atElapsed(elapsedMs)
     val builderWithSpawn =
-      if pieceWasLocked(step.before, step.after) then timedBuilder.recordPieceSpawn(step.nextShape)
+      if step.pieceLocked then timedBuilder.recordPieceSpawn(step.nextShape)
       else timedBuilder
     builderWithSpawn.recordInput(step.input).advanceFrame
-
-  private def pieceWasLocked(oldState: GameState, newState: GameState): Boolean =
-    oldState.currentTetromino.shape != newState.currentTetromino.shape ||
-      oldState.nextTetromino != newState.nextTetromino

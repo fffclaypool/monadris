@@ -9,6 +9,10 @@ import org.scalatest.matchers.should.Matchers
 
 class GameViewSpec extends AnyFlatSpec with Matchers:
 
+  private object SmallGrid:
+    val Width  = 6
+    val Height = 8
+
   val config: AppConfig = TestConfig.testConfig
   val gridWidth: Int    = config.grid.width
   val gridHeight: Int   = config.grid.height
@@ -50,55 +54,55 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     }
 
   "GameView.toScreenBuffer" should "create non-empty buffer" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer = GameView.toScreenBuffer(initialState)
     buffer.width should be > 0
     buffer.height should be > 0
   }
 
   it should "include grid borders" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer = GameView.toScreenBuffer(initialState)
     buffer.pixels(0)(0).char shouldBe '┌'
   }
 
   it should "include score info" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Score:")
   }
 
   it should "include level info" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Level:")
   }
 
   it should "include lines info" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Lines:")
   }
 
   it should "include next piece info" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Next:")
   }
 
   it should "show PAUSED when game is paused" in {
     val pausedState = initialState.copy(status = GameStatus.Paused)
-    val buffer      = GameView.toScreenBuffer(pausedState, config)
+    val buffer      = GameView.toScreenBuffer(pausedState)
     val allText     = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("PAUSED")
   }
 
   it should "not show PAUSED when game is playing" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should not include "PAUSED"
   }
 
   it should "include control hints" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val allText = buffer.pixels.flatMap(_.map(_.char)).mkString
     allText should include("Quit")
   }
@@ -109,17 +113,17 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
       .place(Position(5, 15), Cell.Filled(TetrominoShape.I))
     val stateWithBlock = initialState.copy(grid = grid)
 
-    val buffer = GameView.toScreenBuffer(stateWithBlock, config)
+    val buffer = GameView.toScreenBuffer(stateWithBlock)
     buffer.pixels.exists(row => row.exists(p => p.char == '▓')) shouldBe true
   }
 
   it should "show current tetromino blocks" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer = GameView.toScreenBuffer(initialState)
     buffer.pixels.exists(row => row.exists(p => p.char == '█')) shouldBe true
   }
 
   it should "show empty cells" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer = GameView.toScreenBuffer(initialState)
     buffer.pixels.exists(row => row.exists(p => p.char == '·')) shouldBe true
   }
 
@@ -195,7 +199,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   "GameView grid rendering" should "handle all tetromino shapes" in
     TetrominoShape.values.foreach { shape =>
       val state  = GameState.initial(shape, TetrominoShape.I, gridWidth, gridHeight)
-      val buffer = GameView.toScreenBuffer(state, config)
+      val buffer = GameView.toScreenBuffer(state)
       buffer.width should be > 0
     }
 
@@ -205,7 +209,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     }
 
     val stateWithFilledRow = initialState.copy(grid = grid)
-    val buffer             = GameView.toScreenBuffer(stateWithFilledRow, config)
+    val buffer             = GameView.toScreenBuffer(stateWithFilledRow)
 
     val lockedCount = buffer.pixels.flatMap(_.filter(_.char == '▓')).size
     lockedCount shouldBe >=(gridWidth)
@@ -218,18 +222,18 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
       .place(Position(1, 0), Cell.Filled(TetrominoShape.O))
 
     val state  = initialState.copy(grid = grid)
-    val buffer = GameView.toScreenBuffer(state, config)
+    val buffer = GameView.toScreenBuffer(state)
 
     buffer.pixels.exists(row => row.exists(p => p.char == '▓')) shouldBe true
   }
 
   "Ghost piece rendering" should "show ghost blocks in the buffer" in {
-    val buffer = GameView.toScreenBuffer(initialState, config)
+    val buffer = GameView.toScreenBuffer(initialState)
     buffer.pixels.exists(row => row.exists(p => p.char == '░')) shouldBe true
   }
 
   it should "use the same color as the current piece" in {
-    val buffer        = GameView.toScreenBuffer(initialState, config)
+    val buffer        = GameView.toScreenBuffer(initialState)
     val expectedColor = GameView.shapeToColor(TetrominoShape.T)
     val ghostPixels   = buffer.pixels.flatMap(_.filter(_.char == '░'))
     ghostPixels should not be empty
@@ -237,7 +241,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "render ghost below the current piece" in {
-    val buffer  = GameView.toScreenBuffer(initialState, config)
+    val buffer  = GameView.toScreenBuffer(initialState)
     val ghostYs = for
       (row, y) <- buffer.pixels.zipWithIndex
       pixel    <- row
@@ -258,7 +262,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
       g.place(Position(x, gridHeight - 1), Cell.Filled(TetrominoShape.I))
     }
     val state   = initialState.copy(grid = bottomRow)
-    val buffer  = GameView.toScreenBuffer(state, config)
+    val buffer  = GameView.toScreenBuffer(state)
     val ghostYs = for
       (row, y) <- buffer.pixels.zipWithIndex
       pixel    <- row
@@ -279,14 +283,14 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
       if valid then next else t
     }
     val stateAtBottom = initialState.copy(currentTetromino = tetromino)
-    val buffer        = GameView.toScreenBuffer(stateAtBottom, config)
+    val buffer        = GameView.toScreenBuffer(stateAtBottom)
     // Ghost overlaps with the piece, so '░' is not shown (FilledBlock takes priority)
     val ghostPixels = buffer.pixels.flatMap(_.filter(_.char == '░'))
     ghostPixels shouldBe empty
   }
 
   "Next piece graphic rendering" should "show filled blocks in the info panel" in {
-    val buffer          = GameView.toScreenBuffer(initialState, config)
+    val buffer          = GameView.toScreenBuffer(initialState)
     val infoPanelStartX = gridWidth + 4
     val nextPieceBlocks = for
       (row, y)   <- buffer.pixels.zipWithIndex
@@ -299,7 +303,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   it should "render graphic for all tetromino shapes" in
     TetrominoShape.values.foreach { shape =>
       val state           = GameState.initial(TetrominoShape.T, shape, gridWidth, gridHeight)
-      val buffer          = GameView.toScreenBuffer(state, config)
+      val buffer          = GameView.toScreenBuffer(state)
       val infoPanelStartX = gridWidth + 4
       val nextPieceBlocks = for
         (row, y)   <- buffer.pixels.zipWithIndex
@@ -312,7 +316,7 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
   it should "use correct color for next piece graphic" in
     TetrominoShape.values.foreach { shape =>
       val state           = GameState.initial(TetrominoShape.T, shape, gridWidth, gridHeight)
-      val buffer          = GameView.toScreenBuffer(state, config)
+      val buffer          = GameView.toScreenBuffer(state)
       val expectedColor   = GameView.shapeToColor(shape)
       val infoPanelStartX = gridWidth + 4
       val nextPiecePixels = for
@@ -323,3 +327,22 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
       nextPiecePixels should not be empty
       all(nextPiecePixels.map(_.color)) shouldBe expectedColor
     }
+
+  "GameView.toScreenBuffer" should "size the screen from the grid of the state" in {
+    val smallState = GameState.initial(TetrominoShape.T, TetrominoShape.I, SmallGrid.Width, SmallGrid.Height)
+    val regular    = GameView.toScreenBuffer(initialState)
+    val small      = GameView.toScreenBuffer(smallState)
+
+    (regular.width - small.width) shouldBe (gridWidth - SmallGrid.Width)
+    (regular.height - small.height) shouldBe (gridHeight - SmallGrid.Height)
+  }
+
+  "GameView.gameOverScreen" should "be the game screen with the result box drawn over it" in {
+    val screen   = GameView.toScreenBuffer(initialState)
+    val gameOver = GameView.gameOverScreen(initialState)
+
+    gameOver.width shouldBe screen.width
+    gameOver.height shouldBe screen.height
+    gameOver.getRow(0) shouldBe screen.getRow(0)
+    gameOver should not be screen
+  }
