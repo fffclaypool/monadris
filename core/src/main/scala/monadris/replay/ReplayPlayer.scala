@@ -1,6 +1,6 @@
 package monadris.replay
 
-import monadris.config.AppConfig
+import monadris.config.GameConfig
 import monadris.domain.*
 import monadris.game.GameLogic
 
@@ -49,7 +49,7 @@ object ReplayPlayer:
       isFinished = false
     )
 
-  def advanceFrame(state: ReplayPlayerState, config: AppConfig): ReplayPlayerState =
+  def advanceFrame(state: ReplayPlayerState, config: GameConfig): ReplayPlayerState =
     if state.isFinished then state
     else processEventsAtFrame(state, config)
 
@@ -61,7 +61,7 @@ object ReplayPlayer:
 
   private def processEventsAtFrame(
     state: ReplayPlayerState,
-    config: AppConfig
+    config: GameConfig
   ): ReplayPlayerState =
     val events                 = state.replayData.events
     val currentFrame           = state.currentFrame
@@ -99,7 +99,7 @@ object ReplayPlayer:
   private def processEvent(
     event: ReplayEvent,
     state: FrameProcessingState,
-    config: AppConfig
+    config: GameConfig
   ): FrameProcessingState =
     event match
       case ReplayEvent.PlayerInput(input, _, _) =>

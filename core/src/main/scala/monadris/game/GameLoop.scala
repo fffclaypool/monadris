@@ -1,6 +1,6 @@
 package monadris.game
 
-import monadris.config.AppConfig
+import monadris.config.GameConfig
 import monadris.domain.*
 
 object GameLoop:
@@ -16,7 +16,7 @@ object GameLoop:
     state: GameState,
     input: Input,
     nextShape: TetrominoShape,
-    config: AppConfig
+    config: GameConfig
   ): Outcome =
     val result       = GameLogic.step(state, input, nextShape, config)
     val newState     = result.state

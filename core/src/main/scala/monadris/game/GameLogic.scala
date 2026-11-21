@@ -1,6 +1,6 @@
 package monadris.game
 
-import monadris.config.AppConfig
+import monadris.config.GameConfig
 import monadris.domain.*
 
 object GameLogic:
@@ -23,7 +23,7 @@ object GameLogic:
     state: GameState,
     input: Input,
     nextShape: TetrominoShape,
-    config: AppConfig
+    config: GameConfig
   ): UpdateResult =
     if !state.isPlaying then
       input match
@@ -45,7 +45,7 @@ object GameLogic:
     state: GameState,
     input: Input,
     nextShape: TetrominoShape,
-    config: AppConfig
+    config: GameConfig
   ): GameState =
     step(state, input, nextShape, config).state
 
@@ -60,7 +60,7 @@ object GameLogic:
   private def handleMoveDown(
     state: GameState,
     nextShape: TetrominoShape,
-    config: AppConfig
+    config: GameConfig
   ): UpdateResult =
     val movedTetromino = state.currentTetromino.moveDown
     if Collision.isValidPosition(movedTetromino, state.grid) then
@@ -75,7 +75,7 @@ object GameLogic:
   private def handleHardDrop(
     state: GameState,
     nextShape: TetrominoShape,
-    config: AppConfig
+    config: GameConfig
   ): UpdateResult =
     val droppedTetromino = Collision.hardDropPosition(state.currentTetromino, state.grid)
     val dropDistance     = droppedTetromino.position.y - state.currentTetromino.position.y
@@ -89,7 +89,7 @@ object GameLogic:
   private def lockTetromino(
     state: GameState,
     nextShape: TetrominoShape,
-    config: AppConfig
+    config: GameConfig
   ): UpdateResult =
     val newGrid         = state.grid.placeTetromino(state.currentTetromino)
     val clearResult     = LineClearing.clearLines(newGrid, state.level, config.score)

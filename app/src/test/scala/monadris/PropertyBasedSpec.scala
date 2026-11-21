@@ -270,7 +270,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
 
           val finalState = inputs.foldLeft(initialState) { (state, input) =>
             if state.isGameOver then state
-            else GameLogic.update(state, input, nextShape, config)
+            else GameLogic.update(state, input, nextShape, config.game)
           }
 
           assertTrue(true)
@@ -285,7 +285,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           val scores = inputs
             .scanLeft(initialState) { (state, input) =>
               if state.isGameOver then state
-              else GameLogic.update(state, input, nextShape, config)
+              else GameLogic.update(state, input, nextShape, config.game)
             }
             .map(_.score)
 
@@ -305,7 +305,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
           val levels = inputs
             .scanLeft(initialState) { (state, input) =>
               if state.isGameOver then state
-              else GameLogic.update(state, input, nextShape, config)
+              else GameLogic.update(state, input, nextShape, config.game)
             }
             .map(_.level)
 
@@ -320,8 +320,8 @@ object PropertyBasedSpec extends ZIOSpecDefault:
         val config = TestServices.testConfig
         check(genGameState) { state =>
           val nextShape   = TetrominoShape.O
-          val pausedOnce  = GameLogic.update(state, Input.Pause, nextShape, config)
-          val pausedTwice = GameLogic.update(pausedOnce, Input.Pause, nextShape, config)
+          val pausedOnce  = GameLogic.update(state, Input.Pause, nextShape, config.game)
+          val pausedTwice = GameLogic.update(pausedOnce, Input.Pause, nextShape, config.game)
           assertTrue(pausedTwice.status == state.status)
         }
       },
@@ -333,7 +333,7 @@ object PropertyBasedSpec extends ZIOSpecDefault:
 
           val finalState = inputs.foldLeft(initialState) { (state, input) =>
             if state.isGameOver then state
-            else GameLogic.update(state, input, nextShape, config)
+            else GameLogic.update(state, input, nextShape, config.game)
           }
 
           assertTrue(

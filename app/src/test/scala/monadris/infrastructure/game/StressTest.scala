@@ -101,7 +101,7 @@ object StressTest extends ZIOSpecDefault:
         val input = inputs(i % inputs.length)
 
         val provider = deterministicShapeProvider(shapeCounter)
-        state = GameLogic.update(state, input, provider, testConfig)
+        state = GameLogic.update(state, input, provider, testConfig.game)
         shapeCounter = shapeCounter + 1
 
       state

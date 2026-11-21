@@ -7,19 +7,9 @@ import monadris.config.*
  * Pure config values with no ZIO dependency.
  */
 object TestConfig:
-  val testConfig: AppConfig = AppConfig(
+  val testConfig: GameConfig = GameConfig(
     grid = GridConfig(width = 10, height = 20),
     score = ScoreConfig(singleLine = 100, doubleLine = 300, tripleLine = 500, tetris = 800, hardDropPerCell = 2),
     level = LevelConfig(linesPerLevel = 10),
-    speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50),
-    terminal = TerminalConfig(escapeSequenceWaitMs = 20, escapeSequenceSecondWaitMs = 5, inputPollIntervalMs = 20),
-    timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000),
-    replay = ReplayConfig(defaultSpeed = 1.0, storage = ReplayStorage.File),
-    database = DatabaseConfig(
-      url = "jdbc:postgresql://localhost:5432/test",
-      username = "test",
-      password = "test",
-      poolSize = 5,
-      connectionTimeoutMs = 30000
-    )
+    speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50)
   )

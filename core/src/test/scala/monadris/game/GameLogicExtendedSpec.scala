@@ -1,7 +1,7 @@
 package monadris.game
 
 import monadris.TestConfig
-import monadris.config.AppConfig
+import monadris.config.GameConfig
 import monadris.domain.*
 
 import org.scalatest.flatspec.AnyFlatSpec
@@ -12,9 +12,9 @@ import org.scalatest.matchers.should.Matchers
  */
 class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
 
-  val config: AppConfig = TestConfig.testConfig
-  val gridWidth         = config.grid.width
-  val gridHeight        = config.grid.height
+  val config: GameConfig = TestConfig.testConfig
+  val gridWidth          = config.grid.width
+  val gridHeight         = config.grid.height
 
   val maxIterations: Int  = gridHeight * 2
   val takeIterations: Int = maxIterations + 1

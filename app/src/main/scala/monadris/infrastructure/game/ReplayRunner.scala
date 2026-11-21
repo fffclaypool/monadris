@@ -142,7 +142,7 @@ object ReplayRunner:
     renderer: Renderer
   ): ZIO[TtyService & ConsoleService, Throwable, PlaybackState] =
     val advanced = state.copy(
-      replayState = ReplayPlayer.advanceFrame(state.replayState, config),
+      replayState = ReplayPlayer.advanceFrame(state.replayState, config.game),
       remainingDelayMs = None
     )
     redrawAndContinue(advanced, config, renderer)
