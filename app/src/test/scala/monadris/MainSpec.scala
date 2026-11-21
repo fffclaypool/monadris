@@ -3,6 +3,7 @@ package monadris
 import zio.*
 import zio.test.*
 
+import monadris.infrastructure.persistence.FileReplayRepository
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.TestServices as Mocks
 import monadris.replay.ReplayData
@@ -23,6 +24,10 @@ object MainSpec extends ZIOSpecDefault:
   }
 
   def spec = suite("Main Application")(
+    test("replayRepositoryLayer provides file storage without a database when storage is file") {
+      for repository <- ZIO.service[ReplayRepository]
+      yield assertTrue(repository.isInstanceOf[FileReplayRepository])
+    }.provide(Mocks.config, Main.replayRepositoryLayer),
     test("program runs and exits with Q key") {
       val inputs = Chunk('q'.toInt)
       for _ <- Main.program

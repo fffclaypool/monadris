@@ -7,6 +7,14 @@ import monadris.infrastructure.terminal.TestServices as LocalTestServices
 
 object SystemInterfaceSpec extends ZIOSpecDefault:
 
+  private object Shell:
+    val Succeeding      = "true"
+    val FailingExitCode = "3"
+    val Failing         = s"exit $FailingExitCode"
+    val EchoedText      = "monadris"
+    val Echo            = s"echo $EchoedText"
+    val EchoToStderr    = s"echo $EchoedText 1>&2"
+
   def spec = suite("SystemInterface")(
     suite("GameEnv type alias")(
       test("GameEnv includes TerminalSession") {
@@ -25,6 +33,24 @@ object SystemInterfaceSpec extends ZIOSpecDefault:
 
         effect.provideLayer(layer)
       }
+    ),
+    suite("CommandService.live")(
+      test("exec succeeds for a command that exits with zero") {
+        for result <- CommandService.exec(Shell.Succeeding).either
+        yield assertTrue(result.isRight)
+      }.provide(CommandService.live),
+      test("exec fails for a command that exits with a non-zero status") {
+        for result <- CommandService.exec(Shell.Failing).either
+        yield assertTrue(result.left.exists(_.getMessage.contains(Shell.FailingExitCode)))
+      }.provide(CommandService.live),
+      test("execCapture returns the standard output of the command") {
+        for output <- CommandService.execCapture(Shell.Echo)
+        yield assertTrue(output.trim == Shell.EchoedText)
+      }.provide(CommandService.live),
+      test("execCapture does not include standard error") {
+        for output <- CommandService.execCapture(Shell.EchoToStderr)
+        yield assertTrue(output.isEmpty)
+      }.provide(CommandService.live)
     ),
     suite("TerminalSession.live")(
       test("can be constructed from terminal services") {
