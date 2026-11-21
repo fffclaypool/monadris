@@ -24,8 +24,8 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     val TicksToReachBottom = GridHeight - 2
 
   /** Fixed shape provider for testing */
-  private def fixedShapeProvider(shape: TetrominoShape): () => TetrominoShape =
-    () => shape
+  private def fixedShapeProvider(shape: TetrominoShape): TetrominoShape =
+    shape
 
   /** Create initial game state */
   private def createInitialState(
@@ -52,7 +52,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     initialState: GameState,
     inputs: Chunk[Input],
     config: AppConfig,
-    nextShapeProvider: () => TetrominoShape
+    nextShapeProvider: TetrominoShape
   ): GameState =
     inputs.foldLeft(initialState) { (state, input) =>
       GameLogic.update(state, input, nextShapeProvider, config)
@@ -213,7 +213,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
 
       for
         consoleService <- ZIO.service[Mocks.TestConsoleService]
-        screenBuffer = GameView.toScreenBuffer(stateWithScore, config)
+        screenBuffer = GameView.toScreenBuffer(stateWithScore)
         _      <- ConsoleRenderer.render(screenBuffer)
         output <- consoleService.buffer.get
         combined = output.mkString
@@ -390,7 +390,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
 
       for
         consoleService <- ZIO.service[Mocks.TestConsoleService]
-        screenBuffer = GameView.toScreenBuffer(pausedState, config)
+        screenBuffer = GameView.toScreenBuffer(pausedState)
         _      <- ConsoleRenderer.render(screenBuffer)
         output <- consoleService.buffer.get
         combined = output.mkString
@@ -417,7 +417,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
           }
 
         consoleService <- ZIO.service[Mocks.TestConsoleService]
-        screenBuffer = GameView.toScreenBuffer(finalState, config)
+        screenBuffer = GameView.toScreenBuffer(finalState)
         _      <- ConsoleRenderer.render(screenBuffer)
         output <- consoleService.buffer.get
       yield assertTrue(finalState.score > 0) &&

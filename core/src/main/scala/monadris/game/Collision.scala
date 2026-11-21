@@ -4,15 +4,8 @@ import monadris.domain.*
 
 object Collision:
 
-  enum CollisionType:
-    case None, Wall, Floor, Block, Ceiling
-
   def isValidPosition(tetromino: Tetromino, grid: Grid): Boolean =
-    tetromino.currentBlocks.forall { pos =>
-      isWithinHorizontalBounds(pos, grid) &&
-      isWithinVerticalBounds(pos, grid) &&
-      grid.isEmpty(pos)
-    }
+    grid.canPlace(tetromino)
 
   def isWithinHorizontalBounds(pos: Position, grid: Grid): Boolean =
     pos.x >= 0 && pos.x < grid.width
@@ -20,28 +13,13 @@ object Collision:
   def isWithinVerticalBounds(pos: Position, grid: Grid): Boolean =
     pos.y >= 0 && pos.y < grid.height
 
-  def detectCollision(tetromino: Tetromino, grid: Grid): CollisionType =
-    val blocks = tetromino.currentBlocks
-    if blocks.exists(p => p.x < 0 || p.x >= grid.width) then CollisionType.Wall
-    else if blocks.exists(p => p.y >= grid.height) then CollisionType.Floor
-    else if blocks.exists(p => p.y < 0) then CollisionType.Ceiling
-    else if blocks.exists(p => !grid.isEmpty(p)) then CollisionType.Block
-    else CollisionType.None
-
-  /** Returns true if current position is valid but moving one step down would collide */
-  def hasLanded(tetromino: Tetromino, grid: Grid): Boolean =
-    isValidPosition(tetromino, grid) &&
-      !isValidPosition(tetromino.moveDown, grid)
-
   def hardDropPosition(tetromino: Tetromino, grid: Grid): Tetromino =
-    @annotation.tailrec
-    def drop(t: Tetromino): Tetromino =
-      val next = t.moveDown
-      if isValidPosition(next, grid) then drop(next)
-      else t
-    drop(tetromino)
+    grid.dropToBottom(tetromino)
 
-  /** SRS wall kick: tries offset positions when direct rotation fails */
+  /**
+   * Wall kick: when the rotated piece does not fit, tries the offsets below in order.
+   * This is a simplified table (the same for every rotation state), not the SRS kick data.
+   */
   def tryRotateWithWallKick(
     tetromino: Tetromino,
     grid: Grid,

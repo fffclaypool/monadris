@@ -38,6 +38,12 @@ final case class ScreenBuffer(
       copy(pixels = pixels.updated(y, safeRow))
     else this
 
+  /** Draws another buffer on top of this one with its top-left corner at (x, y) */
+  def overlay(x: Int, y: Int, other: ScreenBuffer): ScreenBuffer =
+    other.pixels.zipWithIndex.foldLeft(this) { case (buffer, (row, rowIndex)) =>
+      buffer.drawPixels(x, y + rowIndex, row)
+    }
+
   def getRow(y: Int): Vector[Pixel] =
     if y >= 0 && y < height then pixels(y)
     else Vector.empty

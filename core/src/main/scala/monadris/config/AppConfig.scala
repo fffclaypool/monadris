@@ -20,7 +20,8 @@ final case class ScoreConfig(
   singleLine: Int,
   doubleLine: Int,
   tripleLine: Int,
-  tetris: Int
+  tetris: Int,
+  hardDropPerCell: Int
 )
 
 final case class LevelConfig(

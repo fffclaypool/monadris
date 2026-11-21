@@ -19,6 +19,17 @@ final case class Grid private (
   def isEmpty(pos: Position): Boolean =
     get(pos).contains(Cell.Empty)
 
+  /** True if every block of the tetromino lies inside the grid on an empty cell */
+  def canPlace(tetromino: Tetromino): Boolean =
+    tetromino.currentBlocks.forall(isEmpty)
+
+  /** The tetromino moved straight down as far as it can go */
+  @annotation.tailrec
+  def dropToBottom(tetromino: Tetromino): Tetromino =
+    val next = tetromino.moveDown
+    if canPlace(next) then dropToBottom(next)
+    else tetromino
+
   def place(pos: Position, cell: Cell): Grid =
     if isInBounds(pos) then copy(cells = cells.updated(pos.y, cells(pos.y).updated(pos.x, cell)))
     else this

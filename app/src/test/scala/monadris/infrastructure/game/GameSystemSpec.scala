@@ -601,7 +601,7 @@ object GameSystemSpec extends ZIOSpecDefault:
     suite("GameRunner LoopState")(
       test("LoopState holds game state and previous buffer") {
         val state     = initialState
-        val buffer    = GameView.toScreenBuffer(state, Mocks.testConfig)
+        val buffer    = GameView.toScreenBuffer(state)
         val loopState = GameLoopRunner.LoopState(state, Some(buffer))
 
         assertTrue(

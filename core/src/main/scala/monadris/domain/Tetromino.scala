@@ -18,7 +18,7 @@ enum Rotation:
 enum TetrominoShape:
   case I, O, T, S, Z, J, L
 
-  /** Relative coordinates in R0 state (SRS compliant) */
+  /** Relative coordinates in R0 state; pieces rotate around the block at (0, 0) */
   def blocks: List[Position] = this match
     case I => List(Position(-1, 0), Position(0, 0), Position(1, 0), Position(2, 0))
     case O => List(Position(0, 0), Position(1, 0), Position(0, 1), Position(1, 1))
@@ -55,9 +55,12 @@ final case class Tetromino(
   def rotateCounterClockwise: Tetromino = copy(rotation = rotation.rotateCounterClockwise)
 
 object Tetromino:
-  def spawn(shape: TetrominoShape, gridWidth: Int = 10): Tetromino =
+  /** Row of the rotation centre on spawn; leaves room for blocks one row above it */
+  val SpawnRow: Int = 1
+
+  def spawn(shape: TetrominoShape, gridWidth: Int): Tetromino =
     Tetromino(
       shape = shape,
-      position = Position(gridWidth / 2, 1),
+      position = Position(gridWidth / 2, SpawnRow),
       rotation = Rotation.R0
     )

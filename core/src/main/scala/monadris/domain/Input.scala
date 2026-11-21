@@ -8,5 +8,4 @@ enum Input:
   case RotateCounterClockwise
   case HardDrop
   case Pause
-  case Quit
   case Tick

@@ -25,12 +25,12 @@ object Renderer:
       config: AppConfig,
       previousBuffer: Option[ScreenBuffer]
     ): ZIO[ConsoleService, Throwable, ScreenBuffer] =
-      val buffer = GameView.toScreenBuffer(state, config)
+      val buffer = GameView.toScreenBuffer(state)
       ConsoleRenderer.render(buffer, previousBuffer).as(buffer)
 
     def renderGameOver(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
       val buffer = GameView.gameOverScreen(state)
-      ConsoleRenderer.renderWithoutClear(buffer)
+      ConsoleRenderer.render(buffer)
 
     def renderTitle: ZIO[ConsoleService, Throwable, Unit] =
       val buffer = GameView.titleScreen

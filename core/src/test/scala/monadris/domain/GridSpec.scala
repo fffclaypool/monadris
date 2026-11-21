@@ -7,6 +7,10 @@ import org.scalatest.matchers.should.Matchers
 
 class GridSpec extends AnyFlatSpec with Matchers:
 
+  private object Placement:
+    val Width  = 10
+    val Height = 20
+
   val gridWidth: Int  = TestConfig.testConfig.grid.width
   val gridHeight: Int = TestConfig.testConfig.grid.height
 
@@ -109,4 +113,39 @@ class GridSpec extends AnyFlatSpec with Matchers:
 
     clearedGrid.isEmpty(Position(0, bottomRow)) shouldBe true
     clearedGrid.isEmpty(origin) shouldBe true
+  }
+
+  "Grid.canPlace" should "accept a tetromino on empty cells inside the grid" in {
+    val grid = Grid.empty(Placement.Width, Placement.Height)
+
+    grid.canPlace(Tetromino.spawn(TetrominoShape.T, Placement.Width)) shouldBe true
+  }
+
+  it should "reject a tetromino that leaves the grid or overlaps a filled cell" in {
+    val grid      = Grid.empty(Placement.Width, Placement.Height)
+    val tetromino = Tetromino.spawn(TetrominoShape.T, Placement.Width)
+    val outside   = tetromino.copy(position = Position(-1, Tetromino.SpawnRow))
+    val occupied  = grid.place(tetromino.position, Cell.Filled(TetrominoShape.I))
+
+    grid.canPlace(outside) shouldBe false
+    occupied.canPlace(tetromino) shouldBe false
+  }
+
+  "Grid.dropToBottom" should "move the tetromino down until it rests on the floor" in {
+    val grid    = Grid.empty(Placement.Width, Placement.Height)
+    val dropped = grid.dropToBottom(Tetromino.spawn(TetrominoShape.O, Placement.Width))
+
+    dropped.currentBlocks.map(_.y).max shouldBe (Placement.Height - 1)
+    grid.canPlace(dropped) shouldBe true
+    grid.canPlace(dropped.moveDown) shouldBe false
+  }
+
+  it should "stop on top of filled cells" in {
+    val tetromino = Tetromino.spawn(TetrominoShape.O, Placement.Width)
+    val floorRow  = Placement.Height - 1
+    val grid      = (0 until Placement.Width).foldLeft(Grid.empty(Placement.Width, Placement.Height)) { (g, x) =>
+      g.place(Position(x, floorRow), Cell.Filled(TetrominoShape.I))
+    }
+
+    grid.dropToBottom(tetromino).currentBlocks.map(_.y).max shouldBe (floorRow - 1)
   }

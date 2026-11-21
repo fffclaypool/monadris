@@ -16,7 +16,7 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
-  def nextShapeProvider: () => TetrominoShape = () => TetrominoShape.O
+  def nextShapeProvider: TetrominoShape = TetrominoShape.O
 
   "GameLogic.update with MoveLeft" should "move tetromino left" in {
     val state     = initialState
@@ -173,10 +173,46 @@ class GameLogicSpec extends AnyFlatSpec with Matchers:
     state.status shouldBe GameStatus.Playing
   }
 
-  "GameLogic.restart" should "create fresh game state" in {
-    val state = GameLogic.restart(TetrominoShape.S, TetrominoShape.Z, gridWidth, gridHeight)
+  "GameLogic.step" should "not report a lock for inputs that only move the piece" in
+    List(Input.MoveLeft, Input.MoveRight, Input.MoveDown, Input.RotateClockwise, Input.Pause, Input.Tick).foreach {
+      input =>
+        GameLogic.step(initialState, input, nextShapeProvider, config).pieceLocked shouldBe false
+    }
 
-    state.score shouldBe 0
-    state.linesCleared shouldBe 0
-    state.status shouldBe GameStatus.Playing
+  it should "report a lock when a hard drop places the piece" in {
+    val result = GameLogic.step(initialState, Input.HardDrop, nextShapeProvider, config)
+
+    result.pieceLocked shouldBe true
+    result.state.nextTetromino shouldBe nextShapeProvider
+  }
+
+  it should "report a lock even when the current, next and upcoming shapes are identical" in {
+    val sameShape = TetrominoShape.T
+    val state     = GameState.initial(sameShape, sameShape, gridWidth, gridHeight)
+    val result    = GameLogic.step(state, Input.HardDrop, sameShape, config)
+
+    result.pieceLocked shouldBe true
+    result.state.currentTetromino.shape shouldBe sameShape
+    result.state.nextTetromino shouldBe sameShape
+  }
+
+  it should "report a lock when the tick that cannot move the piece down places it" in {
+    val landed = initialState.copy(
+      currentTetromino = initialState.grid.dropToBottom(initialState.currentTetromino)
+    )
+
+    GameLogic.step(landed, Input.Tick, nextShapeProvider, config).pieceLocked shouldBe true
+  }
+
+  it should "agree with update on the resulting state" in {
+    GameLogic.step(initialState, Input.HardDrop, nextShapeProvider, config).state shouldBe
+      GameLogic.update(initialState, Input.HardDrop, nextShapeProvider, config)
+  }
+
+  "Hard drop" should "score the configured bonus per dropped cell" in {
+    val dropped  = initialState.grid.dropToBottom(initialState.currentTetromino)
+    val distance = dropped.position.y - initialState.currentTetromino.position.y
+    val result   = GameLogic.update(initialState, Input.HardDrop, nextShapeProvider, config)
+
+    result.score shouldBe distance * config.score.hardDropPerCell
   }

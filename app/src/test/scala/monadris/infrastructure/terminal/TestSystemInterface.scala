@@ -83,7 +83,7 @@ object TestServices:
 
   val testConfig: AppConfig = AppConfig(
     grid = GridConfig(width = 10, height = 20),
-    score = ScoreConfig(singleLine = 100, doubleLine = 300, tripleLine = 500, tetris = 800),
+    score = ScoreConfig(singleLine = 100, doubleLine = 300, tripleLine = 500, tetris = 800, hardDropPerCell = 2),
     level = LevelConfig(linesPerLevel = 10),
     speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50),
     terminal = TerminalConfig(escapeSequenceWaitMs = 20, escapeSequenceSecondWaitMs = 5, inputPollIntervalMs = 20),

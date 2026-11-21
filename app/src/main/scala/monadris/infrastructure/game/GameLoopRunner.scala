@@ -25,7 +25,8 @@ object GameLoopRunner:
     input: Input,
     before: GameState,
     after: GameState,
-    nextShape: TetrominoShape
+    nextShape: TetrominoShape,
+    pieceLocked: Boolean
   )
 
   /** Folds every processed command into an accumulator (e.g. a replay recording) */
@@ -137,4 +138,7 @@ object GameLoopRunner:
       }
       _         <- ZIO.foreachDiscard(outcome.nextIntervalMs)(intervalRef.set)
       newBuffer <- renderer.render(outcome.state, config, state.previousBuffer)
-    yield (LoopState(outcome.state, Some(newBuffer)), Step(input, oldState, outcome.state, nextShape))
+    yield (
+      LoopState(outcome.state, Some(newBuffer)),
+      Step(input, oldState, outcome.state, nextShape, outcome.pieceLocked)
+    )

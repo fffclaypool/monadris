@@ -26,7 +26,7 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
 
-  def nextShapeProvider: () => TetrominoShape = () => TetrominoShape.O
+  def nextShapeProvider: TetrominoShape = TetrominoShape.O
 
   "GameLogic.update" should "not process input when game is over" in {
     val gameOverState = initialState.copy(status = GameStatus.GameOver)
@@ -183,21 +183,3 @@ class GameLogicExtendedSpec extends AnyFlatSpec with Matchers:
       val moved = GameLogic.update(state, Input.MoveDown, nextShapeProvider, config)
       moved.currentTetromino.position.y should be > state.currentTetromino.position.y
     }
-
-  "GameLogic.restart" should "create fresh state with given shapes" in {
-    val state = GameLogic.restart(TetrominoShape.S, TetrominoShape.Z, gridWidth, gridHeight)
-
-    state.currentTetromino.shape shouldBe TetrominoShape.S
-    state.nextTetromino shouldBe TetrominoShape.Z
-    state.score shouldBe initialScore
-    state.level shouldBe initialLevel
-    state.linesCleared shouldBe initialLinesCleared
-    state.status shouldBe GameStatus.Playing
-  }
-
-  it should "create valid initial grid" in {
-    val state = GameLogic.restart(TetrominoShape.L, TetrominoShape.J, gridWidth, gridHeight)
-
-    state.grid.width shouldBe gridWidth
-    state.grid.height shouldBe gridHeight
-  }

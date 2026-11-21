@@ -5,33 +5,49 @@ import monadris.domain.*
 
 object GameLogic:
 
+  /** The state after an input, and whether that input locked the current piece into the grid */
   final case class UpdateResult(
     state: GameState,
-    needsNextShape: Boolean
+    pieceLocked: Boolean
   )
+
+  private def unlocked(state: GameState): UpdateResult =
+    UpdateResult(state, pieceLocked = false)
+
+  /**
+   * Applies one input.
+   *
+   * @param nextShape the shape that enters the preview if this input locks the current piece
+   */
+  def step(
+    state: GameState,
+    input: Input,
+    nextShape: TetrominoShape,
+    config: AppConfig
+  ): UpdateResult =
+    if !state.isPlaying then
+      input match
+        case Input.Pause if state.status == GameStatus.Paused =>
+          unlocked(state.copy(status = GameStatus.Playing))
+        case _ => unlocked(state)
+    else
+      input match
+        case Input.MoveLeft               => unlocked(handleMove(state, _.moveLeft))
+        case Input.MoveRight              => unlocked(handleMove(state, _.moveRight))
+        case Input.MoveDown               => handleMoveDown(state, nextShape, config)
+        case Input.RotateClockwise        => unlocked(handleRotation(state, clockwise = true))
+        case Input.RotateCounterClockwise => unlocked(handleRotation(state, clockwise = false))
+        case Input.HardDrop               => handleHardDrop(state, nextShape, config)
+        case Input.Pause                  => unlocked(state.copy(status = GameStatus.Paused))
+        case Input.Tick                   => handleMoveDown(state, nextShape, config)
 
   def update(
     state: GameState,
     input: Input,
-    nextShapeProvider: () => TetrominoShape,
+    nextShape: TetrominoShape,
     config: AppConfig
   ): GameState =
-    if !state.isPlaying then
-      input match
-        case Input.Pause if state.status == GameStatus.Paused =>
-          state.copy(status = GameStatus.Playing)
-        case _ => state
-    else
-      input match
-        case Input.MoveLeft               => handleMove(state, _.moveLeft)
-        case Input.MoveRight              => handleMove(state, _.moveRight)
-        case Input.MoveDown               => handleMoveDown(state, nextShapeProvider, config)
-        case Input.RotateClockwise        => handleRotation(state, clockwise = true)
-        case Input.RotateCounterClockwise => handleRotation(state, clockwise = false)
-        case Input.HardDrop               => handleHardDrop(state, nextShapeProvider, config)
-        case Input.Pause                  => state.copy(status = GameStatus.Paused)
-        case Input.Quit                   => state
-        case Input.Tick                   => handleTick(state, nextShapeProvider, config)
+    step(state, input, nextShape, config).state
 
   private def handleMove(
     state: GameState,
@@ -43,12 +59,13 @@ object GameLogic:
 
   private def handleMoveDown(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape,
+    nextShape: TetrominoShape,
     config: AppConfig
-  ): GameState =
+  ): UpdateResult =
     val movedTetromino = state.currentTetromino.moveDown
-    if Collision.isValidPosition(movedTetromino, state.grid) then state.copy(currentTetromino = movedTetromino)
-    else lockTetromino(state, nextShapeProvider, config)
+    if Collision.isValidPosition(movedTetromino, state.grid) then
+      unlocked(state.copy(currentTetromino = movedTetromino))
+    else lockTetromino(state, nextShape, config)
 
   private def handleRotation(state: GameState, clockwise: Boolean): GameState =
     Collision.tryRotateWithWallKick(state.currentTetromino, state.grid, clockwise) match
@@ -57,59 +74,37 @@ object GameLogic:
 
   private def handleHardDrop(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape,
+    nextShape: TetrominoShape,
     config: AppConfig
-  ): GameState =
+  ): UpdateResult =
     val droppedTetromino = Collision.hardDropPosition(state.currentTetromino, state.grid)
     val dropDistance     = droppedTetromino.position.y - state.currentTetromino.position.y
-    val bonusScore       = dropDistance * 2
+    val bonusScore       = dropDistance * config.score.hardDropPerCell
     val newState         = state.copy(
       currentTetromino = droppedTetromino,
       score = state.score + bonusScore
     )
-    lockTetromino(newState, nextShapeProvider, config)
-
-  private def handleTick(
-    state: GameState,
-    nextShapeProvider: () => TetrominoShape,
-    config: AppConfig
-  ): GameState =
-    handleMoveDown(state, nextShapeProvider, config)
+    lockTetromino(newState, nextShape, config)
 
   private def lockTetromino(
     state: GameState,
-    nextShapeProvider: () => TetrominoShape,
+    nextShape: TetrominoShape,
     config: AppConfig
-  ): GameState =
+  ): UpdateResult =
     val newGrid         = state.grid.placeTetromino(state.currentTetromino)
     val clearResult     = LineClearing.clearLines(newGrid, state.level, config.score)
     val newLinesCleared = state.linesCleared + clearResult.linesCleared
     val newLevel        = LineClearing.calculateLevel(newLinesCleared, config.level)
     val nextTetromino   = Tetromino.spawn(state.nextTetromino, state.grid.width)
-    val upcomingShape   = nextShapeProvider()
+    val lockedState     = state.copy(
+      grid = clearResult.grid,
+      score = state.score + clearResult.scoreGained,
+      linesCleared = newLinesCleared,
+      level = newLevel
+    )
 
-    if Collision.isGameOver(nextTetromino, clearResult.grid) then
-      state.copy(
-        grid = clearResult.grid,
-        score = state.score + clearResult.scoreGained,
-        linesCleared = newLinesCleared,
-        level = newLevel,
-        status = GameStatus.GameOver
-      )
-    else
-      state.copy(
-        grid = clearResult.grid,
-        currentTetromino = nextTetromino,
-        nextTetromino = upcomingShape,
-        score = state.score + clearResult.scoreGained,
-        linesCleared = newLinesCleared,
-        level = newLevel
-      )
+    val newState =
+      if Collision.isGameOver(nextTetromino, clearResult.grid) then lockedState.copy(status = GameStatus.GameOver)
+      else lockedState.copy(currentTetromino = nextTetromino, nextTetromino = nextShape)
 
-  def restart(
-    firstShape: TetrominoShape,
-    nextShape: TetrominoShape,
-    gridWidth: Int,
-    gridHeight: Int
-  ): GameState =
-    GameState.initial(firstShape, nextShape, gridWidth, gridHeight)
+    UpdateResult(newState, pieceLocked = true)

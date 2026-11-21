@@ -70,7 +70,8 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
   def spec = suite("RecordingGameLoopRunner")(
     suite("recordStep")(
       test("stamps the input with the current frame and elapsed time, then advances the frame") {
-        val step    = GameLoopRunner.Step(Input.MoveLeft, initialState, initialState, TetrominoShape.O)
+        val step =
+          GameLoopRunner.Step(Input.MoveLeft, initialState, initialState, TetrominoShape.O, pieceLocked = false)
         val builder = RecordingGameLoopRunner.recordStep(newBuilder, step, Elapsed.First)
         assertTrue(
           builder.events == Vector(ReplayEvent.PlayerInput(Input.MoveLeft, 0L, Elapsed.First)),
@@ -82,7 +83,7 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
           currentTetromino = Tetromino.spawn(TetrominoShape.I, testGridWidth),
           nextTetromino = TetrominoShape.O
         )
-        val step    = GameLoopRunner.Step(Input.HardDrop, initialState, lockedState, TetrominoShape.O)
+        val step = GameLoopRunner.Step(Input.HardDrop, initialState, lockedState, TetrominoShape.O, pieceLocked = true)
         val builder = RecordingGameLoopRunner.recordStep(newBuilder, step, Elapsed.First)
         assertTrue(
           builder.events == Vector(
@@ -92,7 +93,7 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
         )
       },
       test("consecutive steps keep their own elapsed times") {
-        val step    = GameLoopRunner.Step(Input.Tick, initialState, initialState, TetrominoShape.O)
+        val step    = GameLoopRunner.Step(Input.Tick, initialState, initialState, TetrominoShape.O, pieceLocked = false)
         val builder = RecordingGameLoopRunner.recordStep(
           RecordingGameLoopRunner.recordStep(newBuilder, step, Elapsed.First),
           step,
