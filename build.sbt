@@ -50,7 +50,6 @@ lazy val app = project
     name                      := "monadris-app",
     libraryDependencies ++= Seq(
       "dev.zio"       %% "zio"                        % "2.1.25",
-      "dev.zio"       %% "zio-streams"                % "2.1.25",
       "dev.zio"       %% "zio-logging"                % "2.1.17",
       "dev.zio"       %% "zio-logging-slf4j"          % "2.1.17",
       "dev.zio"       %% "zio-config"                 % "4.0.7",
@@ -62,6 +61,7 @@ lazy val app = project
       "org.postgresql" % "postgresql"                 % "42.7.10",
       "org.flywaydb"   % "flyway-core"                % "12.4.0",
       "org.flywaydb"   % "flyway-database-postgresql" % "12.4.0",
+      "dev.zio"       %% "zio-streams"                % "2.1.25" % Test,
       "dev.zio"       %% "zio-test"                   % "2.1.25" % Test,
       "dev.zio"       %% "zio-test-sbt"               % "2.1.25" % Test,
       "dev.zio"       %% "zio-test-magnolia"          % "2.1.25" % Test

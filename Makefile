@@ -54,9 +54,8 @@ coverage-check:
 	scripts/check-coverage.sh
 
 coverage-baseline: coverage-check
-	@SCALA_VERSION=3.3.5; \
-	CORE_RATE=$$(grep -oP 'statement-rate="\K[0-9.]+' core/target/scala-$$SCALA_VERSION/scoverage-report/scoverage.xml | head -1); \
-	APP_RATE=$$(grep -oP 'statement-rate="\K[0-9.]+' app/target/scala-$$SCALA_VERSION/scoverage-report/scoverage.xml | head -1); \
+	@CORE_RATE=$$(grep -ohP 'statement-rate="\K[0-9.]+' core/target/scala-*/scoverage-report/scoverage.xml | head -1); \
+	APP_RATE=$$(grep -ohP 'statement-rate="\K[0-9.]+' app/target/scala-*/scoverage-report/scoverage.xml | head -1); \
 	printf '{\n  "core": %s,\n  "app": %s\n}\n' "$$CORE_RATE" "$$APP_RATE" > .coverage-baseline.json; \
 	echo "Baseline updated: core=$$CORE_RATE%, app=$$APP_RATE%"
 
