@@ -4,6 +4,7 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.TetrominoShape
+import monadris.infrastructure.persistence.ReplayError
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
 import monadris.replay.*
@@ -33,21 +34,21 @@ object ReplaySelectorSpec extends ZIOSpecDefault:
   case class MockReplayRepository(
     replays: Ref[Map[String, ReplayData]]
   ) extends ReplayRepository:
-    def save(name: String, replay: ReplayData): Task[Unit] =
+    def save(name: String, replay: ReplayData): IO[ReplayError, Unit] =
       replays.update(_ + (name -> replay))
 
-    def load(name: String): Task[ReplayData] =
+    def load(name: String): IO[ReplayError, ReplayData] =
       replays.get.flatMap { r =>
-        ZIO.fromOption(r.get(name)).orElseFail(new RuntimeException(s"Replay not found: $name"))
+        ZIO.fromOption(r.get(name)).orElseFail(ReplayError.NotFound(name))
       }
 
-    def list: Task[Vector[String]] =
+    def list: IO[ReplayError, Vector[String]] =
       replays.get.map(_.keys.toVector.sorted)
 
-    def exists(name: String): Task[Boolean] =
+    def exists(name: String): IO[ReplayError, Boolean] =
       replays.get.map(_.contains(name))
 
-    def delete(name: String): Task[Unit] =
+    def delete(name: String): IO[ReplayError, Unit] =
       replays.update(_ - name)
 
   object MockReplayRepository:

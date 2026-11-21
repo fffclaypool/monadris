@@ -4,6 +4,7 @@ import zio.*
 
 import monadris.config.AppConfig
 import monadris.domain.*
+import monadris.infrastructure.persistence.ReplayError
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.GameEnv
 import monadris.infrastructure.terminal.Renderer
@@ -42,7 +43,7 @@ object GameSession:
   private def recordUnlessNameTaken(name: String): ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
     ReplayRepository.exists(name).either.flatMap {
       case Left(error)  => StorageErrors.report("check the replay name", error)
-      case Right(true)  => TerminalSession.showMessageAndWait(s"\r\nA replay named '$name' already exists.\r\n")
+      case Right(true)  => TerminalSession.showMessageAndWait(s"\r\n${ReplayError.AlreadyExists(name).message}\r\n")
       case Right(false) => recordGame(name)
     }
 

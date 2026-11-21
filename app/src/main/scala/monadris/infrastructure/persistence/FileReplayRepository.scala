@@ -1,8 +1,10 @@
 package monadris.infrastructure.persistence
 
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 
 import scala.jdk.CollectionConverters.*
 
@@ -19,32 +21,38 @@ final class FileReplayRepository(
   private object FileExtension:
     val ReplayJson = ".replay.json"
 
-  override def save(name: String, replay: ReplayData): Task[Unit] =
+  override def save(name: String, replay: ReplayData): IO[ReplayError, Unit] =
     for
       filePath <- resolvePath(name)
-      _        <- ensureDirectoryExists
-      encoded  <- ZIO.fromEither(codec.encode(replay)).mapError(msg => new RuntimeException(msg))
-      _        <- ZIO.attemptBlocking(Files.writeString(filePath, encoded))
+      _        <- blockingIO(Files.createDirectories(replayDir))
+      encoded  <- ZIO.fromEither(codec.encode(replay)).mapError(ReplayError.Corrupted(_))
+      // CREATE_NEW makes "does not exist yet" and "write" a single atomic step.
+      _ <- ZIO
+        .attemptBlocking(Files.writeString(filePath, encoded, StandardOpenOption.CREATE_NEW))
+        .mapError {
+          case _: FileAlreadyExistsException => ReplayError.AlreadyExists(name)
+          case other                         => ReplayError.StorageFailure(other)
+        }
     yield ()
 
-  override def load(name: String): Task[ReplayData] =
+  override def load(name: String): IO[ReplayError, ReplayData] =
     for
       filePath <- resolvePath(name)
-      found    <- ZIO.attemptBlocking(Files.exists(filePath))
-      _        <- ZIO.fail(new RuntimeException(s"Replay not found: $name")).unless(found)
-      content  <- ZIO.attemptBlocking(Files.readString(filePath))
-      replay   <- ZIO.fromEither(codec.decode(content)).mapError(msg => new RuntimeException(msg))
+      found    <- blockingIO(Files.exists(filePath))
+      _        <- ZIO.fail(ReplayError.NotFound(name)).unless(found)
+      content  <- blockingIO(Files.readString(filePath))
+      replay   <- ZIO.fromEither(codec.decode(content)).mapError(ReplayError.Corrupted(_))
     yield replay
 
   /** Newest first (by modification time), matching PostgresReplayRepository. */
-  override def list: Task[Vector[String]] =
+  override def list: IO[ReplayError, Vector[String]] =
     for
-      exists <- ZIO.attemptBlocking(Files.exists(replayDir))
+      exists <- blockingIO(Files.exists(replayDir))
       names  <- if exists then listReplayFiles else ZIO.succeed(Vector.empty)
     yield names
 
-  private def listReplayFiles: Task[Vector[String]] =
-    ZIO.attemptBlocking {
+  private def listReplayFiles: IO[ReplayError, Vector[String]] =
+    blockingIO {
       val stream = Files.list(replayDir)
       try
         val iterator: java.util.Iterator[Path] = stream.iterator()
@@ -56,26 +64,26 @@ final class FileReplayRepository(
       finally stream.close()
     }
 
-  override def exists(name: String): Task[Boolean] =
-    resolvePath(name).flatMap(filePath => ZIO.attemptBlocking(Files.exists(filePath)))
+  override def exists(name: String): IO[ReplayError, Boolean] =
+    resolvePath(name).flatMap(filePath => blockingIO(Files.exists(filePath)))
 
-  override def delete(name: String): Task[Unit] =
-    resolvePath(name).flatMap(filePath => ZIO.attemptBlocking(Files.deleteIfExists(filePath))).unit
+  override def delete(name: String): IO[ReplayError, Unit] =
+    resolvePath(name).flatMap(filePath => blockingIO(Files.deleteIfExists(filePath))).unit
 
   private def replayNameOf(path: Path): String =
     path.getFileName.toString.stripSuffix(FileExtension.ReplayJson)
 
   /** Rejects names that could escape the replay directory (e.g. "../x"). */
-  private def resolvePath(name: String): Task[Path] =
+  private def resolvePath(name: String): IO[ReplayError, Path] =
     ZIO
       .fromEither(ReplayName.validate(name))
       .mapBoth(
-        msg => new IllegalArgumentException(msg),
+        ReplayError.InvalidName(_),
         validName => replayDir.resolve(s"$validName${FileExtension.ReplayJson}")
       )
 
-  private val ensureDirectoryExists: Task[Unit] =
-    ZIO.attemptBlocking(Files.createDirectories(replayDir)).unit
+  private def blockingIO[A](effect: => A): IO[ReplayError, A] =
+    ZIO.attemptBlocking(effect).mapError(ReplayError.StorageFailure(_))
 
 object FileReplayRepository:
   private object Defaults:

@@ -63,15 +63,15 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
       connectionTimeoutMs = TestValues.ConnectionTimeoutMs
     )
 
-  private def deleteAllReplays(repo: ReplayRepository): Task[Unit] =
+  private def deleteAllReplays(repo: ReplayRepository): IO[ReplayError, Unit] =
     for
       names <- repo.list
       _     <- ZIO.foreachDiscard(names)(repo.delete)
     yield ()
 
   private def withPostgresRepo[A](
-    test: ReplayRepository => Task[A]
-  ): Task[A] =
+    test: ReplayRepository => ZIO[Any, Any, A]
+  ): ZIO[Any, Any, A] =
     ZIO.scoped {
       for
         _          <- FlywayMigration.migrate.provide(ZLayer.succeed(dbConfig))
@@ -85,6 +85,36 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
     }
 
   def spec = suite("PostgresReplayRepository Integration")(
+    suite("typed errors")(
+      test("saving an existing name fails with AlreadyExists and keeps the original") {
+        withPostgresRepo { repo =>
+          val original = createReplayData()
+          for
+            _      <- repo.save("duplicate", original)
+            second <- repo.save("duplicate", createReplayData(score = original.metadata.finalScore + 1)).either
+            loaded <- repo.load("duplicate")
+          yield assertTrue(
+            second == Left(ReplayError.AlreadyExists("duplicate")),
+            loaded.metadata.finalScore == original.metadata.finalScore
+          )
+        }
+      },
+      test("saving an invalid name fails with InvalidName") {
+        withPostgresRepo { repo =>
+          for result <- repo.save("../evil", createReplayData()).either
+          yield assertTrue(result.left.exists {
+            case ReplayError.InvalidName(_) => true
+            case _                          => false
+          })
+        }
+      },
+      test("loading a missing replay fails with NotFound") {
+        withPostgresRepo { repo =>
+          for result <- repo.load("missing").either
+          yield assertTrue(result == Left(ReplayError.NotFound("missing")))
+        }
+      }
+    ),
     suite("save")(
       test("saves replay with JSONB events") {
         withPostgresRepo { repo =>

@@ -4,6 +4,7 @@ import zio.*
 import zio.test.*
 
 import monadris.infrastructure.persistence.FileReplayRepository
+import monadris.infrastructure.persistence.ReplayError
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.TestServices as Mocks
 import monadris.replay.ReplayData
@@ -16,11 +17,11 @@ object MainSpec extends ZIOSpecDefault:
 
   val mockReplayRepository: ULayer[ReplayRepository] = ZLayer.succeed {
     new ReplayRepository:
-      def save(name: String, replay: ReplayData): Task[Unit] = ZIO.unit
-      def load(name: String): Task[ReplayData]               = ZIO.fail(new RuntimeException("Not found"))
-      def list: Task[Vector[String]]                         = ZIO.succeed(Vector.empty)
-      def exists(name: String): Task[Boolean]                = ZIO.succeed(false)
-      def delete(name: String): Task[Unit]                   = ZIO.unit
+      def save(name: String, replay: ReplayData): IO[ReplayError, Unit] = ZIO.unit
+      def load(name: String): IO[ReplayError, ReplayData]               = ZIO.fail(ReplayError.NotFound(name))
+      def list: IO[ReplayError, Vector[String]]                         = ZIO.succeed(Vector.empty)
+      def exists(name: String): IO[ReplayError, Boolean]                = ZIO.succeed(false)
+      def delete(name: String): IO[ReplayError, Unit]                   = ZIO.unit
   }
 
   def spec = suite("Main Application")(

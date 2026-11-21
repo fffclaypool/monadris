@@ -49,7 +49,7 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
 
   private val ReplayFileSuffix = ".replay.json"
 
-  private def withTempDir[A](test: Path => Task[A]): Task[A] =
+  private def withTempDir[A](test: Path => ZIO[Any, Any, A]): ZIO[Any, Any, A] =
     ZIO.acquireReleaseWith(
       ZIO.attemptBlocking(Files.createTempDirectory("monadris-test-replays"))
     )(dir =>
@@ -58,7 +58,7 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
       }.ignore
     )(test)
 
-  private def withTempRepo[A](test: ReplayRepository => Task[A]): Task[A] =
+  private def withTempRepo[A](test: ReplayRepository => ZIO[Any, Any, A]): ZIO[Any, Any, A] =
     withTempDir(dir => test(FileReplayRepository.make(dir)))
 
   private def setModifiedAt(dir: Path, name: String, millis: Long): Task[Unit] =
@@ -77,16 +77,19 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
           yield assertTrue(exists)
         }
       },
-      test("overwrites existing replay") {
+      test("refuses to overwrite an existing replay") {
         withTempRepo { repo =>
-          val replay1   = createReplayData()
-          val metadata2 = replay1.metadata.copy(finalScore = 999)
-          val replay2   = replay1.copy(metadata = metadata2)
+          val original    = createReplayData()
+          val replacement =
+            original.copy(metadata = original.metadata.copy(finalScore = original.metadata.finalScore + 1))
           for
-            _      <- repo.save("test-replay", replay1)
-            _      <- repo.save("test-replay", replay2)
+            _      <- repo.save("test-replay", original)
+            second <- repo.save("test-replay", replacement).either
             loaded <- repo.load("test-replay")
-          yield assertTrue(loaded.metadata.finalScore == 999)
+          yield assertTrue(
+            second == Left(ReplayError.AlreadyExists("test-replay")),
+            loaded.metadata.finalScore == original.metadata.finalScore
+          )
         }
       }
     ),
