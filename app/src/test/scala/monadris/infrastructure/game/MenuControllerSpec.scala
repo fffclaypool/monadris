@@ -35,41 +35,43 @@ object MenuControllerSpec extends ZIOSpecDefault:
       result <- selected.get
     yield result
 
+  private val itemSelectionSuite = suite("Item selection")(
+    test("Enter selects the first item initially") {
+      for selected <- selectedItem(Chunk(Key.Enter))
+      yield assertTrue(selected.contains(Item.First))
+    },
+    test("the arrow down sequence moves the selection") {
+      for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.ArrowDown, Key.Enter))
+      yield assertTrue(selected.contains(Item.Second))
+    },
+    test("the arrow up sequence wraps around to the last item") {
+      for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.ArrowUp, Key.Enter))
+      yield assertTrue(selected.contains(Item.Last))
+    },
+    test("an unknown arrow sequence leaves the selection unchanged") {
+      for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.Unknown, Key.Enter))
+      yield assertTrue(selected.contains(Item.First))
+    },
+    test("an escape followed by something other than a bracket leaves the selection unchanged") {
+      for selected <- selectedItem(Chunk(Key.Escape, Key.Unknown, Key.Enter))
+      yield assertTrue(selected.contains(Item.First))
+    },
+    test("the shortcut key shown next to an item selects it directly") {
+      for selected <- selectedItem(Chunk(Item.ThirdKey))
+      yield assertTrue(selected.contains(Item.Third))
+    },
+    test("a key that is not a shortcut is ignored") {
+      for selected <- selectedItem(Chunk(Key.Unknown, Key.Enter))
+      yield assertTrue(selected.contains(Item.First))
+    },
+    test("the end of the input stream quits without selecting anything") {
+      for selected <- selectedItem(Chunk(-1))
+      yield assertTrue(selected.isEmpty)
+    }
+  )
+
   def spec = suite("MenuController")(
-    suite("Item selection")(
-      test("Enter selects the first item initially") {
-        for selected <- selectedItem(Chunk(Key.Enter))
-        yield assertTrue(selected.contains(Item.First))
-      },
-      test("the arrow down sequence moves the selection") {
-        for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.ArrowDown, Key.Enter))
-        yield assertTrue(selected.contains(Item.Second))
-      },
-      test("the arrow up sequence wraps around to the last item") {
-        for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.ArrowUp, Key.Enter))
-        yield assertTrue(selected.contains(Item.Last))
-      },
-      test("an unknown arrow sequence leaves the selection unchanged") {
-        for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.Unknown, Key.Enter))
-        yield assertTrue(selected.contains(Item.First))
-      },
-      test("an escape followed by something other than a bracket leaves the selection unchanged") {
-        for selected <- selectedItem(Chunk(Key.Escape, Key.Unknown, Key.Enter))
-        yield assertTrue(selected.contains(Item.First))
-      },
-      test("the shortcut key shown next to an item selects it directly") {
-        for selected <- selectedItem(Chunk(Item.ThirdKey))
-        yield assertTrue(selected.contains(Item.Third))
-      },
-      test("a key that is not a shortcut is ignored") {
-        for selected <- selectedItem(Chunk(Key.Unknown, Key.Enter))
-        yield assertTrue(selected.contains(Item.First))
-      },
-      test("the end of the input stream quits without selecting anything") {
-        for selected <- selectedItem(Chunk(-1))
-        yield assertTrue(selected.isEmpty)
-      }
-    ),
+    itemSelectionSuite,
     suite("MenuAction enum")(
       test("Select wraps index correctly") {
         val action = MenuController.MenuAction.Select(2)
