@@ -1,5 +1,6 @@
 package monadris.infrastructure.persistence
 
+import java.sql.SQLException
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -50,6 +51,7 @@ final class PostgresReplayRepository(
 ) extends ReplayRepository:
 
   import quill.*
+  import PostgresReplayRepository.SqlState
 
   // Custom encoder/decoder for JSONB columns
   private given jsonbEncoder: Encoder[JsonbString] = encoder(
@@ -66,14 +68,15 @@ final class PostgresReplayRepository(
   private inline def gameResults = quote(querySchema[GameResultRow]("game_results"))
   private inline def replays     = quote(querySchema[ReplayRow]("replays"))
 
-  override def save(name: String, replay: ReplayData): Task[Unit] =
+  override def save(name: String, replay: ReplayData): IO[ReplayError, Unit] =
     for
+      validName    <- ZIO.fromEither(ReplayName.validate(name)).mapError(ReplayError.InvalidName(_))
       now          <- Clock.currentDateTime.map(_.withOffsetSameInstant(ZoneOffset.UTC))
       gameResultId <- Random.nextUUID
       replayId     <- Random.nextUUID
       gameResultRow = GameResultRow(
         id = gameResultId,
-        replayName = name,
+        replayName = validName,
         timestamp = OffsetDateTime.ofInstant(Instant.ofEpochMilli(replay.metadata.timestamp), ZoneOffset.UTC),
         finalScore = replay.metadata.finalScore,
         finalLevel = replay.metadata.finalLevel,
@@ -98,15 +101,18 @@ final class PostgresReplayRepository(
           _ <- run(gameResults.insertValue(lift(gameResultRow)))
           _ <- run(replays.insertValue(lift(replayRow)))
         yield ()
+      }.mapError {
+        case e: SQLException if e.getSQLState == SqlState.UniqueViolation => ReplayError.AlreadyExists(validName)
+        case other                                                        => ReplayError.StorageFailure(other)
       }
     yield ()
 
-  override def load(name: String): Task[ReplayData] =
+  override def load(name: String): IO[ReplayError, ReplayData] =
     for
-      gameResultOpt <- run(gameResults.filter(_.replayName == lift(name))).map(_.headOption)
-      gameResult    <- ZIO.fromOption(gameResultOpt).orElseFail(new RuntimeException(s"Replay not found: $name"))
-      replayRowOpt  <- run(replays.filter(_.gameResultId == lift(gameResult.id))).map(_.headOption)
-      replayRow     <- ZIO.fromOption(replayRowOpt).orElseFail(new RuntimeException(s"Replay data not found: $name"))
+      gameResultOpt <- query(run(gameResults.filter(_.replayName == lift(name)))).map(_.headOption)
+      gameResult    <- ZIO.fromOption(gameResultOpt).orElseFail(ReplayError.NotFound(name))
+      replayRowOpt  <- query(run(replays.filter(_.gameResultId == lift(gameResult.id)))).map(_.headOption)
+      replayRow     <- ZIO.fromOption(replayRowOpt).orElseFail(ReplayError.Corrupted(s"no events stored for '$name'"))
       events        <- decodeEvents(replayRow.events.value)
       initialPiece  <- parseShape(replayRow.initialPiece)
       nextPiece     <- parseShape(replayRow.nextPiece)
@@ -124,24 +130,29 @@ final class PostgresReplayRepository(
       )
     yield ReplayData(metadata, events)
 
-  override def list: Task[Vector[String]] =
-    run(gameResults.sortBy(_.timestamp)(Ord.desc).map(_.replayName)).map(_.toVector)
+  override def list: IO[ReplayError, Vector[String]] =
+    query(run(gameResults.sortBy(_.timestamp)(Ord.desc).map(_.replayName))).map(_.toVector)
 
-  override def exists(name: String): Task[Boolean] =
-    run(gameResults.filter(_.replayName == lift(name)).nonEmpty)
+  override def exists(name: String): IO[ReplayError, Boolean] =
+    query(run(gameResults.filter(_.replayName == lift(name)).nonEmpty))
 
-  override def delete(name: String): Task[Unit] =
-    run(gameResults.filter(_.replayName == lift(name)).delete).unit
+  override def delete(name: String): IO[ReplayError, Unit] =
+    query(run(gameResults.filter(_.replayName == lift(name)).delete)).unit
 
-  private def decodeEvents(json: String): Task[Vector[ReplayEvent]] =
-    ZIO
-      .fromEither(JsonReplayCodec.decodeEvents(json))
-      .mapError(msg => new RuntimeException(s"Failed to decode events: $msg"))
+  private def query[A](effect: ZIO[Any, SQLException, A]): IO[ReplayError, A] =
+    effect.mapError(ReplayError.StorageFailure(_))
 
-  private def parseShape(s: String): Task[TetrominoShape] =
-    ZIO.fromEither(JsonReplayCodec.parseShape(s)).mapError(msg => new RuntimeException(msg))
+  private def decodeEvents(json: String): IO[ReplayError, Vector[ReplayEvent]] =
+    ZIO.fromEither(JsonReplayCodec.decodeEvents(json)).mapError(ReplayError.Corrupted(_))
+
+  private def parseShape(s: String): IO[ReplayError, TetrominoShape] =
+    ZIO.fromEither(JsonReplayCodec.parseShape(s)).mapError(ReplayError.Corrupted(_))
 
 object PostgresReplayRepository:
+
+  private[persistence] object SqlState:
+    /** PostgreSQL error code for a violated UNIQUE constraint */
+    val UniqueViolation = "23505"
 
   val layer: ZLayer[Quill.Postgres[SnakeCase], Nothing, ReplayRepository] =
     ZLayer.fromFunction((quill: Quill.Postgres[SnakeCase]) => new PostgresReplayRepository(quill))

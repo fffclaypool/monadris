@@ -4,6 +4,7 @@ import zio.*
 import zio.test.*
 
 import monadris.domain.*
+import monadris.infrastructure.persistence.ReplayError
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
 import monadris.replay.*
@@ -11,11 +12,11 @@ import monadris.replay.*
 object GameSessionSpec extends ZIOSpecDefault:
 
   case class MockReplayRepository(saved: Ref[Option[(String, ReplayData)]]) extends ReplayRepository:
-    def save(name: String, replay: ReplayData): Task[Unit] = saved.set(Some((name, replay)))
-    def load(name: String): Task[ReplayData]               = ZIO.fail(new RuntimeException("Not found"))
-    def list: Task[Vector[String]]                         = ZIO.succeed(Vector.empty)
-    def exists(name: String): Task[Boolean]                = ZIO.succeed(false)
-    def delete(name: String): Task[Unit]                   = ZIO.unit
+    def save(name: String, replay: ReplayData): IO[ReplayError, Unit] = saved.set(Some((name, replay)))
+    def load(name: String): IO[ReplayError, ReplayData]               = ZIO.fail(ReplayError.NotFound(name))
+    def list: IO[ReplayError, Vector[String]]                         = ZIO.succeed(Vector.empty)
+    def exists(name: String): IO[ReplayError, Boolean]                = ZIO.succeed(false)
+    def delete(name: String): IO[ReplayError, Unit]                   = ZIO.unit
 
   object MockReplayRepository:
     def layer: ULayer[ReplayRepository] =

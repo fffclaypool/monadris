@@ -27,15 +27,15 @@ object ReplayRepositorySpec extends ZIOSpecDefault:
   private val mockRepo: ULayer[ReplayRepository] = ZLayer.fromZIO {
     Ref.make(Map.empty[String, ReplayData]).map { store =>
       new ReplayRepository:
-        def save(name: String, replay: ReplayData): Task[Unit] =
+        def save(name: String, replay: ReplayData): IO[ReplayError, Unit] =
           store.update(_ + (name -> replay))
-        def load(name: String): Task[ReplayData] =
-          store.get.flatMap(m => ZIO.fromOption(m.get(name)).orElseFail(new RuntimeException(s"Not found: $name")))
-        def list: Task[Vector[String]] =
+        def load(name: String): IO[ReplayError, ReplayData] =
+          store.get.flatMap(m => ZIO.fromOption(m.get(name)).orElseFail(ReplayError.NotFound(name)))
+        def list: IO[ReplayError, Vector[String]] =
           store.get.map(_.keys.toVector.sorted)
-        def exists(name: String): Task[Boolean] =
+        def exists(name: String): IO[ReplayError, Boolean] =
           store.get.map(_.contains(name))
-        def delete(name: String): Task[Unit] =
+        def delete(name: String): IO[ReplayError, Unit] =
           store.update(_ - name)
     }
   }
