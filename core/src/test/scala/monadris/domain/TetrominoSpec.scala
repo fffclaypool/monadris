@@ -107,6 +107,15 @@ class TetrominoSpec extends AnyFlatSpec with Matchers:
     relativePositions(tetromino.currentBlocks) shouldBe relativePositions(rotated.currentBlocks)
   }
 
+  it should "occupy the same cells in every rotation state" in {
+    val tetromino = Tetromino.spawn(TetrominoShape.O, gridWidth)
+    val expected  = tetromino.currentBlocks.toSet
+
+    Rotation.values.foreach { rotation =>
+      tetromino.copy(rotation = rotation).currentBlocks.toSet shouldBe expected
+    }
+  }
+
   "TetrominoShape.I" should "have correct block positions" in {
     val blocks = TetrominoShape.I.blocks
     blocks.size shouldBe blocksPerTetromino

@@ -9,6 +9,7 @@ import monadris.infrastructure.terminal.GameEnv
 import monadris.infrastructure.terminal.Renderer
 import monadris.infrastructure.terminal.TerminalSession
 import monadris.infrastructure.terminal.TtyService
+import monadris.replay.ReplayName
 
 object GameSession:
 
@@ -27,9 +28,26 @@ object GameSession:
       _            <- showOutro(finalState)
     yield ()
 
+  /**
+   * The replay name is validated and checked for duplicates before the game starts,
+   * so a finished game is not lost to a name that cannot be saved.
+   */
   def playAndRecord: ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
+    TerminalSession.prompt("\r\n\r\nEnter replay name: ").flatMap { input =>
+      ReplayName.validate(input) match
+        case Left(reason) => TerminalSession.showMessageAndWait(s"\r\n$reason\r\n")
+        case Right(name)  => recordUnlessNameTaken(name)
+    }
+
+  private def recordUnlessNameTaken(name: String): ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
+    ReplayRepository.exists(name).either.flatMap {
+      case Left(error)  => StorageErrors.report("check the replay name", error)
+      case Right(true)  => TerminalSession.showMessageAndWait(s"\r\nA replay named '$name' already exists.\r\n")
+      case Right(false) => recordGame(name)
+    }
+
+  private def recordGame(name: String): ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
     for
-      name         <- TerminalSession.prompt("\r\n\r\nEnter replay name: ")
       initialState <- initializeGame
       config       <- ZIO.service[AppConfig]
       result       <- RecordingGameLoopRunner.recordingGameLoop(
@@ -39,9 +57,11 @@ object GameSession:
         GameRunner.RandomPieceGenerator
       )
       (finalState, replayData) = result
-      _ <- ReplayRepository.save(name, replayData)
-      _ <- showOutro(finalState)
-      _ <- TerminalSession.showMessageAndWait(s"\r\nReplay saved as: $name\r\n")
+      saved <- ReplayRepository.save(name, replayData).either
+      _     <- showOutro(finalState)
+      _     <- saved match
+        case Right(_)    => TerminalSession.showMessageAndWait(s"\r\nReplay saved as: $name\r\n")
+        case Left(error) => StorageErrors.report("save the replay", error)
     yield ()
 
   private def initializeGame: ZIO[AppConfig, Nothing, GameState] =

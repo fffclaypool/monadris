@@ -44,9 +44,17 @@ final case class TimingConfig(
   outroDelayMs: Long
 )
 
+/** Where recorded replays are persisted */
+enum ReplayStorage:
+  case File, Postgres
+
+object ReplayStorage:
+  def fromString(value: String): Option[ReplayStorage] =
+    ReplayStorage.values.find(_.toString.equalsIgnoreCase(value.trim))
+
 final case class ReplayConfig(
   defaultSpeed: Double,
-  baseFrameIntervalMs: Long
+  storage: ReplayStorage
 )
 
 final case class DatabaseConfig(

@@ -11,7 +11,6 @@ import monadris.game.LineClearing
 import monadris.infrastructure.terminal.CommandService
 import monadris.infrastructure.terminal.ConsoleService
 import monadris.infrastructure.terminal.Renderer
-import monadris.infrastructure.terminal.TerminalControl
 import monadris.infrastructure.terminal.TerminalInput
 import monadris.infrastructure.terminal.TestServices as Mocks
 import monadris.infrastructure.terminal.TtyService
@@ -101,23 +100,6 @@ object GameSystemSpec extends ZIOSpecDefault:
           _       <- CommandService.exec("ls -la")
           history <- service.history.get
         yield assertTrue(history == List("echo hello", "ls -la"))
-      }.provide(Mocks.command)
-    ),
-
-    suite("TerminalControl")(
-      test("enableRawMode calls correct stty command") {
-        for
-          service <- ZIO.service[Mocks.TestCommandService]
-          _       <- TerminalControl.enableRawMode
-          history <- service.history.get
-        yield assertTrue(history.contains("stty raw -echo < /dev/tty"))
-      }.provide(Mocks.command),
-      test("disableRawMode calls correct stty command") {
-        for
-          service <- ZIO.service[Mocks.TestCommandService]
-          _       <- TerminalControl.disableRawMode
-          history <- service.history.get
-        yield assertTrue(history.contains("stty cooked echo < /dev/tty"))
       }.provide(Mocks.command)
     ),
 

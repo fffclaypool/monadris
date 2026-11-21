@@ -8,6 +8,8 @@ services:
       - sbt-cache:/home/vscode/.cache/coursier
       - sbt-ivy:/home/vscode/.ivy2
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      MONADRIS_REPLAY_STORAGE: postgres
     command: sleep infinity
     depends_on:
       postgres:

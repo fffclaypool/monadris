@@ -3,12 +3,14 @@ package monadris
 import zio.*
 import zio.logging.backend.SLF4J
 
-import monadris.config.ConfigLayer
+import monadris.config.AppConfig
 import monadris.config.DatabaseConfig
+import monadris.config.ReplayStorage
 import monadris.infrastructure.game.GameSession
 import monadris.infrastructure.game.MenuController
 import monadris.infrastructure.game.ReplaySelector
 import monadris.infrastructure.persistence.DatabaseLayer
+import monadris.infrastructure.persistence.FileReplayRepository
 import monadris.infrastructure.persistence.FlywayMigration
 import monadris.infrastructure.persistence.PostgresReplayRepository
 import monadris.infrastructure.persistence.ReplayRepository
@@ -18,30 +20,41 @@ import monadris.view.GameView
 
 object Main extends ZIOAppDefault:
 
+  /** Errors are logged and then propagated, so the process exits with a non-zero code. */
   override def run: Task[Unit] =
     program
-      .provideLayer(
-        Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
-          GameEnv.live ++
-          databaseLayer
-      )
-      .catchAll {
-        case error: Config.Error =>
-          ZIO.logError(s"Configuration error: ${error.getMessage}")
-        case error =>
-          ZIO.logError(s"Application failed: $error")
+      .provideLayer(appLayer)
+      .tapError {
+        case error: Config.Error => ZIO.logError(s"Configuration error: ${error.getMessage}")
+        case error               => ZIO.logError(s"Application failed: $error")
       }
 
-  private val databaseConfigLayer: ZLayer[Any, Config.Error, DatabaseConfig] =
-    ConfigLayer.live.project(_.database)
+  private val loggingLayer: ZLayer[Any, Nothing, Unit] =
+    Runtime.removeDefaultLoggers >>> SLF4J.slf4j
 
   private val migrationLayer: ZLayer[DatabaseConfig, Throwable, Unit] =
     ZLayer.fromZIO(FlywayMigration.migrate.unit)
 
-  private val databaseLayer: ZLayer[Any, Throwable, ReplayRepository] =
-    databaseConfigLayer >>>
-      (migrationLayer ++ DatabaseLayer.live) >>>
+  /**
+   * Only built when PostgreSQL storage is selected.
+   * Migration runs before the connection pool is created, so an unreachable
+   * database fails fast instead of waiting for the pool's connection timeout.
+   */
+  private val postgresReplayLayer: ZLayer[AppConfig, Throwable, ReplayRepository] =
+    ZLayer.fromFunction((config: AppConfig) => config.database) >>>
+      migrationLayer.flatMap(_ => DatabaseLayer.live) >>>
       PostgresReplayRepository.layer
+
+  /** Chooses the replay backend from `monadris.replay.storage`; the default (file) needs no database. */
+  val replayRepositoryLayer: ZLayer[AppConfig, Throwable, ReplayRepository] =
+    ZLayer.service[AppConfig].flatMap { env =>
+      env.get.replay.storage match
+        case ReplayStorage.File     => FileReplayRepository.layer
+        case ReplayStorage.Postgres => postgresReplayLayer
+    }
+
+  private val appLayer: ZLayer[Any, Throwable, GameEnv & ReplayRepository] =
+    loggingLayer ++ (GameEnv.live >+> replayRepositoryLayer)
 
   val program: ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
     ZIO.scoped {

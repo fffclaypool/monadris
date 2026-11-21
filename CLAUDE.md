@@ -81,7 +81,8 @@ monadris/
 - Contains:
   - `config/ConfigLayer` - ZIO Config loading from `application.conf`
   - `infrastructure/game/` - Game runtime (`GameRunner`, `GameSession`, `ReplayRunner`)
-  - `infrastructure/persistence/` - Replay storage (`FileReplayRepository`, `JsonReplayCodec`)
+  - `infrastructure/persistence/` - Replay storage (`FileReplayRepository`, `PostgresReplayRepository`, `JsonReplayCodec`)
+    - Backend is chosen by `monadris.replay.storage` (`file` default, `postgres`); see `Main.replayRepositoryLayer`
   - `infrastructure/terminal/` - Console I/O (`ConsoleRenderer`, `TerminalInput`)
   - `Main.scala` - Application entry point
 

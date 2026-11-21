@@ -1,6 +1,7 @@
 package monadris.infrastructure.terminal
 
 import java.io.FileInputStream
+import java.nio.charset.StandardCharsets
 
 import zio.*
 
@@ -66,17 +67,41 @@ object ConsoleService:
   }
 
 trait CommandService:
+  /** Runs a shell command; fails if it exits with a non-zero status */
   def exec(cmd: String): Task[Unit]
 
+  /** Runs a shell command and returns its standard output */
+  def execCapture(cmd: String): Task[String]
+
 object CommandService:
+  private object Shell:
+    val Path        = "/bin/sh"
+    val CommandFlag = "-c"
+    val SuccessCode = 0
+
   def exec(cmd: String): ZIO[CommandService, Throwable, Unit] =
     ZIO.serviceWithZIO(_.exec(cmd))
 
+  def execCapture(cmd: String): ZIO[CommandService, Throwable, String] =
+    ZIO.serviceWithZIO(_.execCapture(cmd))
+
   val live: ZLayer[Any, Nothing, CommandService] = ZLayer.succeed {
     new CommandService:
-      def exec(cmd: String): Task[Unit] = ZIO.attempt {
-        java.lang.Runtime.getRuntime.exec(Array("/bin/sh", "-c", cmd)).waitFor()
-      }.unit
+      def exec(cmd: String): Task[Unit] = execCapture(cmd).unit
+
+      def execCapture(cmd: String): Task[String] =
+        ZIO
+          .attemptBlocking {
+            val process = new ProcessBuilder(Shell.Path, Shell.CommandFlag, cmd)
+              .redirectError(ProcessBuilder.Redirect.DISCARD)
+              .start()
+            val output = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+            (process.waitFor(), output)
+          }
+          .flatMap { case (exitCode, output) =>
+            if exitCode == Shell.SuccessCode then ZIO.succeed(output)
+            else ZIO.fail(new RuntimeException(s"Command failed with exit code $exitCode: $cmd"))
+          }
   }
 
 type GameEnv = TtyService & ConsoleService & CommandService & AppConfig & TerminalSession

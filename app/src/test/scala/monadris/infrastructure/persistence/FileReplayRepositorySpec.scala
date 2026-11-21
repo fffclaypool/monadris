@@ -2,6 +2,7 @@ package monadris.infrastructure.persistence
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 
 import zio.*
 import zio.test.*
@@ -41,14 +42,29 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
     )
     ReplayData(metadata, events)
 
-  private def withTempRepo[A](test: ReplayRepository => Task[A]): Task[A] =
+  private object ModifiedAt:
+    val Oldest: Long = 1000L
+    val Middle: Long = 2000L
+    val Newest: Long = 3000L
+
+  private val ReplayFileSuffix = ".replay.json"
+
+  private def withTempDir[A](test: Path => Task[A]): Task[A] =
     ZIO.acquireReleaseWith(
       ZIO.attemptBlocking(Files.createTempDirectory("monadris-test-replays"))
     )(dir =>
       ZIO.attemptBlocking {
         Files.walk(dir).sorted(java.util.Comparator.reverseOrder()).forEach(Files.delete(_))
       }.ignore
-    )(dir => test(FileReplayRepository.make(dir)))
+    )(test)
+
+  private def withTempRepo[A](test: ReplayRepository => Task[A]): Task[A] =
+    withTempDir(dir => test(FileReplayRepository.make(dir)))
+
+  private def setModifiedAt(dir: Path, name: String, millis: Long): Task[Unit] =
+    ZIO.attemptBlocking {
+      Files.setLastModifiedTime(dir.resolve(s"$name$ReplayFileSuffix"), FileTime.fromMillis(millis))
+    }.unit
 
   def spec = suite("FileReplayRepository")(
     suite("save")(
@@ -116,16 +132,52 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
           )
         }
       },
-      test("returns sorted list") {
-        withTempRepo { repo =>
+      test("returns newest replay first") {
+        withTempDir { dir =>
+          val repo = FileReplayRepository.make(dir)
           for
             _       <- repo.save("charlie", createReplayData())
             _       <- repo.save("alpha", createReplayData())
             _       <- repo.save("bravo", createReplayData())
+            _       <- setModifiedAt(dir, "charlie", ModifiedAt.Middle)
+            _       <- setModifiedAt(dir, "alpha", ModifiedAt.Oldest)
+            _       <- setModifiedAt(dir, "bravo", ModifiedAt.Newest)
             replays <- repo.list
           yield assertTrue(
-            replays == Vector("alpha", "bravo", "charlie")
+            replays == Vector("bravo", "charlie", "alpha")
           )
+        }
+      },
+      test("orders replays with the same modification time by name") {
+        withTempDir { dir =>
+          val repo = FileReplayRepository.make(dir)
+          for
+            _       <- repo.save("bravo", createReplayData())
+            _       <- repo.save("alpha", createReplayData())
+            _       <- setModifiedAt(dir, "bravo", ModifiedAt.Oldest)
+            _       <- setModifiedAt(dir, "alpha", ModifiedAt.Oldest)
+            replays <- repo.list
+          yield assertTrue(replays == Vector("alpha", "bravo"))
+        }
+      }
+    ),
+    suite("name validation")(
+      test("save rejects a name that would escape the replay directory") {
+        withTempDir { dir =>
+          val repo = FileReplayRepository.make(dir.resolve("replays"))
+          for
+            result  <- repo.save("../escaped", createReplayData()).either
+            escaped <- ZIO.attemptBlocking(Files.exists(dir.resolve(s"escaped$ReplayFileSuffix")))
+          yield assertTrue(result.isLeft, !escaped)
+        }
+      },
+      test("load, exists and delete reject invalid names") {
+        withTempRepo { repo =>
+          for
+            loaded  <- repo.load("a/b").either
+            exists  <- repo.exists("").either
+            deleted <- repo.delete("..").either
+          yield assertTrue(loaded.isLeft, exists.isLeft, deleted.isLeft)
         }
       }
     ),
@@ -229,7 +281,7 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
             _       <- repo.save("c", replay)
             _       <- repo.delete("b")
             replays <- repo.list
-          yield assertTrue(replays == Vector("a", "c"))
+          yield assertTrue(replays.toSet == Set("a", "c"))
         }
       }
     )

@@ -35,7 +35,10 @@ final case class Tetromino(
 ):
   def currentBlocks: List[Position] =
     val baseBlocks    = shape.blocks
-    val rotatedBlocks = rotateBlocks(baseBlocks, rotation)
+    val rotatedBlocks = shape match
+      // The O piece is rotationally symmetric; rotating it around a block would shift it.
+      case TetrominoShape.O => baseBlocks
+      case _                => rotateBlocks(baseBlocks, rotation)
     rotatedBlocks.map(_ + position)
 
   private def rotateBlocks(blocks: List[Position], rot: Rotation): List[Position] =

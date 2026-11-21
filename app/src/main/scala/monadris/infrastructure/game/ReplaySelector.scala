@@ -7,24 +7,24 @@ import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.GameEnv
 import monadris.infrastructure.terminal.Renderer
 import monadris.infrastructure.terminal.TerminalSession
+import monadris.replay.ReplayData
 
 object ReplaySelector:
 
   def watchReplay: ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
-    for
-      replays <- ReplayRepository.list
-      _       <-
-        if replays.isEmpty then showNoReplaysMessage
-        else selectAndPlayReplay(replays)
-    yield ()
+    withReplays(selectAndPlayReplay)
 
   def listReplays: ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
-    for
-      replays <- ReplayRepository.list
-      _       <-
-        if replays.isEmpty then showNoReplaysMessage
-        else printReplayList(replays)
-    yield ()
+    withReplays(printReplayList)
+
+  private def withReplays(
+    use: Vector[String] => ZIO[GameEnv & ReplayRepository, Throwable, Unit]
+  ): ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
+    ReplayRepository.list.either.flatMap {
+      case Left(error)                       => StorageErrors.report("list replays", error)
+      case Right(replays) if replays.isEmpty => showNoReplaysMessage
+      case Right(replays)                    => use(replays)
+    }
 
   private def showNoReplaysMessage: ZIO[GameEnv, Throwable, Unit] =
     TerminalSession.showMessageAndWait("\r\n\r\nNo replays found.\r\n")
@@ -50,7 +50,14 @@ object ReplaySelector:
   private def playReplay(name: String): ZIO[GameEnv & ReplayRepository, Throwable, Unit] =
     for
       _      <- TerminalSession.showMessage(s"\r\nLoading replay: $name\r\n")
-      replay <- ReplayRepository.load(name)
+      loaded <- ReplayRepository.load(name).either
+      _      <- loaded match
+        case Left(error)   => StorageErrors.report("load the replay", error)
+        case Right(replay) => runReplay(replay)
+    yield ()
+
+  private def runReplay(replay: ReplayData): ZIO[GameEnv, Throwable, Unit] =
+    for
       config <- ZIO.service[AppConfig]
       _      <- ReplayRunner.run(replay, config, Renderer.live)
       _      <- TerminalSession.waitForKeypress()

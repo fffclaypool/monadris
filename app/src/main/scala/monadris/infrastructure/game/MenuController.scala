@@ -11,17 +11,18 @@ import monadris.view.GameView
 object MenuController:
 
   private object Keys:
-    val Enter: Int      = '\r'.toInt
-    val EnterLF: Int    = '\n'.toInt
-    val Escape: Int     = 27
-    val ArrowUp: Char   = 'A'
-    val ArrowDown: Char = 'B'
-    val KeyK: Int       = 'k'.toInt
-    val KeyKUpper: Int  = 'K'.toInt
-    val KeyJ: Int       = 'j'.toInt
-    val KeyJUpper: Int  = 'J'.toInt
-    val KeyQ: Int       = 'q'.toInt
-    val KeyQUpper: Int  = 'Q'.toInt
+    val Enter: Int       = '\r'.toInt
+    val EnterLF: Int     = '\n'.toInt
+    val Escape: Int      = 27
+    val EndOfStream: Int = -1
+    val ArrowUp: Char    = 'A'
+    val ArrowDown: Char  = 'B'
+    val KeyK: Int        = 'k'.toInt
+    val KeyKUpper: Int   = 'K'.toInt
+    val KeyJ: Int        = 'j'.toInt
+    val KeyJUpper: Int   = 'J'.toInt
+    val KeyQ: Int        = 'q'.toInt
+    val KeyQUpper: Int   = 'Q'.toInt
 
   enum MenuAction:
     case Select(index: Int)
@@ -70,7 +71,7 @@ object MenuController:
         case Keys.KeyJ | Keys.KeyJUpper =>
           val newIndex = if currentIndex < menuSize - 1 then currentIndex + 1 else 0
           ZIO.succeed(MenuAction.Navigate(newIndex))
-        case Keys.KeyQ | Keys.KeyQUpper =>
+        case Keys.KeyQ | Keys.KeyQUpper | Keys.EndOfStream =>
           ZIO.succeed(MenuAction.Quit)
         case n if n >= '1' && n <= '4' =>
           ZIO.succeed(MenuAction.Select(n - '1'))
