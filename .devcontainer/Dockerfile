@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/java:1-21-bullseye
+FROM mcr.microsoft.com/devcontainers/java:1-21-bookworm
 
 USER root
 RUN rm -f /etc/apt/sources.list.d/yarn.list \
@@ -16,12 +16,12 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
         ffmpeg \
         nodejs \
         postgresql-client \
+        pre-commit \
         python3-pip \
         vhs \
         docker.io \
         gh \
-    && npm install -g @anthropic-ai/claude-code repomix \
-    && pip3 install --no-cache-dir pre-commit \
+    && npm install -g @anthropic-ai/claude-code@latest repomix \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
