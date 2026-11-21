@@ -53,8 +53,8 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       test("encodes replay with PlayerInput events") {
         val metadata = createMetadata()
         val events   = Vector(
-          ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-          ReplayEvent.PlayerInput(Input.MoveRight, 10L)
+          ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.MoveRight, 10L, ReplayEvent.StartOfRecordingMs)
         )
         val replay = ReplayData(metadata, events)
 
@@ -70,8 +70,8 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       test("encodes replay with PieceSpawn events") {
         val metadata = createMetadata()
         val events   = Vector(
-          ReplayEvent.PieceSpawn(TetrominoShape.O, 5L),
-          ReplayEvent.PieceSpawn(TetrominoShape.S, 15L)
+          ReplayEvent.PieceSpawn(TetrominoShape.O, 5L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PieceSpawn(TetrominoShape.S, 15L, ReplayEvent.StartOfRecordingMs)
         )
         val replay = ReplayData(metadata, events)
 
@@ -95,7 +95,7 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
           Input.Tick
         )
         val events = inputs.zipWithIndex.map { case (input, i) =>
-          ReplayEvent.PlayerInput(input, i.toLong)
+          ReplayEvent.PlayerInput(input, i.toLong, ReplayEvent.StartOfRecordingMs)
         }.toVector
         val replay = ReplayData(metadata, events)
 
@@ -106,7 +106,7 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       test("encodes all tetromino shapes") {
         val metadata = createMetadata()
         val events   = TetrominoShape.values.zipWithIndex.map { case (shape, i) =>
-          ReplayEvent.PieceSpawn(shape, i.toLong)
+          ReplayEvent.PieceSpawn(shape, i.toLong, ReplayEvent.StartOfRecordingMs)
         }.toVector
         val replay = ReplayData(metadata, events)
 
@@ -131,8 +131,8 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       test("decodes replay with events") {
         val metadata = createMetadata()
         val events   = Vector(
-          ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-          ReplayEvent.PieceSpawn(TetrominoShape.O, 10L)
+          ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PieceSpawn(TetrominoShape.O, 10L, ReplayEvent.StartOfRecordingMs)
         )
         val replay = ReplayData(metadata, events)
 
@@ -208,10 +208,10 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       test("preserves events through encode/decode") {
         val metadata = createMetadata()
         val events   = Vector(
-          ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-          ReplayEvent.PlayerInput(Input.MoveRight, 5L),
-          ReplayEvent.PieceSpawn(TetrominoShape.O, 10L),
-          ReplayEvent.PlayerInput(Input.HardDrop, 15L)
+          ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.MoveRight, 5L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PieceSpawn(TetrominoShape.O, 10L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.HardDrop, 15L, ReplayEvent.StartOfRecordingMs)
         )
         val replay = ReplayData(metadata, events)
 
@@ -236,7 +236,7 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
           Input.Tick
         )
         val events = inputs.zipWithIndex.map { case (input, i) =>
-          ReplayEvent.PlayerInput(input, i.toLong)
+          ReplayEvent.PlayerInput(input, i.toLong, ReplayEvent.StartOfRecordingMs)
         }.toVector
         val replay = ReplayData(metadata, events)
 
@@ -251,7 +251,7 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       test("preserves all tetromino shapes through roundtrip") {
         val metadata = createMetadata()
         val events   = TetrominoShape.values.zipWithIndex.map { case (shape, i) =>
-          ReplayEvent.PieceSpawn(shape, i.toLong)
+          ReplayEvent.PieceSpawn(shape, i.toLong, ReplayEvent.StartOfRecordingMs)
         }.toVector
         val replay = ReplayData(metadata, events)
 

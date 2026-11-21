@@ -10,8 +10,8 @@ enum ReplayEvent:
   /** Milliseconds since the start of the recording; drives playback timing */
   def elapsedMs: Long
 
-  case PlayerInput(input: Input, frameNumber: Long, elapsedMs: Long = ReplayEvent.StartOfRecordingMs)
-  case PieceSpawn(shape: TetrominoShape, frameNumber: Long, elapsedMs: Long = ReplayEvent.StartOfRecordingMs)
+  case PlayerInput(input: Input, frameNumber: Long, elapsedMs: Long)
+  case PieceSpawn(shape: TetrominoShape, frameNumber: Long, elapsedMs: Long)
 
 object ReplayEvent:
   val StartOfRecordingMs: Long = 0L

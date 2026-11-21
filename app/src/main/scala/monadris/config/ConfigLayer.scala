@@ -24,5 +24,10 @@ object ConfigLayer:
 
   val live: ZLayer[Any, Config.Error, AppConfig] =
     ZLayer.fromZIO(
-      TypesafeConfigProvider.fromResourcePath().load(configDescriptor)
+      TypesafeConfigProvider.fromResourcePath().load(configDescriptor).flatMap(validated)
     )
+
+  private[config] def validated(config: AppConfig): IO[Config.Error, AppConfig] =
+    ZIO
+      .fromEither(ConfigValidation.validate(config))
+      .mapError(errors => Config.Error.InvalidData(message = s"Invalid configuration: ${errors.mkString("; ")}"))

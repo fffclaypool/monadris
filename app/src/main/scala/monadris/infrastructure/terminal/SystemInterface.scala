@@ -15,6 +15,13 @@ trait TtyService:
   def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]]
 
 object TtyService:
+  private object Polling:
+    /** How often the terminal is checked for input while waiting with a timeout */
+    val IntervalMs: Int = 10
+
+  private object Device:
+    val Path = "/dev/tty"
+
   def available(): ZIO[TtyService, Throwable, Int] =
     ZIO.serviceWithZIO(_.available())
 
@@ -29,7 +36,7 @@ object TtyService:
 
   val live: ZLayer[Any, Nothing, TtyService] = ZLayer.scoped {
     for tty <- ZIO.acquireRelease(
-        ZIO.attempt(new FileInputStream("/dev/tty")).orDie
+        ZIO.attempt(new FileInputStream(Device.Path)).orDie
       )(fis => ZIO.succeed(fis.close()))
     yield new TtyService:
       def available(): Task[Int]                                 = ZIO.attemptBlocking(tty.available())
@@ -43,9 +50,7 @@ object TtyService:
         else
           available().flatMap { avail =>
             if avail > 0 then read().map(Some(_))
-            else
-              val pollInterval = 10
-              sleep(pollInterval) *> pollForInput(remainingMs - pollInterval)
+            else sleep(Polling.IntervalMs) *> pollForInput(remainingMs - Polling.IntervalMs)
           }
   }
 
