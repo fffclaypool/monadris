@@ -76,51 +76,52 @@ object TerminalSession:
         console    <- ZIO.service[ConsoleService]
         cmd        <- ZIO.service[CommandService]
         savedState <- Ref.make(Option.empty[String])
-      yield make(tty, console, cmd, savedState)
+      yield Live(tty, console, cmd, savedState)
     }
 
-  private def make(
+  // A named class rather than an anonymous one: coverage reports merge all anonymous
+  // classes of a package into a single "$anon" entry and misattribute their lines.
+  final private class Live(
     tty: TtyService,
     console: ConsoleService,
     cmd: CommandService,
     savedState: Ref[Option[String]]
-  ): TerminalSession =
-    new TerminalSession:
-      def showMessage(message: String): Task[Unit] =
-        console.print(message) *> console.flush()
+  ) extends TerminalSession:
+    def showMessage(message: String): Task[Unit] =
+      console.print(message) *> console.flush()
 
-      def prompt(message: String): Task[String] =
-        ZIO.acquireReleaseWith(disableRawMode)(_ => enableRawMode.ignore) { _ =>
-          showMessage(message) *> readLine(Chunk.empty)
-        }
+    def prompt(message: String): Task[String] =
+      ZIO.acquireReleaseWith(disableRawMode)(_ => enableRawMode.ignore) { _ =>
+        showMessage(message) *> readLine(Chunk.empty)
+      }
 
-      def waitForKeypress(): Task[Int] =
-        tty.read()
+    def waitForKeypress(): Task[Int] =
+      tty.read()
 
-      def showMessageAndWait(message: String): Task[Unit] =
-        showMessage(message + Messages.PressAnyKey) *> tty.read().unit
+    def showMessageAndWait(message: String): Task[Unit] =
+      showMessage(message + Messages.PressAnyKey) *> tty.read().unit
 
-      /** Remembers the settings found on first use so they can be restored exactly. */
-      def enableRawMode: Task[Unit] =
-        for
-          current <- cmd.execCapture(Stty.SaveState).map(_.trim).option
-          _       <- savedState.update(_.orElse(current.filter(Stty.isValidState)))
-          _       <- cmd.exec(Stty.Raw)
-        yield ()
+    /** Remembers the settings found on first use so they can be restored exactly. */
+    def enableRawMode: Task[Unit] =
+      for
+        current <- cmd.execCapture(Stty.SaveState).map(_.trim).option
+        _       <- savedState.update(_.orElse(current.filter(Stty.isValidState)))
+        _       <- cmd.exec(Stty.Raw)
+      yield ()
 
-      def disableRawMode: Task[Unit] =
-        for
-          saved <- savedState.get
-          _     <- cmd.exec(saved.fold(Stty.Cooked)(Stty.restore))
-          _     <- console.print(AnsiRenderer.Codes.ShowCursor)
-          _     <- console.flush()
-        yield ()
+    def disableRawMode: Task[Unit] =
+      for
+        saved <- savedState.get
+        _     <- cmd.exec(saved.fold(Stty.Cooked)(Stty.restore))
+        _     <- console.print(AnsiRenderer.Codes.ShowCursor)
+        _     <- console.flush()
+      yield ()
 
-      /** Reads raw bytes up to the end of the line and decodes them as UTF-8. */
-      private def readLine(acc: Chunk[Byte]): Task[String] =
-        tty.read().flatMap {
-          case Keys.Enter | Keys.LineFeed | Keys.EndOfStream =>
-            ZIO.succeed(new String(acc.toArray, StandardCharsets.UTF_8))
-          case byte =>
-            readLine(acc :+ byte.toByte)
-        }
+    /** Reads raw bytes up to the end of the line and decodes them as UTF-8. */
+    private def readLine(acc: Chunk[Byte]): Task[String] =
+      tty.read().flatMap {
+        case Keys.Enter | Keys.LineFeed | Keys.EndOfStream =>
+          ZIO.succeed(new String(acc.toArray, StandardCharsets.UTF_8))
+        case byte =>
+          readLine(acc :+ byte.toByte)
+      }

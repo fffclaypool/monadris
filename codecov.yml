@@ -24,4 +24,4 @@ comment:
   require_changes: false
 
 ignore:
-  - "src/main/scala/monadris/Main.scala"
+  - "app/src/main/scala/monadris/Main.scala"
