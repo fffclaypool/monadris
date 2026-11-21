@@ -48,9 +48,9 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
       durationMs = TestValues.DurationMs
     )
     val events = Vector(
-      ReplayEvent.PieceSpawn(TetrominoShape.O, 0L),
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PlayerInput(Input.HardDrop, 10L)
+      ReplayEvent.PieceSpawn(TetrominoShape.O, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.HardDrop, 10L, ReplayEvent.StartOfRecordingMs)
     )
     ReplayData(metadata, events)
 
@@ -214,9 +214,9 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
             durationMs = 1000L
           )
           val events = Vector(
-            ReplayEvent.PieceSpawn(TetrominoShape.T, 0L),
-            ReplayEvent.PieceSpawn(TetrominoShape.S, 5L),
-            ReplayEvent.PieceSpawn(TetrominoShape.Z, 10L)
+            ReplayEvent.PieceSpawn(TetrominoShape.T, 0L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PieceSpawn(TetrominoShape.S, 5L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PieceSpawn(TetrominoShape.Z, 10L, ReplayEvent.StartOfRecordingMs)
           )
           val replay = ReplayData(metadata, events)
 
@@ -225,9 +225,9 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
             loaded <- repo.load("piece-spawn-test")
           yield assertTrue(
             loaded.events.size == 3,
-            loaded.events(0) == ReplayEvent.PieceSpawn(TetrominoShape.T, 0L),
-            loaded.events(1) == ReplayEvent.PieceSpawn(TetrominoShape.S, 5L),
-            loaded.events(2) == ReplayEvent.PieceSpawn(TetrominoShape.Z, 10L)
+            loaded.events(0) == ReplayEvent.PieceSpawn(TetrominoShape.T, 0L, ReplayEvent.StartOfRecordingMs),
+            loaded.events(1) == ReplayEvent.PieceSpawn(TetrominoShape.S, 5L, ReplayEvent.StartOfRecordingMs),
+            loaded.events(2) == ReplayEvent.PieceSpawn(TetrominoShape.Z, 10L, ReplayEvent.StartOfRecordingMs)
           )
         }
       },
@@ -246,10 +246,10 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
             durationMs = 1000L
           )
           val events = Vector(
-            ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-            ReplayEvent.PlayerInput(Input.MoveRight, 1L),
-            ReplayEvent.PlayerInput(Input.RotateClockwise, 2L),
-            ReplayEvent.PlayerInput(Input.HardDrop, 3L)
+            ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PlayerInput(Input.RotateClockwise, 2L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PlayerInput(Input.HardDrop, 3L, ReplayEvent.StartOfRecordingMs)
           )
           val replay = ReplayData(metadata, events)
 
@@ -258,10 +258,10 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
             loaded <- repo.load("player-input-test")
           yield assertTrue(
             loaded.events.size == 4,
-            loaded.events(0) == ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-            loaded.events(1) == ReplayEvent.PlayerInput(Input.MoveRight, 1L),
-            loaded.events(2) == ReplayEvent.PlayerInput(Input.RotateClockwise, 2L),
-            loaded.events(3) == ReplayEvent.PlayerInput(Input.HardDrop, 3L)
+            loaded.events(0) == ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+            loaded.events(1) == ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs),
+            loaded.events(2) == ReplayEvent.PlayerInput(Input.RotateClockwise, 2L, ReplayEvent.StartOfRecordingMs),
+            loaded.events(3) == ReplayEvent.PlayerInput(Input.HardDrop, 3L, ReplayEvent.StartOfRecordingMs)
           )
         }
       },
@@ -280,11 +280,11 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
             durationMs = 5000L
           )
           val events = Vector(
-            ReplayEvent.PieceSpawn(TetrominoShape.L, 0L),
-            ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-            ReplayEvent.PlayerInput(Input.HardDrop, 0L),
-            ReplayEvent.PieceSpawn(TetrominoShape.J, 1L),
-            ReplayEvent.PlayerInput(Input.Tick, 1L)
+            ReplayEvent.PieceSpawn(TetrominoShape.L, 0L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PlayerInput(Input.HardDrop, 0L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PieceSpawn(TetrominoShape.J, 1L, ReplayEvent.StartOfRecordingMs),
+            ReplayEvent.PlayerInput(Input.Tick, 1L, ReplayEvent.StartOfRecordingMs)
           )
           val replay = ReplayData(metadata, events)
 

@@ -51,6 +51,15 @@ object GameLoopRunner:
    * Runs the interactive game and returns the final state together with whatever
    * the observer accumulated. The input and tick fibers live only as long as the loop.
    */
+  /** Everything the loop needs that stays the same from one command to the next */
+  final private case class LoopContext(
+    queue: Queue[GameCommand],
+    config: AppConfig,
+    intervalRef: Ref[Long],
+    renderer: Renderer,
+    randomPiece: GameRunner.RandomPiece
+  )
+
   def observedGameLoop[A](
     initialState: GameState,
     config: AppConfig,
@@ -68,16 +77,9 @@ object GameLoopRunner:
             .run(commandQueue, config.terminal.inputPollIntervalMs)
             .provideSome[TtyService](ZLayer.succeed(config))
             .forkScoped
-          _      <- GameClock.run(commandQueue, intervalRef).forkScoped
-          result <- observedEventLoop(
-            commandQueue,
-            LoopState(initialState, Some(initialBuffer)),
-            config,
-            intervalRef,
-            renderer,
-            randomPiece,
-            initialObserved
-          )(observe)
+          _ <- GameClock.run(commandQueue, intervalRef).forkScoped
+          context = LoopContext(commandQueue, config, intervalRef, renderer, randomPiece)
+          result <- observedEventLoop(context, LoopState(initialState, Some(initialBuffer)), initialObserved)(observe)
         yield result
       }
       .map { case (loopState, observed) => (loopState.gameState, observed) }
@@ -90,54 +92,47 @@ object GameLoopRunner:
     renderer: Renderer,
     randomPiece: GameRunner.RandomPiece
   ): ZIO[ConsoleService, Throwable, LoopState] =
-    observedEventLoop(queue, state, config, intervalRef, renderer, randomPiece, ())(ignoreSteps).map {
+    observedEventLoop(LoopContext(queue, config, intervalRef, renderer, randomPiece), state, ())(ignoreSteps).map {
       case (loopState, _) => loopState
     }
 
   private def observedEventLoop[A](
-    queue: Queue[GameCommand],
+    context: LoopContext,
     state: LoopState,
-    config: AppConfig,
-    intervalRef: Ref[Long],
-    renderer: Renderer,
-    randomPiece: GameRunner.RandomPiece,
     observed: A
   )(observe: Observer[A]): ZIO[ConsoleService, Throwable, (LoopState, A)] =
     def continueWith(input: Input): ZIO[ConsoleService, Throwable, (LoopState, A)] =
       for
-        stepResult <- handleCommand(input, state, config, intervalRef, renderer, randomPiece)
+        stepResult <- handleCommand(context, input, state)
         (newLoopState, step) = stepResult
         newObserved <- observe(observed, step)
         result      <-
           if newLoopState.gameState.isGameOver then ZIO.succeed((newLoopState, newObserved))
-          else observedEventLoop(queue, newLoopState, config, intervalRef, renderer, randomPiece, newObserved)(observe)
+          else observedEventLoop(context, newLoopState, newObserved)(observe)
       yield result
 
-    queue.take.flatMap {
+    context.queue.take.flatMap {
       case GameCommand.Quit              => ZIO.succeed((state, observed))
       case GameCommand.UserAction(input) => continueWith(input)
       case GameCommand.TimeTick          => continueWith(Input.Tick)
     }
 
   private def handleCommand(
+    context: LoopContext,
     input: Input,
-    state: LoopState,
-    config: AppConfig,
-    intervalRef: Ref[Long],
-    renderer: Renderer,
-    randomPiece: GameRunner.RandomPiece
+    state: LoopState
   ): ZIO[ConsoleService, Throwable, (LoopState, Step)] =
     for
-      nextShape <- randomPiece.nextShape
+      nextShape <- context.randomPiece.nextShape
       oldState = state.gameState
-      outcome  = GameLoop.handleInput(oldState, input, nextShape, config)
+      outcome  = GameLoop.handleInput(oldState, input, nextShape, context.config)
       _ <- ZIO.when(outcome.state.isGameOver && !oldState.isGameOver) {
         ZIO.logInfo(
           s"Game Over - Score: ${outcome.state.score}, Lines: ${outcome.state.linesCleared}, Level: ${outcome.state.level}"
         )
       }
-      _         <- ZIO.foreachDiscard(outcome.nextIntervalMs)(intervalRef.set)
-      newBuffer <- renderer.render(outcome.state, config, state.previousBuffer)
+      _         <- ZIO.foreachDiscard(outcome.nextIntervalMs)(context.intervalRef.set)
+      newBuffer <- context.renderer.render(outcome.state, context.config, state.previousBuffer)
     yield (
       LoopState(outcome.state, Some(newBuffer)),
       Step(input, oldState, outcome.state, nextShape, outcome.pieceLocked)

@@ -74,8 +74,8 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "return 0.0 at start with events" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PlayerInput(Input.MoveRight, 1L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs)
     )
     val replay = ReplayData(metadata, events)
     val state  = ReplayPlayer.initialize(replay)
@@ -96,7 +96,7 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "process events at current frame" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
     )
     val replay       = ReplayData(metadata, events)
     val initialState = ReplayPlayer.initialize(replay)
@@ -112,7 +112,7 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "mark as finished when all events processed" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
     )
     val replay = ReplayData(metadata, events)
     val state  = ReplayPlayer.initialize(replay)
@@ -125,7 +125,7 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "not process events from future frames" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 5L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 5L, ReplayEvent.StartOfRecordingMs)
     )
     val replay       = ReplayData(metadata, events)
     val initialState = ReplayPlayer.initialize(replay)
@@ -142,8 +142,8 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "process multiple events at same frame" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
     )
     val replay       = ReplayData(metadata, events)
     val initialState = ReplayPlayer.initialize(replay)
@@ -158,8 +158,8 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "handle PieceSpawn events" in {
     val metadata = createMetadata(initialPiece = TetrominoShape.T, nextPiece = TetrominoShape.I)
     val events   = Vector(
-      ReplayEvent.PieceSpawn(TetrominoShape.O, 0L),
-      ReplayEvent.PlayerInput(Input.HardDrop, 0L)
+      ReplayEvent.PieceSpawn(TetrominoShape.O, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.HardDrop, 0L, ReplayEvent.StartOfRecordingMs)
     )
     val replay = ReplayData(metadata, events)
     val state  = ReplayPlayer.initialize(replay)
@@ -172,9 +172,9 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   it should "mark as finished when game is over" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PlayerInput(Input.MoveLeft, 1L),
-      ReplayEvent.PlayerInput(Input.MoveLeft, 2L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveLeft, 1L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveLeft, 2L, ReplayEvent.StartOfRecordingMs)
     )
     val replay       = ReplayData(metadata, events)
     val initialState = ReplayPlayer.initialize(replay)
@@ -191,9 +191,9 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
   "ReplayPlayer" should "advance through multiple frames correctly" in {
     val metadata = createMetadata()
     val events   = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PlayerInput(Input.MoveRight, 2L),
-      ReplayEvent.PlayerInput(Input.MoveDown, 4L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveRight, 2L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveDown, 4L, ReplayEvent.StartOfRecordingMs)
     )
     val replay = ReplayData(metadata, events)
     var state  = ReplayPlayer.initialize(replay)
@@ -255,8 +255,8 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
 
   "ReplayPlayer.advanceFrame" should "play events stamped with an already passed frame instead of stalling" in {
     val events = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, Timing.LaterFrame),
-      ReplayEvent.PlayerInput(Input.MoveRight, 0L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, Timing.LaterFrame, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.MoveRight, 0L, ReplayEvent.StartOfRecordingMs)
     )
     val initial  = ReplayPlayer.initialize(ReplayData(createMetadata(), events))
     val finished = (0L to Timing.LaterFrame).foldLeft(initial)((state, _) => ReplayPlayer.advanceFrame(state, config))

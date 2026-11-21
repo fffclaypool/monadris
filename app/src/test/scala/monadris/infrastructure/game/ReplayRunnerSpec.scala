@@ -58,6 +58,10 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
     val GapMs: Long         = 300L
     val DoubleSpeed: Double = 2.0
     val MaxDelayMs: Int     = 5000
+    val TooFast: Double     = 100.0
+    val TooSlow: Double     = 0.0
+    val MaxSpeed: Double    = 4.0
+    val MinSpeed: Double    = 0.25
 
   private def playbackAt(replayState: ReplayPlayerState, speed: Double): ReplayRunner.PlaybackState =
     ReplayRunner.PlaybackState(replayState = replayState, previousBuffer = None, speed = speed, paused = false)
@@ -89,8 +93,8 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
       },
       test("PlaybackState tracks replay state correctly") {
         val events = Vector(
-          ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-          ReplayEvent.PlayerInput(Input.MoveRight, 1L)
+          ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs)
         )
         val replayData    = createTestReplayData(events)
         val replayState   = ReplayPlayer.initialize(replayData)
@@ -138,6 +142,50 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
         assertTrue(ReplayRunner.frameDelayMs(state) == 0)
       }
     ),
+    suite("withSpeed")(
+      test("clamps the speed to the supported range") {
+        val state = playbackAt(ReplayPlayer.initialize(createTestReplayData()), speed = 1.0)
+        assertTrue(
+          ReplayRunner.withSpeed(state, Recorded.TooFast).speed == Recorded.MaxSpeed,
+          ReplayRunner.withSpeed(state, Recorded.TooSlow).speed == Recorded.MinSpeed
+        )
+      },
+      test("rescales an interrupted wait to the new speed") {
+        val state = playbackAt(ReplayPlayer.initialize(createTestReplayData()), speed = 1.0)
+          .copy(remainingDelayMs = Some(Recorded.GapMs))
+        assertTrue(
+          ReplayRunner.withSpeed(state, Recorded.DoubleSpeed).remainingDelayMs == Some(Recorded.GapMs / 2)
+        )
+      }
+    ),
+    suite("Pause")(
+      test("status line shows whether playback is paused") {
+        val playing = playbackAt(ReplayPlayer.initialize(createTestReplayData()), speed = 1.0)
+        assertTrue(
+          ReplayRunner.statusText(playing).contains("[REPLAY]"),
+          ReplayRunner.statusText(playing.copy(paused = true)).contains("[PAUSED]")
+        )
+      },
+      test("P pauses and resumes playback, and the replay still finishes") {
+        val events   = Vector(ReplayEvent.PlayerInput(Input.MoveLeft, 0L, 0L))
+        val renderer = MockRenderer()
+        for
+          service <- ZIO.service[LocalTestServices.TestConsoleService]
+          result  <- ReplayRunner
+            .run(createTestReplayData(events), LocalTestServices.testConfig, renderer)
+            .provideSome[LocalTestServices.TestConsoleService](
+              LocalTestServices.tty(Chunk('p'.toInt, 'p'.toInt))
+            )
+            .timeout(Duration.fromMillis(2000))
+          output <- service.buffer.get
+          combined = output.mkString
+        yield assertTrue(
+          result.isDefined,
+          combined.contains("[PAUSED]"),
+          combined.contains("Replay finished")
+        )
+      }.provide(LocalTestServices.console)
+    ),
     suite("Replay playback")(
       test("Empty replay finishes immediately") {
         val replayData = createTestReplayData()
@@ -152,9 +200,9 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
       }.provide(LocalTestServices.console),
       test("Q key quits replay") {
         val events = Vector(
-          ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-          ReplayEvent.PlayerInput(Input.MoveRight, 1L),
-          ReplayEvent.PlayerInput(Input.MoveDown, 2L)
+          ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.MoveDown, 2L, ReplayEvent.StartOfRecordingMs)
         )
         val replayData = createTestReplayData(events)
         val renderer   = MockRenderer()
@@ -222,8 +270,8 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
     suite("Replay progress")(
       test("Progress starts at 0 for new replay") {
         val events = Vector(
-          ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-          ReplayEvent.PlayerInput(Input.MoveRight, 1L)
+          ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+          ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs)
         )
         val replayData  = createTestReplayData(events)
         val replayState = ReplayPlayer.initialize(replayData)

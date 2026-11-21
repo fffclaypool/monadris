@@ -57,7 +57,7 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
     val replay     = builder.build(finalState, TestValues.EndTimestamp)
 
     replay.events.size shouldBe 1
-    replay.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
+    replay.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
   }
 
   it should "record multiple inputs in order" in {
@@ -70,9 +70,9 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
     val replay     = builder.build(finalState, TestValues.EndTimestamp)
 
     replay.events.size shouldBe 3
-    replay.events(0) shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
-    replay.events(1) shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 0L)
-    replay.events(2) shouldBe ReplayEvent.PlayerInput(Input.HardDrop, 0L)
+    replay.events(0) shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
+    replay.events(1) shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 0L, ReplayEvent.StartOfRecordingMs)
+    replay.events(2) shouldBe ReplayEvent.PlayerInput(Input.HardDrop, 0L, ReplayEvent.StartOfRecordingMs)
   }
 
   "ReplayBuilder.recordPieceSpawn" should "add PieceSpawn event" in {
@@ -83,7 +83,7 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
     val replay     = builder.build(finalState, TestValues.EndTimestamp)
 
     replay.events.size shouldBe 1
-    replay.events.head shouldBe ReplayEvent.PieceSpawn(TetrominoShape.O, 0L)
+    replay.events.head shouldBe ReplayEvent.PieceSpawn(TetrominoShape.O, 0L, ReplayEvent.StartOfRecordingMs)
   }
 
   "ReplayBuilder.advanceFrame" should "increment frame counter" in {
@@ -97,8 +97,8 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
     val replay     = builder.build(finalState, TestValues.EndTimestamp)
 
     replay.events.size shouldBe 2
-    replay.events(0) shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
-    replay.events(1) shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 2L)
+    replay.events(0) shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
+    replay.events(1) shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 2L, ReplayEvent.StartOfRecordingMs)
   }
 
   "ReplayBuilder.build" should "create ReplayData with correct metadata" in {
@@ -127,10 +127,10 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
     val replay     = builder.build(finalState, TestValues.EndTimestamp)
 
     replay.events.size shouldBe 4
-    replay.events(0) shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
-    replay.events(1) shouldBe ReplayEvent.PieceSpawn(TetrominoShape.O, 1L)
-    replay.events(2) shouldBe ReplayEvent.PlayerInput(Input.HardDrop, 1L)
-    replay.events(3) shouldBe ReplayEvent.PlayerInput(Input.Tick, 3L)
+    replay.events(0) shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
+    replay.events(1) shouldBe ReplayEvent.PieceSpawn(TetrominoShape.O, 1L, ReplayEvent.StartOfRecordingMs)
+    replay.events(2) shouldBe ReplayEvent.PlayerInput(Input.HardDrop, 1L, ReplayEvent.StartOfRecordingMs)
+    replay.events(3) shouldBe ReplayEvent.PlayerInput(Input.Tick, 3L, ReplayEvent.StartOfRecordingMs)
   }
 
   "ReplayBuilder" should "be immutable" in {
@@ -146,9 +146,9 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
 
     replay1.events shouldBe empty
     replay2.events.size shouldBe 1
-    replay2.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L)
+    replay2.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs)
     replay3.events.size shouldBe 1
-    replay3.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 0L)
+    replay3.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 0L, ReplayEvent.StartOfRecordingMs)
   }
 
   "ReplayBuilder.atElapsed" should "stamp subsequently recorded events with the elapsed time" in {

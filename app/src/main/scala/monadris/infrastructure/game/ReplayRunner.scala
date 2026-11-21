@@ -9,6 +9,7 @@ import monadris.infrastructure.terminal.TtyService
 import monadris.replay.ReplayData
 import monadris.replay.ReplayPlayer
 import monadris.replay.ReplayPlayerState
+import monadris.view.AnsiRenderer
 import monadris.view.ScreenBuffer
 
 object ReplayRunner:
@@ -24,21 +25,38 @@ object ReplayRunner:
     /** Upper bound for a single wait, so a corrupt timestamp cannot freeze playback */
     val MaxFrameDelayMs: Long = 5000L
 
-  private object Ansi:
-    val ClearLine: String                  = "\u001b[2K"
-    def moveTo(row: Int, col: Int): String = s"\u001b[${row};${col}H"
+    /** How often the keyboard is checked while playback is paused */
+    val PausePollMs: Int = 100
+
+    val NanosPerMilli: Long = 1000000L
 
   private object Keys:
-    val SpeedUp: Int   = '+'.toInt
-    val SpeedDown: Int = '-'.toInt
-    val Quit: Int      = 'q'.toInt
-    val QuitUpper: Int = 'Q'.toInt
+    val SpeedUp: Int    = '+'.toInt
+    val SpeedDown: Int  = '-'.toInt
+    val Pause: Int      = 'p'.toInt
+    val PauseUpper: Int = 'P'.toInt
+    val Space: Int      = ' '.toInt
+    val Quit: Int       = 'q'.toInt
+    val QuitUpper: Int  = 'Q'.toInt
 
+  private object Status:
+    val FirstColumn    = 1
+    val PercentScale   = 100
+    val PausedLabel    = "[PAUSED]"
+    val PlayingLabel   = "[REPLAY]"
+    val FinishedNotice = "Replay finished. Press any key..."
+    val KeyHelp        = "Q: Quit, +/-: Speed, P: Pause"
+
+  /**
+   * @param remainingDelayMs what is left of the current wait after it was interrupted by a
+   *                         key press; `None` means the next frame's full delay applies
+   */
   final case class PlaybackState(
     replayState: ReplayPlayerState,
     previousBuffer: Option[ScreenBuffer],
     speed: Double,
-    paused: Boolean
+    paused: Boolean,
+    remainingDelayMs: Option[Long] = None
   )
 
   def run(
@@ -46,19 +64,16 @@ object ReplayRunner:
     config: AppConfig,
     renderer: Renderer
   ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
+    val initialState = PlaybackState(
+      replayState = ReplayPlayer.initialize(replayData),
+      previousBuffer = None,
+      speed = Speed.clamp(config.replay.defaultSpeed),
+      paused = false
+    )
     for
-      initialReplayState <- ZIO.succeed(ReplayPlayer.initialize(replayData))
-      initialSpeed = Speed.clamp(config.replay.defaultSpeed)
-      initialBuffer <- renderReplay(renderer, initialReplayState, config, None, initialSpeed)
-      initialPlaybackState = PlaybackState(
-        replayState = initialReplayState,
-        previousBuffer = Some(initialBuffer),
-        speed = initialSpeed,
-        paused = false
-      )
-      finalState <- playbackLoop(initialPlaybackState, config, renderer)
-      statusRow = initialBuffer.height + 1
-      _ <- ConsoleService.print(s"${Ansi.moveTo(statusRow, 1)}${Ansi.ClearLine}Replay finished. Press any key...")
+      rendered   <- render(initialState, config, renderer)
+      finalState <- playbackLoop(rendered, config, renderer)
+      _          <- printStatusLine(finalState, Status.FinishedNotice)
     yield ()
 
   private def playbackLoop(
@@ -67,12 +82,25 @@ object ReplayRunner:
     renderer: Renderer
   ): ZIO[TtyService & ConsoleService, Throwable, PlaybackState] =
     if state.replayState.isFinished then ZIO.succeed(state)
+    else if state.paused then
+      TtyService.readByteWithTimeout(Timing.PausePollMs).flatMap {
+        case Some(key) => handleKeyPress(key, state, config, renderer)
+        case None      => playbackLoop(state, config, renderer)
+      }
     else
+      val delayMs = state.remainingDelayMs.getOrElse(frameDelayMs(state).toLong)
       for
-        inputOpt <- TtyService.readByteWithTimeout(frameDelayMs(state))
-        result   <- inputOpt match
-          case Some(key) => handleKeyPress(key, state, config, renderer)
+        startedAt <- Clock.nanoTime
+        inputOpt  <- TtyService.readByteWithTimeout(delayMs.toInt)
+        result    <- inputOpt match
           case None      => advancePlayback(state, config, renderer)
+          case Some(key) =>
+            // Keep what is left of this wait, so key presses do not stretch the replay.
+            Clock.nanoTime.flatMap { now =>
+              val waitedMs  = (now - startedAt) / Timing.NanosPerMilli
+              val remaining = Math.max(0L, delayMs - waitedMs)
+              handleKeyPress(key, state.copy(remainingDelayMs = Some(remaining)), config, renderer)
+            }
       yield result
 
   private def handleKeyPress(
@@ -84,55 +112,64 @@ object ReplayRunner:
     key match
       case Keys.Quit | Keys.QuitUpper =>
         ZIO.succeed(state.copy(replayState = state.replayState.copy(isFinished = true)))
-
       case Keys.SpeedUp =>
-        val newSpeed = (state.speed + Speed.Step).min(Speed.Max)
-        for
-          newBuffer <- renderReplay(renderer, state.replayState, config, state.previousBuffer, newSpeed)
-          newState = state.copy(speed = newSpeed, previousBuffer = Some(newBuffer))
-          result <- playbackLoop(newState, config, renderer)
-        yield result
-
+        redrawAndContinue(withSpeed(state, state.speed + Speed.Step), config, renderer)
       case Keys.SpeedDown =>
-        val newSpeed = (state.speed - Speed.Step).max(Speed.Min)
-        for
-          newBuffer <- renderReplay(renderer, state.replayState, config, state.previousBuffer, newSpeed)
-          newState = state.copy(speed = newSpeed, previousBuffer = Some(newBuffer))
-          result <- playbackLoop(newState, config, renderer)
-        yield result
-
+        redrawAndContinue(withSpeed(state, state.speed - Speed.Step), config, renderer)
+      case Keys.Pause | Keys.PauseUpper | Keys.Space =>
+        redrawAndContinue(state.copy(paused = !state.paused), config, renderer)
       case _ =>
         playbackLoop(state, config, renderer)
+
+  /** Changes the speed and rescales the interrupted wait to the new speed. */
+  private[game] def withSpeed(state: PlaybackState, requestedSpeed: Double): PlaybackState =
+    val newSpeed = Speed.clamp(requestedSpeed)
+    state.copy(
+      speed = newSpeed,
+      remainingDelayMs = state.remainingDelayMs.map(remaining => (remaining * state.speed / newSpeed).toLong)
+    )
+
+  private def redrawAndContinue(
+    state: PlaybackState,
+    config: AppConfig,
+    renderer: Renderer
+  ): ZIO[TtyService & ConsoleService, Throwable, PlaybackState] =
+    render(state, config, renderer).flatMap(playbackLoop(_, config, renderer))
 
   private def advancePlayback(
     state: PlaybackState,
     config: AppConfig,
     renderer: Renderer
   ): ZIO[TtyService & ConsoleService, Throwable, PlaybackState] =
-    val newReplayState = ReplayPlayer.advanceFrame(state.replayState, config)
-    for
-      newBuffer <- renderReplay(renderer, newReplayState, config, state.previousBuffer, state.speed)
-      newState = state.copy(replayState = newReplayState, previousBuffer = Some(newBuffer))
-      result <- playbackLoop(newState, config, renderer)
-    yield result
+    val advanced = state.copy(
+      replayState = ReplayPlayer.advanceFrame(state.replayState, config),
+      remainingDelayMs = None
+    )
+    redrawAndContinue(advanced, config, renderer)
 
   /** Reproduces the pause the player made before the next frame, scaled by the playback speed. */
   private[game] def frameDelayMs(state: PlaybackState): Int =
     val recordedDelayMs = state.replayState.delayUntilNextFrameMs.min(Timing.MaxFrameDelayMs)
     (recordedDelayMs / state.speed).toInt
 
-  private def renderReplay(
-    renderer: Renderer,
-    replayState: ReplayPlayerState,
+  private def render(
+    state: PlaybackState,
     config: AppConfig,
-    previousBuffer: Option[ScreenBuffer],
-    speed: Double
-  ): ZIO[ConsoleService, Throwable, ScreenBuffer] =
+    renderer: Renderer
+  ): ZIO[ConsoleService, Throwable, PlaybackState] =
     for
-      buffer <- renderer.render(replayState.gameState, config, previousBuffer)
-      progress   = (replayState.progress * 100).toInt
-      statusRow  = buffer.height + 1
-      statusLine = s"[REPLAY] Speed: ${speed}x | Progress: $progress% | Q: Quit, +/-: Speed"
-      _ <- ConsoleService.print(s"${Ansi.moveTo(statusRow, 1)}${Ansi.ClearLine}$statusLine")
-      _ <- ConsoleService.flush()
-    yield buffer
+      buffer <- renderer.render(state.replayState.gameState, config, state.previousBuffer)
+      rendered = state.copy(previousBuffer = Some(buffer))
+      _ <- printStatusLine(rendered, statusText(rendered))
+    yield rendered
+
+  private[game] def statusText(state: PlaybackState): String =
+    val label    = if state.paused then Status.PausedLabel else Status.PlayingLabel
+    val progress = (state.replayState.progress * Status.PercentScale).toInt
+    s"$label Speed: ${state.speed}x | Progress: $progress% | ${Status.KeyHelp}"
+
+  /** The status line sits directly below the game screen. */
+  private def printStatusLine(state: PlaybackState, text: String): ZIO[ConsoleService, Throwable, Unit] =
+    val statusRow = state.previousBuffer.fold(Status.FirstColumn)(_.height + 1)
+    val position  = AnsiRenderer.Codes.moveTo(statusRow, Status.FirstColumn)
+    ConsoleService.print(s"$position${AnsiRenderer.Codes.ClearLine}$text") *> ConsoleService.flush()

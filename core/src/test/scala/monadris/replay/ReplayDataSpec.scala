@@ -19,7 +19,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
     val DurationMs: Long  = 180000L
 
   "ReplayEvent.PlayerInput" should "store input and frame number" in {
-    val event = ReplayEvent.PlayerInput(Input.MoveLeft, TestValues.FrameNumber)
+    val event = ReplayEvent.PlayerInput(Input.MoveLeft, TestValues.FrameNumber, ReplayEvent.StartOfRecordingMs)
     event match
       case ReplayEvent.PlayerInput(input, frame, _) =>
         input shouldBe Input.MoveLeft
@@ -39,7 +39,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
       Input.Tick
     )
     inputs.foreach { expectedInput =>
-      val event = ReplayEvent.PlayerInput(expectedInput, 0L)
+      val event = ReplayEvent.PlayerInput(expectedInput, 0L, ReplayEvent.StartOfRecordingMs)
       event match
         case ReplayEvent.PlayerInput(input, _, _) =>
           input shouldBe expectedInput
@@ -48,7 +48,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
   }
 
   "ReplayEvent.PieceSpawn" should "store shape and frame number" in {
-    val event = ReplayEvent.PieceSpawn(TetrominoShape.T, TestValues.FrameNumber)
+    val event = ReplayEvent.PieceSpawn(TetrominoShape.T, TestValues.FrameNumber, ReplayEvent.StartOfRecordingMs)
     event match
       case ReplayEvent.PieceSpawn(shape, frame, _) =>
         shape shouldBe TetrominoShape.T
@@ -58,7 +58,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
 
   it should "support all tetromino shapes" in
     TetrominoShape.values.foreach { expectedShape =>
-      val event = ReplayEvent.PieceSpawn(expectedShape, 0L)
+      val event = ReplayEvent.PieceSpawn(expectedShape, 0L, ReplayEvent.StartOfRecordingMs)
       event match
         case ReplayEvent.PieceSpawn(shape, _, _) =>
           shape shouldBe expectedShape
@@ -109,9 +109,9 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
       durationMs = TestValues.DurationMs
     )
     val events = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PieceSpawn(TetrominoShape.O, 10L),
-      ReplayEvent.PlayerInput(Input.HardDrop, 15L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PieceSpawn(TetrominoShape.O, 10L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PlayerInput(Input.HardDrop, 15L, ReplayEvent.StartOfRecordingMs)
     )
     val replay = ReplayData(metadata, events)
 
@@ -139,9 +139,9 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
     val threeEventReplay = ReplayData(
       metadata,
       Vector(
-        ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-        ReplayEvent.PlayerInput(Input.MoveRight, 1L),
-        ReplayEvent.PieceSpawn(TetrominoShape.S, 2L)
+        ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+        ReplayEvent.PlayerInput(Input.MoveRight, 1L, ReplayEvent.StartOfRecordingMs),
+        ReplayEvent.PieceSpawn(TetrominoShape.S, 2L, ReplayEvent.StartOfRecordingMs)
       )
     )
     threeEventReplay.eventCount shouldBe 3

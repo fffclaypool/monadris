@@ -37,8 +37,8 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
       durationMs = TestValues.DurationMs
     )
     val events = Vector(
-      ReplayEvent.PlayerInput(Input.MoveLeft, 0L),
-      ReplayEvent.PieceSpawn(TetrominoShape.O, 10L)
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PieceSpawn(TetrominoShape.O, 10L, ReplayEvent.StartOfRecordingMs)
     )
     ReplayData(metadata, events)
 

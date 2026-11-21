@@ -13,7 +13,7 @@ object Clock:
   ): ZIO[TtyService, Throwable, Unit] =
     val tickAndSleep = for
       interval <- intervalRef.get
-      _        <- TtyService.sleep(interval.toInt)
+      _        <- TtyService.sleep(interval)
       _        <- queue.offer(GameCommand.TimeTick)
     yield ()
 
