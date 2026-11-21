@@ -168,6 +168,16 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
           )
         )
       },
+      test("returns error for events with an unknown input or shape") {
+        val unknownInput = """[{"PlayerInput":{"input":"Teleport","frameNumber":0}}]"""
+        val unknownShape = """[{"PieceSpawn":{"shape":"X","frameNumber":0}}]"""
+
+        assertTrue(
+          JsonReplayCodec.decodeEvents(unknownInput).isLeft,
+          JsonReplayCodec.decodeEvents(unknownShape).isLeft,
+          JsonReplayCodec.decodeEvents("[{}]").isLeft
+        )
+      },
       test("returns error for invalid JSON") {
         val result = JsonReplayCodec.decode("not valid json")
 

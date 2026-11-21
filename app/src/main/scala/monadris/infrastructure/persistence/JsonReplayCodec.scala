@@ -18,9 +18,6 @@ object JsonReplayCodec extends ReplayCodec:
   given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
   given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail(parseShape)
 
-  given JsonEncoder[Input] = JsonEncoder[String].contramap(_.toString)
-  given JsonDecoder[Input] = JsonDecoder[String].mapOrFail(parseInput)
-
   // `elapsedMs` is optional so that replays recorded before version 1.1 still load.
   final private case class PlayerInputJson(input: String, frameNumber: Long, elapsedMs: Option[Long] = None)
   private given JsonCodec[PlayerInputJson] = DeriveJsonCodec.gen[PlayerInputJson]
