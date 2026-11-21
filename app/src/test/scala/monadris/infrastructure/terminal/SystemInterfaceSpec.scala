@@ -1,11 +1,20 @@
 package monadris.infrastructure.terminal
 
+import java.io.ByteArrayInputStream
+import java.nio.file.Files
+
 import zio.*
 import zio.test.*
 
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
 
 object SystemInterfaceSpec extends ZIOSpecDefault:
+
+  private object Input:
+    val Bytes: Array[Byte] = Array('a'.toByte, 'b'.toByte)
+    val EndOfStream        = -1
+    val TimeoutMs          = 50
+    val MissingPath        = "/nonexistent/monadris-tty"
 
   private object Shell:
     val Succeeding      = "true"
@@ -32,6 +41,63 @@ object SystemInterfaceSpec extends ZIOSpecDefault:
         yield assertTrue(session != null)
 
         effect.provideLayer(layer)
+      }
+    ),
+    suite("TtyService")(
+      test("reads the bytes of the underlying stream in order") {
+        val tty = TtyService.fromInputStream(new ByteArrayInputStream(Input.Bytes))
+        for
+          available <- tty.available()
+          first     <- tty.read()
+          second    <- tty.read()
+          atEnd     <- tty.read()
+        yield assertTrue(
+          available == Input.Bytes.length,
+          first == Input.Bytes(0).toInt,
+          second == Input.Bytes(1).toInt,
+          atEnd == Input.EndOfStream
+        )
+      },
+      test("readByteWithTimeout returns a waiting byte immediately") {
+        val tty = TtyService.fromInputStream(new ByteArrayInputStream(Input.Bytes))
+        for byte <- tty.readByteWithTimeout(Input.TimeoutMs)
+        yield assertTrue(byte == Some(Input.Bytes(0).toInt))
+      },
+      test("readByteWithTimeout gives up after the timeout when nothing arrives") {
+        val tty = TtyService.fromInputStream(new ByteArrayInputStream(Array.emptyByteArray))
+        for
+          fiber  <- tty.readByteWithTimeout(Input.TimeoutMs).fork
+          _      <- TestClock.adjust(Input.TimeoutMs.millis)
+          result <- fiber.join
+        yield assertTrue(result.isEmpty)
+      },
+      test("readByteWithTimeout does not wait at all for a non-positive timeout") {
+        val tty = TtyService.fromInputStream(new ByteArrayInputStream(Array.emptyByteArray))
+        for result <- tty.readByteWithTimeout(0)
+        yield assertTrue(result.isEmpty)
+      },
+      test("sleep suspends for the given time") {
+        val tty = TtyService.fromInputStream(new ByteArrayInputStream(Array.emptyByteArray))
+        for
+          fiber <- tty.sleep(Input.TimeoutMs.toLong).fork
+          _     <- TestClock.adjust(Input.TimeoutMs.millis)
+          _     <- fiber.join
+        yield assertTrue(true)
+      },
+      test("open reads from the given path and closes it with the scope") {
+        ZIO.scoped {
+          for
+            path  <- ZIO.attemptBlocking(Files.createTempFile("monadris-tty", ".bin"))
+            _     <- ZIO.addFinalizer(ZIO.attemptBlocking(Files.deleteIfExists(path)).ignore)
+            _     <- ZIO.attemptBlocking(Files.write(path, Input.Bytes))
+            tty   <- TtyService.open(path.toString)
+            first <- tty.read()
+          yield assertTrue(first == Input.Bytes(0).toInt)
+        }
+      },
+      test("open fails for a path that does not exist") {
+        for result <- ZIO.scoped(TtyService.open(Input.MissingPath)).either
+        yield assertTrue(result.isLeft)
       }
     ),
     suite("CommandService.live")(

@@ -3,6 +3,7 @@ package monadris.infrastructure.persistence
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
+import java.nio.file.attribute.PosixFilePermissions
 
 import zio.*
 import zio.test.*
@@ -48,6 +49,10 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
     val Newest: Long = 3000L
 
   private val ReplayFileSuffix = ".replay.json"
+
+  private object Permissions:
+    val ReadOnly = "r-xr-xr-x"
+    val Writable = "rwxr-xr-x"
 
   private def withTempDir[A](test: Path => ZIO[Any, Any, A]): ZIO[Any, Any, A] =
     ZIO.acquireReleaseWith(
@@ -161,6 +166,43 @@ object FileReplayRepositorySpec extends ZIOSpecDefault:
             _       <- setModifiedAt(dir, "alpha", ModifiedAt.Oldest)
             replays <- repo.list
           yield assertTrue(replays == Vector("alpha", "bravo"))
+        }
+      }
+    ),
+    suite("failures")(
+      test("save reports a storage failure when the directory is not writable") {
+        withTempDir { dir =>
+          val repo = FileReplayRepository.make(dir)
+          for
+            _ <- ZIO.attemptBlocking(
+              Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString(Permissions.ReadOnly))
+            )
+            result <- repo.save("blocked", createReplayData()).either
+            _      <- ZIO.attemptBlocking(
+              Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString(Permissions.Writable))
+            )
+          yield assertTrue(result.left.exists {
+            case ReplayError.StorageFailure(_) => true
+            case _                             => false
+          })
+        }
+      },
+      test("load reports corrupted data when the file is not a replay") {
+        withTempDir { dir =>
+          val repo = FileReplayRepository.make(dir)
+          for
+            _      <- ZIO.attemptBlocking(Files.writeString(dir.resolve(s"broken$ReplayFileSuffix"), "not json"))
+            result <- repo.load("broken").either
+          yield assertTrue(result.left.exists {
+            case ReplayError.Corrupted(_) => true
+            case _                        => false
+          })
+        }
+      },
+      test("load reports a missing replay as NotFound") {
+        withTempRepo { repo =>
+          for result <- repo.load("missing").either
+          yield assertTrue(result == Left(ReplayError.NotFound("missing")))
         }
       }
     ),
