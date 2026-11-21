@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BASELINE_FILE="$PROJECT_ROOT/.coverage-baseline.json"
-SCALA_VERSION="3.3.5"
 
 if [[ ! -f "$BASELINE_FILE" ]]; then
   echo "ERROR: Baseline file not found: $BASELINE_FILE"
@@ -17,8 +16,10 @@ echo "Running coverage analysis (unit tests only)..."
 
 extract_rate() {
   local project="$1"
-  local xml_path="$PROJECT_ROOT/$project/target/scala-$SCALA_VERSION/scoverage-report/scoverage.xml"
-  if [[ ! -f "$xml_path" ]]; then
+  # The Scala version in the path comes from build.sbt, so it is not repeated here.
+  local xml_path
+  xml_path="$(find "$PROJECT_ROOT/$project/target" -path '*/scoverage-report/scoverage.xml' 2>/dev/null | head -1)"
+  if [[ -z "$xml_path" || ! -f "$xml_path" ]]; then
     echo "ERROR: Coverage report not found: $xml_path" >&2
     return 1
   fi
