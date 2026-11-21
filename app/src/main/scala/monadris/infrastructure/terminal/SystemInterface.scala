@@ -1,6 +1,7 @@
 package monadris.infrastructure.terminal
 
 import java.io.FileInputStream
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 
 import zio.*
@@ -34,25 +35,34 @@ object TtyService:
   def readByteWithTimeout(timeoutMs: Int): ZIO[TtyService, Throwable, Option[Int]] =
     ZIO.serviceWithZIO(_.readByteWithTimeout(timeoutMs))
 
-  val live: ZLayer[Any, Nothing, TtyService] = ZLayer.scoped {
-    for tty <- ZIO.acquireRelease(
-        ZIO.attempt(new FileInputStream(Device.Path)).orDie
-      )(fis => ZIO.succeed(fis.close()))
-    yield new TtyService:
-      def available(): Task[Int]                                 = ZIO.attemptBlocking(tty.available())
-      def read(): Task[Int]                                      = ZIO.attemptBlocking(tty.read())
-      def sleep(ms: Long): Task[Unit]                            = ZIO.sleep(ms.millis)
-      def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]] =
-        pollForInput(timeoutMs)
+  /** Opens the given device (or file) for the lifetime of the scope */
+  def open(path: String): ZIO[Scope, Throwable, TtyService] =
+    ZIO
+      .acquireRelease(ZIO.attempt(new FileInputStream(path)))(stream => ZIO.succeed(stream.close()))
+      .map(fromInputStream)
 
-      private def pollForInput(remainingMs: Int): Task[Option[Int]] =
-        if remainingMs <= 0 then ZIO.succeed(None)
-        else
-          available().flatMap { avail =>
-            if avail > 0 then read().map(Some(_))
-            else sleep(Polling.IntervalMs) *> pollForInput(remainingMs - Polling.IntervalMs)
-          }
-  }
+  def fromInputStream(input: InputStream): TtyService = StreamTty(input)
+
+  private val openTerminal: ZIO[Scope, Nothing, TtyService] = open(Device.Path).orDie
+
+  val live: ZLayer[Any, Nothing, TtyService] = ZLayer.scoped(openTerminal)
+
+  final private class StreamTty(input: InputStream) extends TtyService:
+    def available(): Task[Int]      = ZIO.attemptBlocking(input.available())
+    def read(): Task[Int]           = ZIO.attemptBlocking(input.read())
+    def sleep(ms: Long): Task[Unit] = ZIO.sleep(ms.millis)
+
+    def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]] =
+      pollForInput(timeoutMs)
+
+    /** Checks for input every polling interval until something arrives or the time is up */
+    private def pollForInput(remainingMs: Int): Task[Option[Int]] =
+      if remainingMs <= 0 then ZIO.succeed(None)
+      else
+        available().flatMap { avail =>
+          if avail > 0 then read().map(Some(_))
+          else sleep(Polling.IntervalMs) *> pollForInput(remainingMs - Polling.IntervalMs)
+        }
 
 trait ConsoleService:
   def print(text: String): Task[Unit]

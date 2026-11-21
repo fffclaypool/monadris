@@ -14,6 +14,8 @@ import io.getquill.jdbczio.Quill
 object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
 
   private object TestValues:
+    /** One more than the version column (VARCHAR(20)) can hold */
+    val OverlongVersionLength     = 21
     val Timestamp: Long           = 1706500000000L
     val GridWidth: Int            = 10
     val GridHeight: Int           = 20
@@ -105,6 +107,18 @@ object PostgresReplayRepositoryIntegrationSpec extends ZIOSpecDefault:
           yield assertTrue(result.left.exists {
             case ReplayError.InvalidName(_) => true
             case _                          => false
+          })
+        }
+      },
+      test("a database error other than a duplicate is a StorageFailure") {
+        withPostgresRepo { repo =>
+          val replay     = createReplayData()
+          val tooLong    = "v" * TestValues.OverlongVersionLength
+          val unstorable = replay.copy(metadata = replay.metadata.copy(version = tooLong))
+          for result <- repo.save("unstorable", unstorable).either
+          yield assertTrue(result.left.exists {
+            case ReplayError.StorageFailure(_) => true
+            case _                             => false
           })
         }
       },

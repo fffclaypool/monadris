@@ -8,6 +8,7 @@ import monadris.domain.*
 import monadris.infrastructure.terminal.ConsoleService
 import monadris.infrastructure.terminal.Renderer
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
+import monadris.infrastructure.terminal.TtyService
 import monadris.replay.*
 import monadris.view.ScreenBuffer
 
@@ -65,6 +66,18 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
 
   private def playbackAt(replayState: ReplayPlayerState, speed: Double): ReplayRunner.PlaybackState =
     ReplayRunner.PlaybackState(replayState = replayState, previousBuffer = None, speed = speed, paused = false)
+
+  /** A terminal whose timed reads return the scripted results in order, then nothing */
+  private def scriptedTty(script: Ref[List[Option[Int]]]): TtyService =
+    new TtyService:
+      def available(): Task[Int]                                 = ZIO.succeed(0)
+      def read(): Task[Int]                                      = ZIO.never
+      def sleep(ms: Long): Task[Unit]                            = ZIO.unit
+      def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]] =
+        script.modify {
+          case next :: rest => (next, rest)
+          case Nil          => (None, Nil)
+        }
 
   def spec = suite("ReplayRunner")(
     suite("Speed constants")(
@@ -166,6 +179,21 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
           ReplayRunner.statusText(playing.copy(paused = true)).contains("[PAUSED]")
         )
       },
+      test("playback stays paused while no key is pressed") {
+        val events   = Vector(ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs))
+        val renderer = MockRenderer()
+        // pause, then two polls without a key, then resume
+        val polls = List(Some('p'.toInt), None, None, Some('p'.toInt))
+        for
+          remaining <- Ref.make(polls)
+          tty = scriptedTty(remaining)
+          result <- ReplayRunner
+            .run(createTestReplayData(events), LocalTestServices.testConfig, renderer)
+            .provideSome[LocalTestServices.TestConsoleService](ZLayer.succeed[TtyService](tty))
+            .timeout(Duration.fromMillis(2000))
+          unconsumed <- remaining.get
+        yield assertTrue(result.isDefined, unconsumed.isEmpty)
+      }.provide(LocalTestServices.console),
       test("P pauses and resumes playback, and the replay still finishes") {
         val events   = Vector(ReplayEvent.PlayerInput(Input.MoveLeft, 0L, 0L))
         val renderer = MockRenderer()
