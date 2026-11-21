@@ -36,6 +36,10 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
       durationMs = TestValues.DurationMs
     )
 
+  private object Timing:
+    val ElapsedMs: Long   = 1234L
+    val LegacyFrame: Long = 4L
+
   def spec = suite("JsonReplayCodec")(
     suite("encode")(
       test("encodes empty replay data") {
@@ -138,6 +142,30 @@ object JsonReplayCodecSpec extends ZIOSpecDefault:
         assertTrue(
           decoded.isRight,
           decoded.map(_.eventCount) == Right(2)
+        )
+      },
+      test("preserves elapsed time of events through encode/decode") {
+        val events = Vector(
+          ReplayEvent.PieceSpawn(TetrominoShape.O, 0L, Timing.ElapsedMs),
+          ReplayEvent.PlayerInput(Input.HardDrop, 0L, Timing.ElapsedMs)
+        )
+        val decoded = JsonReplayCodec.decodeEvents(JsonReplayCodec.encodeEvents(events))
+
+        assertTrue(decoded == Right(events))
+      },
+      test("derives elapsed time from the frame number for replays without timing") {
+        val legacyJson =
+          s"""[{"PlayerInput":{"input":"MoveLeft","frameNumber":${Timing.LegacyFrame}}},""" +
+            s"""{"PieceSpawn":{"shape":"T","frameNumber":${Timing.LegacyFrame}}}]"""
+        val expectedElapsed = ReplayEvent.legacyElapsedMs(Timing.LegacyFrame)
+
+        assertTrue(
+          JsonReplayCodec.decodeEvents(legacyJson) == Right(
+            Vector(
+              ReplayEvent.PlayerInput(Input.MoveLeft, Timing.LegacyFrame, expectedElapsed),
+              ReplayEvent.PieceSpawn(TetrominoShape.T, Timing.LegacyFrame, expectedElapsed)
+            )
+          )
         )
       },
       test("returns error for invalid JSON") {

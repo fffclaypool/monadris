@@ -11,14 +11,19 @@ final case class ReplayBuilder private (
   initialPiece: TetrominoShape,
   nextPiece: TetrominoShape,
   events: Vector[ReplayEvent],
-  currentFrame: Long
+  currentFrame: Long,
+  currentElapsedMs: Long
 ):
+  /** Sets the time since the start of the recording stamped on subsequently recorded events */
+  def atElapsed(elapsedMs: Long): ReplayBuilder =
+    copy(currentElapsedMs = elapsedMs)
+
   def recordInput(input: Input): ReplayBuilder =
-    val event = ReplayEvent.PlayerInput(input, currentFrame)
+    val event = ReplayEvent.PlayerInput(input, currentFrame, currentElapsedMs)
     copy(events = events :+ event)
 
   def recordPieceSpawn(shape: TetrominoShape): ReplayBuilder =
-    val event = ReplayEvent.PieceSpawn(shape, currentFrame)
+    val event = ReplayEvent.PieceSpawn(shape, currentFrame, currentElapsedMs)
     copy(events = events :+ event)
 
   def advanceFrame: ReplayBuilder =
@@ -54,5 +59,6 @@ object ReplayBuilder:
       initialPiece = initialPiece,
       nextPiece = nextPiece,
       events = Vector.empty,
-      currentFrame = 0
+      currentFrame = 0,
+      currentElapsedMs = ReplayEvent.StartOfRecordingMs
     )

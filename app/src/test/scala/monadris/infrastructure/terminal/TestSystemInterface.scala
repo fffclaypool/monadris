@@ -49,12 +49,6 @@ object TestServices:
             _ <- queue.take
           yield ()
 
-        def withRawMode[A](effect: Task[A]): Task[A] =
-          effect
-
-        def withCooked[A](effect: Task[A]): Task[A] =
-          effect
-
         def enableRawMode: Task[Unit]  = ZIO.unit
         def disableRawMode: Task[Unit] = ZIO.unit
 
@@ -79,7 +73,8 @@ object TestServices:
   }
 
   case class TestCommandService(history: Ref[List[String]]) extends CommandService:
-    def exec(cmd: String): Task[Unit] = history.update(_ :+ cmd)
+    def exec(cmd: String): Task[Unit]          = history.update(_ :+ cmd)
+    def execCapture(cmd: String): Task[String] = history.update(_ :+ cmd).as("")
 
   val command: ULayer[TestCommandService] = ZLayer.fromZIO {
     for history <- Ref.make(List.empty[String])
@@ -93,7 +88,7 @@ object TestServices:
     speed = SpeedConfig(baseDropIntervalMs = 1000, minDropIntervalMs = 100, decreasePerLevelMs = 50),
     terminal = TerminalConfig(escapeSequenceWaitMs = 20, escapeSequenceSecondWaitMs = 5, inputPollIntervalMs = 20),
     timing = TimingConfig(titleDelayMs = 1000, outroDelayMs = 2000),
-    replay = ReplayConfig(defaultSpeed = 1.0, baseFrameIntervalMs = 50),
+    replay = ReplayConfig(defaultSpeed = 1.0, storage = ReplayStorage.File),
     database = DatabaseConfig(
       url = "jdbc:postgresql://localhost:5432/test",
       username = "test",

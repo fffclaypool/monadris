@@ -175,6 +175,8 @@ The dev container includes:
 - sbt 1.9+
 - Bash (for execution script)
 
+PostgreSQL is **not** required: replays are stored as files by default (see [Replay Storage](#replay-storage)).
+
 ## Build & Run
 
 **Note:** Please use the provided shell script. Running directly with `sbt run` may cause display glitches due to terminal mode handling.
@@ -186,6 +188,20 @@ sbt compile
 # Run game
 ./run.sh
 ```
+
+## Replay Storage
+
+Where recorded replays are kept is selected by `monadris.replay.storage` in `application.conf`,
+or by the `MONADRIS_REPLAY_STORAGE` environment variable.
+
+| Value | Location | Notes |
+|-------|----------|-------|
+| `file` (default) | `~/.monadris/replays/<name>.replay.json` | No external services needed |
+| `postgres` | `game_results` / `replays` tables | Connects and runs Flyway migrations at startup; configure with `MONADRIS_DB_URL`, `MONADRIS_DB_USERNAME`, `MONADRIS_DB_PASSWORD` |
+
+The dev container sets `MONADRIS_REPLAY_STORAGE=postgres` and provides the database.
+
+Replay names may contain letters, digits, `-` and `_` (up to 64 characters). Replays are listed newest first.
 
 ## Controls
 

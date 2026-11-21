@@ -6,26 +6,26 @@ import monadris.domain.Input
 import monadris.domain.TetrominoShape
 import monadris.replay.*
 
+/** The single JSON representation of replays, shared by file and database storage. */
 object JsonReplayCodec extends ReplayCodec:
 
-  // Codec for TetrominoShape
-  given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
-  given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail { s =>
+  def parseShape(s: String): Either[String, TetrominoShape] =
     TetrominoShape.values.find(_.toString == s).toRight(s"Unknown shape: $s")
-  }
 
-  // Codec for Input
-  given JsonEncoder[Input] = JsonEncoder[String].contramap(_.toString)
-  given JsonDecoder[Input] = JsonDecoder[String].mapOrFail { s =>
+  def parseInput(s: String): Either[String, Input] =
     Input.values.find(_.toString == s).toRight(s"Unknown input: $s")
-  }
 
-  // Helper case class for PlayerInput JSON serialization
-  final private case class PlayerInputJson(input: String, frameNumber: Long)
+  given JsonEncoder[TetrominoShape] = JsonEncoder[String].contramap(_.toString)
+  given JsonDecoder[TetrominoShape] = JsonDecoder[String].mapOrFail(parseShape)
+
+  given JsonEncoder[Input] = JsonEncoder[String].contramap(_.toString)
+  given JsonDecoder[Input] = JsonDecoder[String].mapOrFail(parseInput)
+
+  // `elapsedMs` is optional so that replays recorded before version 1.1 still load.
+  final private case class PlayerInputJson(input: String, frameNumber: Long, elapsedMs: Option[Long] = None)
   private given JsonCodec[PlayerInputJson] = DeriveJsonCodec.gen[PlayerInputJson]
 
-  // Helper case class for PieceSpawn JSON serialization
-  final private case class PieceSpawnJson(shape: String, frameNumber: Long)
+  final private case class PieceSpawnJson(shape: String, frameNumber: Long, elapsedMs: Option[Long] = None)
   private given JsonCodec[PieceSpawnJson] = DeriveJsonCodec.gen[PieceSpawnJson]
 
   // Wrapper case class for ReplayEvent discriminated union
@@ -35,30 +35,37 @@ object JsonReplayCodec extends ReplayCodec:
   )
   private given JsonCodec[ReplayEventJson] = DeriveJsonCodec.gen[ReplayEventJson]
 
+  private def elapsedOrLegacy(elapsedMs: Option[Long], frameNumber: Long): Long =
+    elapsedMs.getOrElse(ReplayEvent.legacyElapsedMs(frameNumber))
+
   given JsonEncoder[ReplayEvent] = JsonEncoder[ReplayEventJson].contramap {
-    case ReplayEvent.PlayerInput(input, frameNumber) =>
-      ReplayEventJson(PlayerInput = Some(PlayerInputJson(input.toString, frameNumber)))
-    case ReplayEvent.PieceSpawn(shape, frameNumber) =>
-      ReplayEventJson(PieceSpawn = Some(PieceSpawnJson(shape.toString, frameNumber)))
+    case ReplayEvent.PlayerInput(input, frameNumber, elapsedMs) =>
+      ReplayEventJson(PlayerInput = Some(PlayerInputJson(input.toString, frameNumber, Some(elapsedMs))))
+    case ReplayEvent.PieceSpawn(shape, frameNumber, elapsedMs) =>
+      ReplayEventJson(PieceSpawn = Some(PieceSpawnJson(shape.toString, frameNumber, Some(elapsedMs))))
   }
 
   given JsonDecoder[ReplayEvent] = JsonDecoder[ReplayEventJson].mapOrFail {
     case ReplayEventJson(Some(pi), _) =>
-      Input.values.find(_.toString == pi.input) match
-        case Some(input) => Right(ReplayEvent.PlayerInput(input, pi.frameNumber))
-        case None        => Left(s"Unknown input: ${pi.input}")
+      parseInput(pi.input).map { input =>
+        ReplayEvent.PlayerInput(input, pi.frameNumber, elapsedOrLegacy(pi.elapsedMs, pi.frameNumber))
+      }
     case ReplayEventJson(_, Some(ps)) =>
-      TetrominoShape.values.find(_.toString == ps.shape) match
-        case Some(shape) => Right(ReplayEvent.PieceSpawn(shape, ps.frameNumber))
-        case None        => Left(s"Unknown shape: ${ps.shape}")
+      parseShape(ps.shape).map { shape =>
+        ReplayEvent.PieceSpawn(shape, ps.frameNumber, elapsedOrLegacy(ps.elapsedMs, ps.frameNumber))
+      }
     case _ => Left("Invalid replay event: missing PlayerInput or PieceSpawn")
   }
 
-  // Codec for ReplayMetadata
   given JsonCodec[ReplayMetadata] = DeriveJsonCodec.gen[ReplayMetadata]
 
-  // Codec for ReplayData
   given JsonCodec[ReplayData] = DeriveJsonCodec.gen[ReplayData]
+
+  def encodeEvents(events: Vector[ReplayEvent]): String =
+    events.toJson
+
+  def decodeEvents(json: String): Either[String, Vector[ReplayEvent]] =
+    json.fromJson[Vector[ReplayEvent]]
 
   override def encode(replay: ReplayData): Either[String, String] =
     Right(replay.toJsonPretty)

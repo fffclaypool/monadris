@@ -21,7 +21,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
   "ReplayEvent.PlayerInput" should "store input and frame number" in {
     val event = ReplayEvent.PlayerInput(Input.MoveLeft, TestValues.FrameNumber)
     event match
-      case ReplayEvent.PlayerInput(input, frame) =>
+      case ReplayEvent.PlayerInput(input, frame, _) =>
         input shouldBe Input.MoveLeft
         frame shouldBe TestValues.FrameNumber
       case _ => fail("Expected PlayerInput")
@@ -41,7 +41,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
     inputs.foreach { expectedInput =>
       val event = ReplayEvent.PlayerInput(expectedInput, 0L)
       event match
-        case ReplayEvent.PlayerInput(input, _) =>
+        case ReplayEvent.PlayerInput(input, _, _) =>
           input shouldBe expectedInput
         case _ => fail("Expected PlayerInput")
     }
@@ -50,7 +50,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
   "ReplayEvent.PieceSpawn" should "store shape and frame number" in {
     val event = ReplayEvent.PieceSpawn(TetrominoShape.T, TestValues.FrameNumber)
     event match
-      case ReplayEvent.PieceSpawn(shape, frame) =>
+      case ReplayEvent.PieceSpawn(shape, frame, _) =>
         shape shouldBe TetrominoShape.T
         frame shouldBe TestValues.FrameNumber
       case _ => fail("Expected PieceSpawn")
@@ -60,7 +60,7 @@ class ReplayDataSpec extends AnyFlatSpec with Matchers:
     TetrominoShape.values.foreach { expectedShape =>
       val event = ReplayEvent.PieceSpawn(expectedShape, 0L)
       event match
-        case ReplayEvent.PieceSpawn(shape, _) =>
+        case ReplayEvent.PieceSpawn(shape, _, _) =>
           shape shouldBe expectedShape
         case _ => fail("Expected PieceSpawn")
     }

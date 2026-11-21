@@ -54,45 +54,51 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
         shape
       }
 
+  private object Elapsed:
+    val First: Long  = 250L
+    val Second: Long = 1250L
+
+  private def newBuilder: ReplayBuilder =
+    ReplayBuilder.create(
+      timestamp = 0L,
+      gridWidth = testGridWidth,
+      gridHeight = testGridHeight,
+      initialPiece = TetrominoShape.T,
+      nextPiece = TetrominoShape.I
+    )
+
   def spec = suite("RecordingGameLoopRunner")(
-    suite("RecordingLoopState")(
-      test("Can create RecordingLoopState with initial values") {
-        val replayBuilder = ReplayBuilder.create(
-          timestamp = java.lang.System.currentTimeMillis(),
-          gridWidth = testGridWidth,
-          gridHeight = testGridHeight,
-          initialPiece = TetrominoShape.T,
-          nextPiece = TetrominoShape.I
-        )
-        val loopState = RecordingGameLoopRunner.RecordingLoopState(
-          gameState = initialState,
-          previousBuffer = None,
-          replayBuilder = replayBuilder
-        )
+    suite("recordStep")(
+      test("stamps the input with the current frame and elapsed time, then advances the frame") {
+        val step    = GameLoopRunner.Step(Input.MoveLeft, initialState, initialState, TetrominoShape.O)
+        val builder = RecordingGameLoopRunner.recordStep(newBuilder, step, Elapsed.First)
         assertTrue(
-          loopState.gameState == initialState,
-          loopState.previousBuffer.isEmpty,
-          loopState.replayBuilder.currentFrame == 0
+          builder.events == Vector(ReplayEvent.PlayerInput(Input.MoveLeft, 0L, Elapsed.First)),
+          builder.currentFrame == 1L
         )
       },
-      test("RecordingLoopState tracks game state correctly") {
-        val movedState    = initialState.copy(score = 100)
-        val replayBuilder = ReplayBuilder.create(
-          timestamp = java.lang.System.currentTimeMillis(),
-          gridWidth = testGridWidth,
-          gridHeight = testGridHeight,
-          initialPiece = TetrominoShape.T,
-          nextPiece = TetrominoShape.I
+      test("records the spawned piece before the input when a piece was locked") {
+        val lockedState = initialState.copy(
+          currentTetromino = Tetromino.spawn(TetrominoShape.I, testGridWidth),
+          nextTetromino = TetrominoShape.O
         )
-        val loopState = RecordingGameLoopRunner.RecordingLoopState(
-          gameState = movedState,
-          previousBuffer = Some(ScreenBuffer.empty(10, 10)),
-          replayBuilder = replayBuilder
-        )
+        val step    = GameLoopRunner.Step(Input.HardDrop, initialState, lockedState, TetrominoShape.O)
+        val builder = RecordingGameLoopRunner.recordStep(newBuilder, step, Elapsed.First)
         assertTrue(
-          loopState.gameState.score == 100,
-          loopState.previousBuffer.isDefined
+          builder.events == Vector(
+            ReplayEvent.PieceSpawn(TetrominoShape.O, 0L, Elapsed.First),
+            ReplayEvent.PlayerInput(Input.HardDrop, 0L, Elapsed.First)
+          )
         )
+      },
+      test("consecutive steps keep their own elapsed times") {
+        val step    = GameLoopRunner.Step(Input.Tick, initialState, initialState, TetrominoShape.O)
+        val builder = RecordingGameLoopRunner.recordStep(
+          RecordingGameLoopRunner.recordStep(newBuilder, step, Elapsed.First),
+          step,
+          Elapsed.Second
+        )
+        assertTrue(builder.events.map(_.elapsedMs) == Vector(Elapsed.First, Elapsed.Second))
       }
     ),
     suite("Recording game loop")(
@@ -199,8 +205,8 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
         yield result match
           case Some((_, replayData)) =>
             val hasPlayerInputs = replayData.events.exists {
-              case ReplayEvent.PlayerInput(_, _) => true
-              case _                             => false
+              case ReplayEvent.PlayerInput(_, _, _) => true
+              case _                                => false
             }
             assertTrue(hasPlayerInputs || replayData.events.isEmpty)
           case None =>
@@ -273,12 +279,12 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
 
         // Verify PieceSpawn is recorded before PlayerInput
         val pieceSpawnIndex = events.indexWhere {
-          case ReplayEvent.PieceSpawn(_, _) => true
-          case _                            => false
+          case ReplayEvent.PieceSpawn(_, _, _) => true
+          case _                               => false
         }
         val playerInputIndex = events.indexWhere {
-          case ReplayEvent.PlayerInput(_, _) => true
-          case _                             => false
+          case ReplayEvent.PlayerInput(_, _, _) => true
+          case _                                => false
         }
 
         assertTrue(
@@ -304,12 +310,12 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
         val events     = replayData.events
 
         val hasPieceSpawn = events.exists {
-          case ReplayEvent.PieceSpawn(_, _) => true
-          case _                            => false
+          case ReplayEvent.PieceSpawn(_, _, _) => true
+          case _                               => false
         }
         val hasPlayerInput = events.exists {
-          case ReplayEvent.PlayerInput(Input.MoveLeft, _) => true
-          case _                                          => false
+          case ReplayEvent.PlayerInput(Input.MoveLeft, _, _) => true
+          case _                                             => false
         }
 
         assertTrue(
@@ -367,8 +373,8 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
         val replayData = builder.build(finalState, 23456L)
 
         val hasPieceSpawn = replayData.events.exists {
-          case ReplayEvent.PieceSpawn(TetrominoShape.T, _) => true
-          case _                                           => false
+          case ReplayEvent.PieceSpawn(TetrominoShape.T, _, _) => true
+          case _                                              => false
         }
         assertTrue(hasPieceSpawn)
       }

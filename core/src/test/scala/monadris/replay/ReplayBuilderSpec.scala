@@ -150,3 +150,19 @@ class ReplayBuilderSpec extends AnyFlatSpec with Matchers:
     replay3.events.size shouldBe 1
     replay3.events.head shouldBe ReplayEvent.PlayerInput(Input.MoveRight, 0L)
   }
+
+  "ReplayBuilder.atElapsed" should "stamp subsequently recorded events with the elapsed time" in {
+    val elapsedMs = 750L
+    val builder   = createBuilder()
+      .recordInput(Input.MoveLeft)
+      .advanceFrame
+      .atElapsed(elapsedMs)
+      .recordPieceSpawn(TetrominoShape.O)
+      .recordInput(Input.HardDrop)
+
+    builder.events shouldBe Vector(
+      ReplayEvent.PlayerInput(Input.MoveLeft, 0L, ReplayEvent.StartOfRecordingMs),
+      ReplayEvent.PieceSpawn(TetrominoShape.O, 1L, elapsedMs),
+      ReplayEvent.PlayerInput(Input.HardDrop, 1L, elapsedMs)
+    )
+  }

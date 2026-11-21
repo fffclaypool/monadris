@@ -9,6 +9,7 @@ import scala.jdk.CollectionConverters.*
 import zio.*
 
 import monadris.replay.ReplayData
+import monadris.replay.ReplayName
 
 final class FileReplayRepository(
   replayDir: Path,
@@ -20,22 +21,22 @@ final class FileReplayRepository(
 
   override def save(name: String, replay: ReplayData): Task[Unit] =
     for
-      _       <- ensureDirectoryExists
-      encoded <- ZIO.fromEither(codec.encode(replay)).mapError(msg => new RuntimeException(msg))
-      filePath = replayDir.resolve(s"$name${FileExtension.ReplayJson}")
-      _ <- ZIO.attemptBlocking(Files.writeString(filePath, encoded))
+      filePath <- resolvePath(name)
+      _        <- ensureDirectoryExists
+      encoded  <- ZIO.fromEither(codec.encode(replay)).mapError(msg => new RuntimeException(msg))
+      _        <- ZIO.attemptBlocking(Files.writeString(filePath, encoded))
     yield ()
 
   override def load(name: String): Task[ReplayData] =
     for
-      filePath <- ZIO.succeed(replayDir.resolve(s"$name${FileExtension.ReplayJson}"))
-      _        <- ZIO
-        .fail(new RuntimeException(s"Replay not found: $name"))
-        .when(!Files.exists(filePath))
-      content <- ZIO.attemptBlocking(Files.readString(filePath))
-      replay  <- ZIO.fromEither(codec.decode(content)).mapError(msg => new RuntimeException(msg))
+      filePath <- resolvePath(name)
+      found    <- ZIO.attemptBlocking(Files.exists(filePath))
+      _        <- ZIO.fail(new RuntimeException(s"Replay not found: $name")).unless(found)
+      content  <- ZIO.attemptBlocking(Files.readString(filePath))
+      replay   <- ZIO.fromEither(codec.decode(content)).mapError(msg => new RuntimeException(msg))
     yield replay
 
+  /** Newest first (by modification time), matching PostgresReplayRepository. */
   override def list: Task[Vector[String]] =
     for
       exists <- ZIO.attemptBlocking(Files.exists(replayDir))
@@ -49,34 +50,44 @@ final class FileReplayRepository(
         val iterator: java.util.Iterator[Path] = stream.iterator()
         iterator.asScala.toVector
           .filter(_.toString.endsWith(FileExtension.ReplayJson))
-          .map(_.getFileName.toString.stripSuffix(FileExtension.ReplayJson))
-          .sorted
+          .map(path => (replayNameOf(path), Files.getLastModifiedTime(path).toMillis))
+          .sortBy { case (name, modifiedAt) => (-modifiedAt, name) }
+          .map { case (name, _) => name }
       finally stream.close()
     }
 
   override def exists(name: String): Task[Boolean] =
-    val filePath = replayDir.resolve(s"$name${FileExtension.ReplayJson}")
-    ZIO.attemptBlocking(Files.exists(filePath))
+    resolvePath(name).flatMap(filePath => ZIO.attemptBlocking(Files.exists(filePath)))
 
   override def delete(name: String): Task[Unit] =
-    val filePath = replayDir.resolve(s"$name${FileExtension.ReplayJson}")
-    ZIO.attemptBlocking(Files.deleteIfExists(filePath)).unit
+    resolvePath(name).flatMap(filePath => ZIO.attemptBlocking(Files.deleteIfExists(filePath))).unit
+
+  private def replayNameOf(path: Path): String =
+    path.getFileName.toString.stripSuffix(FileExtension.ReplayJson)
+
+  /** Rejects names that could escape the replay directory (e.g. "../x"). */
+  private def resolvePath(name: String): Task[Path] =
+    ZIO
+      .fromEither(ReplayName.validate(name))
+      .mapBoth(
+        msg => new IllegalArgumentException(msg),
+        validName => replayDir.resolve(s"$validName${FileExtension.ReplayJson}")
+      )
 
   private val ensureDirectoryExists: Task[Unit] =
-    ZIO.attemptBlocking {
-      if !Files.exists(replayDir) then Files.createDirectories(replayDir)
-    }.unit
+    ZIO.attemptBlocking(Files.createDirectories(replayDir)).unit
 
 object FileReplayRepository:
   private object Defaults:
     val DirName      = ".monadris"
     val ReplaySubdir = "replays"
+    val HomeProperty = "user.home"
 
-  val layer: ZLayer[Any, Nothing, ReplayRepository] =
-    ZLayer.succeed {
-      val homeDir   = java.lang.System.getProperty("user.home")
-      val replayDir = Paths.get(homeDir, Defaults.DirName, Defaults.ReplaySubdir)
-      new FileReplayRepository(replayDir, JsonReplayCodec: ReplayCodec)
+  val layer: ZLayer[Any, Throwable, ReplayRepository] =
+    ZLayer.fromZIO {
+      ZIO
+        .attempt(java.lang.System.getProperty(Defaults.HomeProperty))
+        .map(homeDir => make(Paths.get(homeDir, Defaults.DirName, Defaults.ReplaySubdir)))
     }
 
   def make(replayDir: Path): ReplayRepository =

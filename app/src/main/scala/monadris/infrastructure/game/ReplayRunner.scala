@@ -14,11 +14,15 @@ import monadris.view.ScreenBuffer
 object ReplayRunner:
 
   private object Speed:
-    val Default: Double      = 1.0
-    val Min: Double          = 0.25
-    val Max: Double          = 4.0
-    val Step: Double         = 0.25
-    val BaseIntervalMs: Long = 50L
+    val Min: Double  = 0.25
+    val Max: Double  = 4.0
+    val Step: Double = 0.25
+
+    def clamp(speed: Double): Double = speed.max(Min).min(Max)
+
+  private object Timing:
+    /** Upper bound for a single wait, so a corrupt timestamp cannot freeze playback */
+    val MaxFrameDelayMs: Long = 5000L
 
   private object Ansi:
     val ClearLine: String                  = "\u001b[2K"
@@ -44,11 +48,12 @@ object ReplayRunner:
   ): ZIO[TtyService & ConsoleService, Throwable, Unit] =
     for
       initialReplayState <- ZIO.succeed(ReplayPlayer.initialize(replayData))
-      initialBuffer      <- renderReplay(renderer, initialReplayState, config, None, Speed.Default)
+      initialSpeed = Speed.clamp(config.replay.defaultSpeed)
+      initialBuffer <- renderReplay(renderer, initialReplayState, config, None, initialSpeed)
       initialPlaybackState = PlaybackState(
         replayState = initialReplayState,
         previousBuffer = Some(initialBuffer),
-        speed = Speed.Default,
+        speed = initialSpeed,
         paused = false
       )
       finalState <- playbackLoop(initialPlaybackState, config, renderer)
@@ -64,9 +69,8 @@ object ReplayRunner:
     if state.replayState.isFinished then ZIO.succeed(state)
     else
       for
-        intervalMs <- calculateInterval(state.speed)
-        inputOpt   <- TtyService.readByteWithTimeout(intervalMs.toInt)
-        result     <- inputOpt match
+        inputOpt <- TtyService.readByteWithTimeout(frameDelayMs(state))
+        result   <- inputOpt match
           case Some(key) => handleKeyPress(key, state, config, renderer)
           case None      => advancePlayback(state, config, renderer)
       yield result
@@ -112,8 +116,10 @@ object ReplayRunner:
       result <- playbackLoop(newState, config, renderer)
     yield result
 
-  private def calculateInterval(speed: Double): UIO[Long] =
-    ZIO.succeed((Speed.BaseIntervalMs / speed).toLong.max(10L))
+  /** Reproduces the pause the player made before the next frame, scaled by the playback speed. */
+  private[game] def frameDelayMs(state: PlaybackState): Int =
+    val recordedDelayMs = state.replayState.delayUntilNextFrameMs.min(Timing.MaxFrameDelayMs)
+    (recordedDelayMs / state.speed).toInt
 
   private def renderReplay(
     renderer: Renderer,

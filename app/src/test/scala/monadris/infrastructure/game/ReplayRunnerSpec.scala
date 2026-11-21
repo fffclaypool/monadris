@@ -53,6 +53,15 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
     def renderTitle: ZIO[ConsoleService, Throwable, Unit] =
       ZIO.unit
 
+  private object Recorded:
+    val FirstTickMs: Long   = 1000L
+    val GapMs: Long         = 300L
+    val DoubleSpeed: Double = 2.0
+    val MaxDelayMs: Int     = 5000
+
+  private def playbackAt(replayState: ReplayPlayerState, speed: Double): ReplayRunner.PlaybackState =
+    ReplayRunner.PlaybackState(replayState = replayState, previousBuffer = None, speed = speed, paused = false)
+
   def spec = suite("ReplayRunner")(
     suite("Speed constants")(
       test("Default speed is 1.0") {
@@ -96,6 +105,37 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
           playbackState.paused,
           !playbackState.replayState.isFinished
         )
+      }
+    ),
+    suite("frameDelayMs")(
+      test("waits as long as the recording did before the next frame") {
+        val events = Vector(
+          ReplayEvent.PlayerInput(Input.Tick, 0L, Recorded.FirstTickMs),
+          ReplayEvent.PlayerInput(Input.MoveLeft, 1L, Recorded.FirstTickMs + Recorded.GapMs)
+        )
+        val atStart    = playbackAt(ReplayPlayer.initialize(createTestReplayData(events)), speed = 1.0)
+        val afterFirst = playbackAt(
+          ReplayPlayer.advanceFrame(atStart.replayState, LocalTestServices.testConfig),
+          speed = 1.0
+        )
+        assertTrue(
+          ReplayRunner.frameDelayMs(atStart) == Recorded.FirstTickMs.toInt,
+          ReplayRunner.frameDelayMs(afterFirst) == Recorded.GapMs.toInt
+        )
+      },
+      test("scales the delay by the playback speed") {
+        val events = Vector(ReplayEvent.PlayerInput(Input.Tick, 0L, Recorded.FirstTickMs))
+        val state  = playbackAt(ReplayPlayer.initialize(createTestReplayData(events)), speed = Recorded.DoubleSpeed)
+        assertTrue(ReplayRunner.frameDelayMs(state) == (Recorded.FirstTickMs / 2).toInt)
+      },
+      test("caps the delay for implausibly large timestamps") {
+        val events = Vector(ReplayEvent.PlayerInput(Input.Tick, 0L, Long.MaxValue))
+        val state  = playbackAt(ReplayPlayer.initialize(createTestReplayData(events)), speed = 1.0)
+        assertTrue(ReplayRunner.frameDelayMs(state) == Recorded.MaxDelayMs)
+      },
+      test("does not wait when the replay has no further events") {
+        val state = playbackAt(ReplayPlayer.initialize(createTestReplayData()), speed = 1.0)
+        assertTrue(ReplayRunner.frameDelayMs(state) == 0)
       }
     ),
     suite("Replay playback")(

@@ -16,6 +16,11 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
     val GridHeight: Int  = config.grid.height
     val DurationMs: Long = 10000L
 
+  private object Timing:
+    val FirstMs: Long    = 1000L
+    val SecondMs: Long   = 1300L
+    val LaterFrame: Long = 3L
+
   private def createMetadata(
     initialPiece: TetrominoShape = TetrominoShape.T,
     nextPiece: TetrominoShape = TetrominoShape.I
@@ -207,4 +212,55 @@ class ReplayPlayerSpec extends AnyFlatSpec with Matchers:
     state = ReplayPlayer.advanceFrame(state, config)
     state.eventIndex shouldBe 2
     state.currentFrame shouldBe 3L
+  }
+
+  "ReplayPlayerState.delayUntilNextFrameMs" should "be the time recorded before the first event" in {
+    val events = Vector(ReplayEvent.PlayerInput(Input.Tick, 0L, Timing.FirstMs))
+    val state  = ReplayPlayer.initialize(ReplayData(createMetadata(), events))
+
+    state.delayUntilNextFrameMs shouldBe Timing.FirstMs
+  }
+
+  it should "be the gap between consecutive frames" in {
+    val events = Vector(
+      ReplayEvent.PlayerInput(Input.Tick, 0L, Timing.FirstMs),
+      ReplayEvent.PieceSpawn(TetrominoShape.O, 1L, Timing.SecondMs),
+      ReplayEvent.PlayerInput(Input.HardDrop, 1L, Timing.SecondMs)
+    )
+    val initial    = ReplayPlayer.initialize(ReplayData(createMetadata(), events))
+    val afterFirst = ReplayPlayer.advanceFrame(initial, config)
+
+    afterFirst.playedElapsedMs shouldBe Timing.FirstMs
+    afterFirst.delayUntilNextFrameMs shouldBe (Timing.SecondMs - Timing.FirstMs)
+  }
+
+  it should "be zero for a frame without events and after the last event" in {
+    val events  = Vector(ReplayEvent.PlayerInput(Input.Tick, Timing.LaterFrame, Timing.FirstMs))
+    val initial = ReplayPlayer.initialize(ReplayData(createMetadata(), events))
+    val empty   = ReplayPlayer.initialize(ReplayData(createMetadata(), Vector.empty))
+
+    initial.delayUntilNextFrameMs shouldBe 0L
+    empty.delayUntilNextFrameMs shouldBe 0L
+  }
+
+  it should "never be negative for timestamps that go backwards" in {
+    val events = Vector(
+      ReplayEvent.PlayerInput(Input.Tick, 0L, Timing.SecondMs),
+      ReplayEvent.PlayerInput(Input.Tick, 1L, Timing.FirstMs)
+    )
+    val afterFirst = ReplayPlayer.advanceFrame(ReplayPlayer.initialize(ReplayData(createMetadata(), events)), config)
+
+    afterFirst.delayUntilNextFrameMs shouldBe 0L
+  }
+
+  "ReplayPlayer.advanceFrame" should "play events stamped with an already passed frame instead of stalling" in {
+    val events = Vector(
+      ReplayEvent.PlayerInput(Input.MoveLeft, Timing.LaterFrame),
+      ReplayEvent.PlayerInput(Input.MoveRight, 0L)
+    )
+    val initial  = ReplayPlayer.initialize(ReplayData(createMetadata(), events))
+    val finished = (0L to Timing.LaterFrame).foldLeft(initial)((state, _) => ReplayPlayer.advanceFrame(state, config))
+
+    finished.eventIndex shouldBe events.size
+    finished.isFinished shouldBe true
   }

@@ -64,11 +64,3 @@ object TerminalInput:
         case None        => KeyMapping.ParseResult.Unknown
       }
     else ZIO.succeed(KeyMapping.ParseResult.Regular(key))
-
-object TerminalControl:
-
-  def enableRawMode: ZIO[CommandService, Throwable, Unit] =
-    CommandService.exec("stty raw -echo < /dev/tty")
-
-  def disableRawMode: ZIO[CommandService, Throwable, Unit] =
-    CommandService.exec("stty cooked echo < /dev/tty")
