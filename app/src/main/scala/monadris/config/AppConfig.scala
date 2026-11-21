@@ -50,7 +50,8 @@ final case class DatabaseConfig(
 ):
   /** Keeps the password out of logs and error messages */
   override def toString: String =
-    s"DatabaseConfig($url, $username, ${DatabaseConfig.RedactedPassword}, $poolSize, $connectionTimeoutMs)"
+    s"DatabaseConfig($url, $username, ${DatabaseConfig.Redacted}, $poolSize, $connectionTimeoutMs)"
 
 object DatabaseConfig:
-  private val RedactedPassword = "***"
+  /** Shown in place of the secret */
+  private val Redacted = "***"

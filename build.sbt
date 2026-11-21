@@ -22,7 +22,8 @@ lazy val core = project
   .settings(commonSettings)
   .settings(
     name := "monadris-core",
-    Compile / wartremoverErrors ++= Warts.unsafe.filterNot(_ == Wart.DefaultArguments), // DefaultArgumentsのみ許容
+    Compile / wartremoverErrors ++= Warts.unsafe
+      .filterNot(_ == Wart.DefaultArguments), // only DefaultArguments is allowed
     Compile / wartremoverErrors ++= Seq(Wart.Var, Wart.Null, Wart.Return, Wart.Throw),
     wartremoverExcluded += (Test / sourceDirectory).value
   )
