@@ -13,9 +13,9 @@ class GameViewSpec extends AnyFlatSpec with Matchers:
     val Width  = 6
     val Height = 8
 
-  val config: AppConfig = TestConfig.testConfig
-  val gridWidth: Int    = config.grid.width
-  val gridHeight: Int   = config.grid.height
+  val config: GameConfig = TestConfig.testConfig
+  val gridWidth: Int     = config.grid.width
+  val gridHeight: Int    = config.grid.height
 
   def initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)

@@ -106,7 +106,7 @@ graph TD
 | Layer | Project | ZIO Dependency | Description |
 |-------|---------|----------------|-------------|
 | **Domain** | `core` | **No** | Immutable data structures (`GameState`, `Grid`, `Tetromino`, `Position`) |
-| **Config** | `core` | **No** | Pure configuration definitions (`AppConfig`) |
+| **Config** | `core` | **No** | Game rules (`GameConfig`) and their validation |
 | **Game** | `core` | **No** | Pure state transitions (`GameLogic`, `GameLoop`, `Collision`, `LineClearing`) |
 | **Input** | `core` | **No** | Input processing (`KeyMapping`, `GameCommand`) |
 | **Replay** | `core` | **No** | Replay recording/playback (`ReplayBuilder`, `ReplayPlayer`, `ReplayData`) |
@@ -114,7 +114,7 @@ graph TD
 | **Game Runtime** | `app` | **Yes** | Game loop execution (`GameRunner`, `GameSession`, `ReplayRunner`, `MenuController`) |
 | **Terminal** | `app` | **Yes** | Console I/O (`ConsoleRenderer`, `TerminalInput`, `TerminalSession`) |
 | **Persistence** | `app` | **Yes** | Replay storage (`FileReplayRepository`, `PostgresReplayRepository`, `FlywayMigration`) |
-| **Config Loader** | `app` | **Yes** | ZIO Config loading (`ConfigLayer`, `DatabaseLayer`) |
+| **Config Loader** | `app` | **Yes** | Full `AppConfig` (game rules + terminal/replay/database), loading and validation (`ConfigLayer`) |
 
 ### 3. Runtime Event Loop
 How ZIO handles concurrent inputs and serializes them into the game loop.
@@ -201,7 +201,9 @@ or by the `MONADRIS_REPLAY_STORAGE` environment variable.
 
 The dev container sets `MONADRIS_REPLAY_STORAGE=postgres` and provides the database.
 
-Replay names may contain letters, digits, `-` and `_` (up to 64 characters). Replays are listed newest first.
+Replay names may contain letters, digits, `-` and `_` (up to 64 characters). Replays are listed newest first. An existing replay is never overwritten.
+
+While watching a replay: `+` / `-` change the speed, `P` or `Space` pauses, `Q` quits. Playback follows the timing of the original game.
 
 ## Controls
 
@@ -221,7 +223,7 @@ Replay names may contain letters, digits, `-` and `_` (up to 64 characters). Rep
 monadris/
 ├── core/                       # Pure logic (ZIO-independent / WartRemover enforced)
 │   └── src/main/scala/monadris/
-│       ├── config/             # Pure config definition (AppConfig)
+│       ├── config/             # Game rules (GameConfig)
 │       ├── domain/             # Immutable data models (GameState, Grid, Tetromino, Position)
 │       ├── game/               # Pure game rules (GameLogic, GameLoop, Collision, LineClearing)
 │       ├── input/              # Input processing (KeyMapping, GameCommand)

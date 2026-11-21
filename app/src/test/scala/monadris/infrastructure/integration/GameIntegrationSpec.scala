@@ -55,7 +55,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
     nextShapeProvider: TetrominoShape
   ): GameState =
     inputs.foldLeft(initialState) { (state, input) =>
-      GameLogic.update(state, input, nextShapeProvider, config)
+      GameLogic.update(state, input, nextShapeProvider, config.game)
     }
 
   def spec = suite("Game Integration Tests")(
@@ -76,7 +76,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         initialState,
         Input.Tick,
         fixedShapeProvider(TetrominoShape.T),
-        config
+        config.game
       )
 
       assertTrue(
@@ -127,7 +127,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         pausedState,
         Input.Tick,
         fixedShapeProvider(TetrominoShape.T),
-        config
+        config.game
       )
 
       assertTrue(
@@ -163,7 +163,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         state,
         Input.HardDrop,
         fixedShapeProvider(TetrominoShape.O),
-        config
+        config.game
       )
 
       assertTrue(
@@ -202,7 +202,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         state,
         Input.HardDrop,
         fixedShapeProvider(TetrominoShape.O),
-        config
+        config.game
       )
 
       assertTrue(finalState.score > 0)
@@ -256,7 +256,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         state,
         Input.HardDrop,
         fixedShapeProvider(TetrominoShape.I),
-        config
+        config.game
       )
 
       assertTrue(
@@ -312,7 +312,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         playingState,
         Input.Pause,
         fixedShapeProvider(TetrominoShape.T),
-        config
+        config.game
       )
 
       assertTrue(pausedState.status == GameStatus.Paused)
@@ -346,7 +346,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         pausedState,
         Input.HardDrop,
         fixedShapeProvider(TetrominoShape.T),
-        config
+        config.game
       )
 
       assertTrue(
@@ -362,7 +362,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
         pausedState,
         Input.Pause,
         fixedShapeProvider(TetrominoShape.T),
-        config
+        config.game
       )
 
       assertTrue(resumedState.status == GameStatus.Playing)
@@ -373,10 +373,12 @@ object GameIntegrationSpec extends ZIOSpecDefault:
       val initialScore = initialState.score
       val initialX     = initialState.currentTetromino.position.x
 
-      val pauseState       = GameLogic.update(initialState, Input.Pause, fixedShapeProvider(TetrominoShape.T), config)
-      val stillPausedState = GameLogic.update(pauseState, Input.MoveLeft, fixedShapeProvider(TetrominoShape.T), config)
-      val resumedState = GameLogic.update(stillPausedState, Input.Pause, fixedShapeProvider(TetrominoShape.T), config)
-      val movedState   = GameLogic.update(resumedState, Input.MoveLeft, fixedShapeProvider(TetrominoShape.T), config)
+      val pauseState = GameLogic.update(initialState, Input.Pause, fixedShapeProvider(TetrominoShape.T), config.game)
+      val stillPausedState =
+        GameLogic.update(pauseState, Input.MoveLeft, fixedShapeProvider(TetrominoShape.T), config.game)
+      val resumedState =
+        GameLogic.update(stillPausedState, Input.Pause, fixedShapeProvider(TetrominoShape.T), config.game)
+      val movedState = GameLogic.update(resumedState, Input.MoveLeft, fixedShapeProvider(TetrominoShape.T), config.game)
 
       assertTrue(
         stillPausedState.currentTetromino.position.x == initialX,
@@ -413,7 +415,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
           .fromQueue(queue)
           .take(2)
           .runFold(initialState) { (currentState, input) =>
-            GameLogic.update(currentState, input, fixedShapeProvider(TetrominoShape.T), config)
+            GameLogic.update(currentState, input, fixedShapeProvider(TetrominoShape.T), config.game)
           }
 
         consoleService <- ZIO.service[Mocks.TestConsoleService]
@@ -444,7 +446,7 @@ object GameIntegrationSpec extends ZIOSpecDefault:
           .fromQueue(queue)
           .take(inputs.size.toLong)
           .runFold(initialState) { (state, input) =>
-            GameLogic.update(state, input, fixedShapeProvider(TetrominoShape.O), config)
+            GameLogic.update(state, input, fixedShapeProvider(TetrominoShape.O), config.game)
           }
       yield assertTrue(
         finalState.score > 0,

@@ -125,7 +125,7 @@ object GameLoopRunner:
     for
       nextShape <- context.randomPiece.nextShape
       oldState = state.gameState
-      outcome  = GameLoop.handleInput(oldState, input, nextShape, context.config)
+      outcome  = GameLoop.handleInput(oldState, input, nextShape, context.config.game)
       _ <- ZIO.when(outcome.state.isGameOver && !oldState.isGameOver) {
         ZIO.logInfo(
           s"Game Over - Score: ${outcome.state.score}, Lines: ${outcome.state.linesCleared}, Level: ${outcome.state.level}"

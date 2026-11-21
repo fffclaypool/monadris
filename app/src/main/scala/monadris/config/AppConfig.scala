@@ -1,5 +1,10 @@
 package monadris.config
 
+/**
+ * The complete application configuration as laid out in `application.conf`.
+ * The game rules are handed to the pure core as a [[GameConfig]]; the remaining
+ * sections concern the terminal, replay storage and the database.
+ */
 final case class AppConfig(
   grid: GridConfig,
   score: ScoreConfig,
@@ -9,30 +14,8 @@ final case class AppConfig(
   timing: TimingConfig,
   replay: ReplayConfig,
   database: DatabaseConfig
-)
-
-final case class GridConfig(
-  width: Int,
-  height: Int
-)
-
-final case class ScoreConfig(
-  singleLine: Int,
-  doubleLine: Int,
-  tripleLine: Int,
-  tetris: Int,
-  hardDropPerCell: Int
-)
-
-final case class LevelConfig(
-  linesPerLevel: Int
-)
-
-final case class SpeedConfig(
-  baseDropIntervalMs: Long,
-  minDropIntervalMs: Long,
-  decreasePerLevelMs: Long
-)
+):
+  def game: GameConfig = GameConfig(grid, score, level, speed)
 
 final case class TerminalConfig(
   escapeSequenceWaitMs: Int,
@@ -64,4 +47,10 @@ final case class DatabaseConfig(
   password: String,
   poolSize: Int,
   connectionTimeoutMs: Long
-)
+):
+  /** Keeps the password out of logs and error messages */
+  override def toString: String =
+    s"DatabaseConfig($url, $username, ${DatabaseConfig.RedactedPassword}, $poolSize, $connectionTimeoutMs)"
+
+object DatabaseConfig:
+  private val RedactedPassword = "***"

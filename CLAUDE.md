@@ -8,6 +8,7 @@
 - Test core only: `sbt core/test`
 - Test app only: `sbt app/test`
 - Stress Test: `sbt stressTest` (runs stress tests only)
+- Integration Test: `sbt integrationTest` (needs PostgreSQL with a `monadris_test` database; see `POSTGRES_*` variables in CI)
 - Run: `sbt app/run`
 - Single Test: `sbt "testOnly monadris.package.ClassName"`
 - Fix Lint/Format: `sbt scalafix` (if configured)
@@ -41,7 +42,7 @@ monadris/
 ├── core/                 # Pure logic (ZIO-independent)
 │   └── src/
 │       ├── main/scala/monadris/
-│       │   ├── config/       # Pure config case classes (AppConfig)
+│       │   ├── config/       # Game rules (GameConfig) and their validation
 │       │   ├── domain/       # Pure data structures (GameState, Grid, Tetromino)
 │       │   ├── game/         # Pure game logic (GameLogic, GameLoop, Collision)
 │       │   ├── input/        # Input processing (KeyMapping, GameCommand)
@@ -51,13 +52,13 @@ monadris/
 ├── app/                  # Impure layer (ZIO-dependent)
 │   └── src/
 │       ├── main/scala/monadris/
-│       │   ├── config/       # ZIO Config loading (ConfigLayer)
+│       │   ├── config/       # AppConfig (game rules + terminal/replay/database), ConfigLayer
 │       │   └── infrastructure/
-│       │       ├── game/         # Game runtime (GameRunner, GameSession)
-│       │       ├── persistence/  # Replay storage (FileReplayRepository)
-│       │       └── terminal/     # Console I/O (ConsoleRenderer, TerminalInput)
+│       │       ├── game/         # Game runtime (GameLoopRunner, GameSession, MenuController, ReplayRunner)
+│       │       ├── persistence/  # Replay storage (File/Postgres repositories, Flyway, ReplayError)
+│       │       └── terminal/     # Console I/O (ConsoleRenderer, TerminalInput, TerminalSession)
 │       └── test/scala/monadris/
-│       └── resources/        # application.conf, logback.xml
+│       └── resources/        # application.conf, logback.xml, db/migration (Flyway)
 └── build.sbt
 ```
 
@@ -67,7 +68,7 @@ monadris/
 - **No ZIO dependency** - pure Scala only
 - **WartRemover enforced** - `var`, `null`, `throw`, `return` are compile errors
 - Contains:
-  - `config/` - Pure `case class` definitions (`AppConfig`, etc.)
+  - `config/` - Game rules only (`GameConfig`: grid, score, level, speed) and `GameConfigValidation`
   - `domain/` - Pure data structures (`GameState`, `Grid`, `Tetromino`, `Input`)
   - `game/` - Pure functions: `(State, Input) => State` (`GameLogic`, `GameLoop`, `Collision`)
   - `input/` - Input processing (`KeyMapping`, `GameCommand`)
@@ -79,11 +80,14 @@ monadris/
 - ZIO 2.x for effects
 - WartRemover disabled (allows ZIO-style patterns)
 - Contains:
-  - `config/ConfigLayer` - ZIO Config loading from `application.conf`
-  - `infrastructure/game/` - Game runtime (`GameRunner`, `GameSession`, `ReplayRunner`)
+  - `config/` - `AppConfig` (adds terminal, timing, replay and database settings; `config.game` is passed to core),
+    `ConfigLayer` (loads and validates `application.conf`)
+  - `infrastructure/game/` - Game runtime (`GameLoopRunner`, `GameSession`, `MenuController`, `ReplayRunner`)
   - `infrastructure/persistence/` - Replay storage (`FileReplayRepository`, `PostgresReplayRepository`, `JsonReplayCodec`)
     - Backend is chosen by `monadris.replay.storage` (`file` default, `postgres`); see `Main.replayRepositoryLayer`
-  - `infrastructure/terminal/` - Console I/O (`ConsoleRenderer`, `TerminalInput`)
+    - Repositories fail with the typed `ReplayError`, not exceptions
+    - Schema changes go in a new `db/migration/V<n>__*.sql` file (applied by Flyway at startup)
+  - `infrastructure/terminal/` - Console I/O (`ConsoleRenderer`, `TerminalInput`, `TerminalSession`)
   - `Main.scala` - Application entry point
 
 ### WartRemover (Purity Enforcement)

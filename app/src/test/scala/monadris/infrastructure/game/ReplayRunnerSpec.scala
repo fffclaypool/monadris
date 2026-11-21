@@ -119,7 +119,7 @@ object ReplayRunnerSpec extends ZIOSpecDefault:
         )
         val atStart    = playbackAt(ReplayPlayer.initialize(createTestReplayData(events)), speed = 1.0)
         val afterFirst = playbackAt(
-          ReplayPlayer.advanceFrame(atStart.replayState, LocalTestServices.testConfig),
+          ReplayPlayer.advanceFrame(atStart.replayState, LocalTestServices.testConfig.game),
           speed = 1.0
         )
         assertTrue(
