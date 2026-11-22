@@ -48,18 +48,34 @@ object GameLoopRunner:
     }
 
   /**
-   * Runs the interactive game and returns the final state together with whatever
-   * the observer accumulated. The input and tick fibers live only as long as the loop.
+   * Everything the loop needs that stays the same from one command to the next.
+   * `upcomingShape` is the piece that enters the preview at the next lock; it is
+   * drawn once and replaced only when it has been consumed.
    */
-  /** Everything the loop needs that stays the same from one command to the next */
   final private case class LoopContext(
     queue: Queue[GameCommand],
     config: AppConfig,
     intervalRef: Ref[Long],
     renderer: Renderer,
-    randomPiece: GameRunner.RandomPiece
+    randomPiece: GameRunner.RandomPiece,
+    upcomingShape: Ref[TetrominoShape]
   )
 
+  private def makeContext(
+    queue: Queue[GameCommand],
+    config: AppConfig,
+    intervalRef: Ref[Long],
+    renderer: Renderer,
+    randomPiece: GameRunner.RandomPiece
+  ): UIO[LoopContext] =
+    randomPiece.nextShape
+      .flatMap(Ref.make(_))
+      .map(LoopContext(queue, config, intervalRef, renderer, randomPiece, _))
+
+  /**
+   * Runs the interactive game and returns the final state together with whatever
+   * the observer accumulated. The input and tick fibers live only as long as the loop.
+   */
   def observedGameLoop[A](
     initialState: GameState,
     config: AppConfig,
@@ -77,9 +93,9 @@ object GameLoopRunner:
             .run(commandQueue, config.terminal.inputPollIntervalMs)
             .provideSome[TtyService](ZLayer.succeed(config))
             .forkScoped
-          _ <- GameClock.run(commandQueue, intervalRef).forkScoped
-          context = LoopContext(commandQueue, config, intervalRef, renderer, randomPiece)
-          result <- observedEventLoop(context, LoopState(initialState, Some(initialBuffer)), initialObserved)(observe)
+          _       <- GameClock.run(commandQueue, intervalRef).forkScoped
+          context <- makeContext(commandQueue, config, intervalRef, renderer, randomPiece)
+          result  <- observedEventLoop(context, LoopState(initialState, Some(initialBuffer)), initialObserved)(observe)
         yield result
       }
       .map { case (loopState, observed) => (loopState.gameState, observed) }
@@ -92,9 +108,9 @@ object GameLoopRunner:
     renderer: Renderer,
     randomPiece: GameRunner.RandomPiece
   ): ZIO[ConsoleService, Throwable, LoopState] =
-    observedEventLoop(LoopContext(queue, config, intervalRef, renderer, randomPiece), state, ())(ignoreSteps).map {
-      case (loopState, _) => loopState
-    }
+    makeContext(queue, config, intervalRef, renderer, randomPiece)
+      .flatMap(observedEventLoop(_, state, ())(ignoreSteps))
+      .map { case (loopState, _) => loopState }
 
   private def observedEventLoop[A](
     context: LoopContext,
@@ -123,7 +139,7 @@ object GameLoopRunner:
     state: LoopState
   ): ZIO[ConsoleService, Throwable, (LoopState, Step)] =
     for
-      nextShape <- context.randomPiece.nextShape
+      nextShape <- context.upcomingShape.get
       oldState = state.gameState
       outcome  = GameLoop.handleInput(oldState, input, nextShape, context.config.game)
       _ <- ZIO.when(outcome.state.isGameOver && !oldState.isGameOver) {
@@ -131,6 +147,7 @@ object GameLoopRunner:
           s"Game Over - Score: ${outcome.state.score}, Lines: ${outcome.state.linesCleared}, Level: ${outcome.state.level}"
         )
       }
+      _         <- ZIO.when(outcome.pieceLocked)(context.randomPiece.nextShape.flatMap(context.upcomingShape.set))
       _         <- ZIO.foreachDiscard(outcome.nextIntervalMs)(context.intervalRef.set)
       newBuffer <- context.renderer.render(outcome.state, context.config, state.previousBuffer)
     yield (
