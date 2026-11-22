@@ -242,7 +242,8 @@ monadris/
 
 ## Testing
 
-This project uses **ZIO Test**.
+Each project uses one test framework: `core` is tested with **ScalaTest** (so that not even its tests depend on ZIO),
+`app` with **ZIO Test**.
 Heavy tests (memory leak checks) are tagged with `heavy` and excluded by default.
 
 ```bash

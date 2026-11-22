@@ -3,19 +3,26 @@ package monadris.infrastructure.game
 import zio.*
 import zio.test.*
 
-import monadris.infrastructure.terminal.TestServices as LocalTestServices
+import monadris.infrastructure.terminal.TestServices as Mocks
+import monadris.view.GameView
 
 object MenuControllerSpec extends ZIOSpecDefault:
 
-  private val menuItemCount = 5
+  private val menuItems     = GameView.MenuItems.all
+  private val menuItemCount = menuItems.size
 
   private object Key:
-    val Escape    = 27
-    val Bracket   = '['.toInt
-    val ArrowUp   = 'A'.toInt
-    val ArrowDown = 'B'.toInt
-    val Unknown   = 'Z'.toInt
-    val Enter     = '\r'.toInt
+    val Escape      = 27
+    val Bracket     = '['.toInt
+    val ArrowUp     = 'A'.toInt
+    val ArrowDown   = 'B'.toInt
+    val Unknown     = 'Z'.toInt
+    val Enter       = '\r'.toInt
+    val LineFeed    = '\n'.toInt
+    val Up          = 'k'.toInt
+    val Down        = 'j'.toInt
+    val Quit        = 'q'.toInt
+    val EndOfStream = -1
 
   private object Item:
     val First     = 0
@@ -24,238 +31,109 @@ object MenuControllerSpec extends ZIOSpecDefault:
     val ThirdKey  = '3'.toInt
     val Last: Int = menuItemCount - 1
 
-  /** Runs the menu on the given keys and returns the index of the item that was executed, if any */
-  private def selectedItem(inputs: Chunk[Int]): ZIO[Any, Throwable, Option[Int]] =
-    for
-      selected <- Ref.make(Option.empty[Int])
-      _        <- MenuController
-        .run[Any](index => selected.set(Some(index)).as(false))
-        .provide(LocalTestServices.tty(inputs), LocalTestServices.console, LocalTestServices.config)
-        .timeout(Duration.fromMillis(500))
-      result <- selected.get
-    yield result
+  private object Shown:
+    val Goodbye = "Thanks for playing!"
 
-  private val itemSelectionSuite = suite("Item selection")(
+  private val suiteTimeout = 10.seconds
+
+  /** Which item was executed (if any) and everything the menu drew */
+  final private case class MenuRun(selected: Option[Int], screen: String)
+
+  /** Runs the menu on the given keys; executing an item leaves the menu */
+  private def runMenu(inputs: Chunk[Int]): Task[MenuRun] =
+    val run =
+      for
+        console  <- ZIO.service[Mocks.TestConsoleService]
+        selected <- Ref.make(Option.empty[Int])
+        _        <- MenuController.run[Any](index => selected.set(Some(index)).as(false))
+        result   <- selected.get
+        output   <- console.buffer.get
+      yield MenuRun(result, output.mkString)
+    run.provide(Mocks.tty(inputs), Mocks.console, Mocks.config)
+
+  private def selects(inputs: Chunk[Int], expected: Int): Task[TestResult] =
+    runMenu(inputs).map(menu => assertTrue(menu.selected.contains(expected)))
+
+  private def quitsWithoutSelecting(inputs: Chunk[Int]): Task[TestResult] =
+    runMenu(inputs).map(menu => assertTrue(menu.selected.isEmpty, menu.screen.contains(Shown.Goodbye)))
+
+  private def itemSelectionSuite = suite("Item selection")(
     test("Enter selects the first item initially") {
-      for selected <- selectedItem(Chunk(Key.Enter))
-      yield assertTrue(selected.contains(Item.First))
+      selects(Chunk(Key.Enter), Item.First)
     },
-    test("the arrow down sequence moves the selection") {
-      for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.ArrowDown, Key.Enter))
-      yield assertTrue(selected.contains(Item.Second))
-    },
-    test("the arrow up sequence wraps around to the last item") {
-      for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.ArrowUp, Key.Enter))
-      yield assertTrue(selected.contains(Item.Last))
-    },
-    test("an unknown arrow sequence leaves the selection unchanged") {
-      for selected <- selectedItem(Chunk(Key.Escape, Key.Bracket, Key.Unknown, Key.Enter))
-      yield assertTrue(selected.contains(Item.First))
-    },
-    test("an escape followed by something other than a bracket leaves the selection unchanged") {
-      for selected <- selectedItem(Chunk(Key.Escape, Key.Unknown, Key.Enter))
-      yield assertTrue(selected.contains(Item.First))
+    test("a line feed selects like Enter") {
+      selects(Chunk(Key.LineFeed), Item.First)
     },
     test("the shortcut key shown next to an item selects it directly") {
-      for selected <- selectedItem(Chunk(Item.ThirdKey))
-      yield assertTrue(selected.contains(Item.Third))
+      selects(Chunk(Item.ThirdKey), Item.Third)
     },
     test("a key that is not a shortcut is ignored") {
-      for selected <- selectedItem(Chunk(Key.Unknown, Key.Enter))
-      yield assertTrue(selected.contains(Item.First))
+      selects(Chunk(Key.Unknown, Key.Enter), Item.First)
+    }
+  )
+
+  private def vimNavigationSuite = suite("Navigation with K and J")(
+    test("j moves the selection down") {
+      selects(Chunk(Key.Down, Key.Enter), Item.Second)
     },
-    test("the end of the input stream quits without selecting anything") {
-      for selected <- selectedItem(Chunk(-1))
-      yield assertTrue(selected.isEmpty)
+    test("k moves the selection back up") {
+      selects(Chunk(Key.Down, Key.Down, Key.Up, Key.Enter), Item.Second)
+    },
+    test("uppercase K and J navigate as well") {
+      selects(Chunk('J'.toInt, 'J'.toInt, 'K'.toInt, Key.Enter), Item.Second)
+    },
+    test("k wraps around from the first item to the last") {
+      selects(Chunk(Key.Up, Key.Enter), Item.Last)
+    },
+    test("j wraps around from the last item to the first") {
+      selects(Chunk.fill(menuItemCount)(Key.Down) :+ Key.Enter, Item.First)
+    }
+  )
+
+  private def arrowNavigationSuite = suite("Navigation with arrow keys")(
+    test("the arrow down sequence moves the selection") {
+      selects(Chunk(Key.Escape, Key.Bracket, Key.ArrowDown, Key.Enter), Item.Second)
+    },
+    test("the arrow up sequence wraps around to the last item") {
+      selects(Chunk(Key.Escape, Key.Bracket, Key.ArrowUp, Key.Enter), Item.Last)
+    },
+    test("an unknown arrow sequence leaves the selection unchanged") {
+      selects(Chunk(Key.Escape, Key.Bracket, Key.Unknown, Key.Enter), Item.First)
+    },
+    test("an escape followed by something other than a bracket leaves the selection unchanged") {
+      selects(Chunk(Key.Escape, Key.Unknown, Key.Enter), Item.First)
+    }
+  )
+
+  private def quitSuite = suite("Quitting")(
+    test("q quits and shows the goodbye screen") {
+      quitsWithoutSelecting(Chunk(Key.Quit))
+    },
+    test("uppercase Q quits as well") {
+      quitsWithoutSelecting(Chunk('Q'.toInt))
+    },
+    test("a lone escape key quits") {
+      quitsWithoutSelecting(Chunk(Key.Escape))
+    },
+    test("the end of the input stream quits") {
+      quitsWithoutSelecting(Chunk(Key.EndOfStream))
+    }
+  )
+
+  private def renderingSuite = suite("Rendering")(
+    test("the menu shows every item with its shortcut key") {
+      runMenu(Chunk(Key.Quit)).map { menu =>
+        assertTrue(
+          menuItems.forall(item => menu.screen.contains(item.label) && menu.screen.contains(item.key.toString))
+        )
+      }
     }
   )
 
   def spec = suite("MenuController")(
     itemSelectionSuite,
-    suite("MenuAction enum")(
-      test("Select wraps index correctly") {
-        val action = MenuController.MenuAction.Select(2)
-        action match
-          case MenuController.MenuAction.Select(idx) => assertTrue(idx == 2)
-          case _                                     => assertTrue(false)
-      },
-      test("Navigate wraps newIndex correctly") {
-        val action = MenuController.MenuAction.Navigate(3)
-        action match
-          case MenuController.MenuAction.Navigate(idx) => assertTrue(idx == 3)
-          case _                                       => assertTrue(false)
-      },
-      test("Quit is a valid action") {
-        val action = MenuController.MenuAction.Quit
-        assertTrue(action == MenuController.MenuAction.Quit)
-      },
-      test("All MenuAction variants are distinct") {
-        val select   = MenuController.MenuAction.Select(0)
-        val navigate = MenuController.MenuAction.Navigate(0)
-        val quit     = MenuController.MenuAction.Quit
-        assertTrue(
-          select != navigate,
-          select != quit,
-          navigate != quit
-        )
-      }
-    ),
-    suite("Menu navigation with keys")(
-      test("K key navigates up from index 1") {
-        val expectedIndex = 0
-        for result <- runMenuWithInputs(
-            startIndex = 1,
-            inputs = Chunk('k'.toInt, 'q'.toInt)
-          )
-        yield assertTrue(result.navigatedTo.contains(expectedIndex))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("J key navigates down from index 0") {
-        val expectedIndex = 1
-        for result <- runMenuWithInputs(
-            startIndex = 0,
-            inputs = Chunk('j'.toInt, 'q'.toInt)
-          )
-        yield assertTrue(result.navigatedTo.contains(expectedIndex))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("K key wraps to bottom from index 0") {
-        val expectedIndex = menuItemCount - 1
-        for result <- runMenuWithInputs(
-            startIndex = 0,
-            inputs = Chunk('K'.toInt, 'q'.toInt)
-          )
-        yield assertTrue(result.navigatedTo.contains(expectedIndex))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("J key wraps to top from last index") {
-        val expectedIndex = 0
-        for result <- runMenuWithInputs(
-            startIndex = menuItemCount - 1,
-            inputs = Chunk('J'.toInt, 'q'.toInt)
-          )
-        yield assertTrue(result.navigatedTo.contains(expectedIndex))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("Number keys select corresponding menu item") {
-        for result <- runMenuWithInputs(
-            startIndex = 0,
-            inputs = Chunk('2'.toInt)
-          )
-        yield assertTrue(result.selectedIndex.contains(1))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("Enter key selects current item") {
-        for result <- runMenuWithInputs(
-            startIndex = 0,
-            inputs = Chunk('\r'.toInt)
-          )
-        yield assertTrue(result.selectedIndex.contains(0))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("Q key quits the menu") {
-        for result <- runMenuWithInputs(startIndex = 0, inputs = Chunk('q'.toInt))
-        yield assertTrue(result.didQuit)
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("Uppercase Q key also quits") {
-        for result <- runMenuWithInputs(startIndex = 0, inputs = Chunk('Q'.toInt))
-        yield assertTrue(result.didQuit)
-      }.provide(LocalTestServices.console, LocalTestServices.config)
-    ),
-    suite("Arrow key handling")(
-      test("Up arrow navigates up") {
-        val escapeSeq     = Chunk(27, '['.toInt, 'A'.toInt)
-        val quitSeq       = Chunk('q'.toInt)
-        val expectedIndex = 0
-        for result <- runMenuWithInputs(
-            startIndex = 1,
-            inputs = escapeSeq ++ quitSeq
-          )
-        yield assertTrue(result.navigatedTo.contains(expectedIndex))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("Down arrow navigates down") {
-        val escapeSeq     = Chunk(27, '['.toInt, 'B'.toInt)
-        val quitSeq       = Chunk('q'.toInt)
-        val expectedIndex = 1
-        for result <- runMenuWithInputs(
-            startIndex = 0,
-            inputs = escapeSeq ++ quitSeq
-          )
-        yield assertTrue(result.navigatedTo.contains(expectedIndex))
-      }.provide(LocalTestServices.console, LocalTestServices.config),
-      test("Escape alone (no arrow sequence) quits") {
-        for result <- runMenuWithInputs(startIndex = 0, inputs = Chunk(27))
-        yield assertTrue(result.didQuit)
-      }.provide(LocalTestServices.console, LocalTestServices.config)
-    ),
-    suite("Menu rendering")(
-      test("Menu renders output to console") {
-        for
-          service <- ZIO.service[LocalTestServices.TestConsoleService]
-          _       <- runMenuWithInputs(startIndex = 0, inputs = Chunk('q'.toInt))
-          output  <- service.buffer.get
-          combined = output.mkString
-        yield assertTrue(combined.nonEmpty)
-      }.provide(LocalTestServices.console, LocalTestServices.config)
-    )
-  )
-
-  final case class MenuTestResult(
-    selectedIndex: Option[Int] = None,
-    navigatedTo: List[Int] = Nil,
-    didQuit: Boolean = false
-  )
-
-  private def runMenuWithInputs(
-    startIndex: Int,
-    inputs: Chunk[Int]
-  ): ZIO[LocalTestServices.TestConsoleService & monadris.config.AppConfig, Throwable, MenuTestResult] =
-    for
-      resultRef <- Ref.make(MenuTestResult())
-      ttyLayer        = LocalTestServices.tty(inputs)
-      executeMenuItem = (index: Int) => resultRef.update(_.copy(selectedIndex = Some(index))).as(false)
-      _ <- MenuController
-        .run[Any](executeMenuItem)
-        .catchAll {
-          case _: java.util.NoSuchElementException => ZIO.unit
-          case e                                   => ZIO.fail(e)
-        }
-        .provideSome[LocalTestServices.TestConsoleService & monadris.config.AppConfig](ttyLayer)
-        .fork
-        .flatMap { fiber =>
-          fiber.join.timeout(Duration.fromMillis(500)).catchAll(_ => ZIO.unit)
-        }
-      result      <- resultRef.get
-      navigations <- extractNavigations(inputs, startIndex)
-    yield result.copy(
-      navigatedTo = navigations,
-      didQuit =
-        inputs.contains('q'.toInt) || inputs.contains('Q'.toInt) || (inputs.headOption.contains(27) && inputs.size == 1)
-    )
-
-  private def extractNavigations(inputs: Chunk[Int], startIndex: Int): UIO[List[Int]] =
-    ZIO.succeed {
-      var idx         = startIndex
-      val menuSize    = menuItemCount
-      val navigations = scala.collection.mutable.ListBuffer.empty[Int]
-
-      val inputList = inputs.toList
-      var i         = 0
-      while i < inputList.size do
-        inputList(i) match
-          case 'k' | 'K' =>
-            idx = if idx > 0 then idx - 1 else menuSize - 1
-            navigations += idx
-          case 'j' | 'J' =>
-            idx = if idx < menuSize - 1 then idx + 1 else 0
-            navigations += idx
-          case 27 if i + 2 < inputList.size && inputList(i + 1) == '[' =>
-            inputList(i + 2) match
-              case 'A' =>
-                idx = if idx > 0 then idx - 1 else menuSize - 1
-                navigations += idx
-                i += 2
-              case 'B' =>
-                idx = if idx < menuSize - 1 then idx + 1 else 0
-                navigations += idx
-                i += 2
-              case _ => ()
-          case _ => ()
-        i += 1
-
-      navigations.toList
-    }
+    vimNavigationSuite,
+    arrowNavigationSuite,
+    quitSuite,
+    renderingSuite
+  ) @@ TestAspect.timeout(suiteTimeout)

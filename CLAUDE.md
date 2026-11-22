@@ -13,6 +13,12 @@
 - Single Test: `sbt "testOnly monadris.package.ClassName"`
 - Fix Lint/Format: `sbt scalafix` (if configured)
 
+### Test Frameworks
+- `core` tests use **ScalaTest** (`AnyFlatSpec with Matchers`); `core` must not depend on ZIO, not even in tests.
+- `app` tests use **ZIO Test** (`ZIOSpecDefault`). Do not add ScalaTest specs to `app`.
+- Keep `def spec` small: put each group of tests in its own `private def xxxSuite = suite(...)` (SonarCloud flags large spec methods).
+- Game-loop tests that assert on the resulting state must use `TestServices.ttyWithoutGravity`; with `TestServices.tty` the gravity timer fires in a burst.
+
 ### Test Tags
 - `heavy` - Long-running stress tests (e.g., 100,000 iterations). Tagged with `TestAspect.tag("heavy")`.
 - Stress tests use the `Stress` config scope in sbt with `RUN_STRESS_TESTS` environment variable.

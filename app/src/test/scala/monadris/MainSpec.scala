@@ -8,12 +8,42 @@ import monadris.infrastructure.persistence.ReplayError
 import monadris.infrastructure.persistence.ReplayRepository
 import monadris.infrastructure.terminal.TestServices as Mocks
 import monadris.replay.ReplayData
+import monadris.view.GameView
 
 /**
  * Integration tests for Main.program.
  * Tests the entire application using TestServices mock implementations.
+ *
+ * PlayGame/PlayAndRecord are not driven from here: the game clock needs
+ * TestClock.adjust and the input fiber competes with the menu for key input.
+ * Those paths are covered by the GameSession/GameLoopRunner specs.
  */
 object MainSpec extends ZIOSpecDefault:
+
+  private object Keys:
+    val Escape: Int = 27
+    val Enter: Int  = '\r'.toInt
+    val Quit: Int   = 'q'.toInt
+
+    val WatchReplay: Int = '3'.toInt
+    val ListReplays: Int = '4'.toInt
+    val AnyKey: Int      = ' '.toInt
+    val Down: Int        = 'j'.toInt
+
+    val LeftArrow: Chunk[Int] = Chunk(Escape, '['.toInt, 'D'.toInt)
+
+  private object Expected:
+    val Title          = "Functional Tetris in Scala"
+    val Controls       = "Controls"
+    val Goodbye        = "Thanks for playing!"
+    val NoReplays      = "No replays found."
+    val MenuItems      = GameView.MenuItems.all.map(_.label)
+    val StepsDownToEnd = MenuItems.size - 1
+
+  private val programTimeout = 5.seconds
+
+  /** What the program wrote to the screen and what it showed through the terminal session */
+  final private case class Transcript(screen: String, messages: List[String])
 
   val mockReplayRepository: ULayer[ReplayRepository] = ZLayer.succeed {
     new ReplayRepository:
@@ -24,231 +54,87 @@ object MainSpec extends ZIOSpecDefault:
       def delete(name: String): IO[ReplayError, Unit]                   = ZIO.unit
   }
 
-  def spec = suite("Main Application")(
-    test("replayRepositoryLayer provides file storage without a database when storage is file") {
-      for repository <- ZIO.service[ReplayRepository]
-      yield assertTrue(repository.isInstanceOf[FileReplayRepository])
-    }.provide(Mocks.config, Main.replayRepositoryLayer),
-    test("program runs and exits with Q key") {
-      val inputs = Chunk('q'.toInt)
-      for _ <- Main.program
-          .timeout(5.seconds)
-      yield assertTrue(true)
-    }.provide(
-      Mocks.tty(Chunk('q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program runs and exits with lowercase q") {
-      for _ <- Main.program
-          .timeout(5.seconds)
-      yield assertTrue(true)
-    }.provide(
-      Mocks.tty(Chunk('q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program runs and exits with uppercase Q") {
-      for _ <- Main.program
-          .timeout(5.seconds)
-      yield assertTrue(true)
-    }.provide(
-      Mocks.tty(Chunk('Q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('Q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program shows title screen") {
+  /** Runs the whole program against the given key presses; fails if it does not exit by itself */
+  private def runProgram(keys: Chunk[Int]): Task[Transcript] =
+    val run =
       for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("Functional Tetris"),
-        combined.contains("Controls")
-      )
-    }.provide(
-      Mocks.tty(Chunk('q'.toInt)),
+        console  <- ZIO.service[Mocks.TestConsoleService]
+        session  <- ZIO.service[Mocks.TestTerminalSession]
+        _        <- Main.program.timeoutFail(new RuntimeException("program did not exit"))(programTimeout)
+        screen   <- console.buffer.get
+        messages <- session.messages.get
+      yield Transcript(screen.mkString, messages)
+    run.provide(
+      Mocks.tty(keys),
       Mocks.console,
       Mocks.command,
       Mocks.config,
-      Mocks.terminalSession(Chunk('q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program shows menu after title") {
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("Functional Tetris in Scala"),
-        combined.contains("Play Game"),
-        combined.contains("Play & Record"),
-        combined.contains("Watch Replay"),
-        combined.contains("List Replays")
-      )
-    }.provide(
-      Mocks.tty(Chunk('q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program outputs goodbye message on quit") {
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(combined.contains("Thanks for playing!"))
-    }.provide(
-      Mocks.tty(Chunk('q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program handles movement before quit") {
-      val inputs = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)
-      for _ <- Main.program
-          .timeout(5.seconds)
-      yield assertTrue(true)
-    }.provide(
-      Mocks.tty(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program handles arrow keys before quit") {
-      val inputs = Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)
-      for _ <- Main.program
-          .timeout(5.seconds)
-      yield assertTrue(true)
-    }.provide(
-      Mocks.tty(Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk(27, '['.toInt, 'D'.toInt, 'q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program ignores unknown keys and continues") {
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("Play Game"),
-        combined.contains("Thanks for playing!")
-      )
-    }.provide(
-      Mocks.tty(Chunk('x'.toInt, 'q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('x'.toInt, 'q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program handles WatchReplay menu selection with no replays") {
-      // Select WatchReplay with '3', press key after "No replays" message, quit with 'q'
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("No replays") || combined.contains("no replays") || combined.contains("Thanks")
-      )
-    }.provide(
-      Mocks.tty(Chunk('3'.toInt, ' '.toInt, 'q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('3'.toInt, ' '.toInt, 'q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program handles ListReplays menu selection with no replays") {
-      // Select ListReplays with '4', press key after "No replays" message, quit with 'q'
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("No replays") || combined.contains("no replays") || combined.contains("Thanks")
-      )
-    }.provide(
-      Mocks.tty(Chunk('4'.toInt, ' '.toInt, 'q'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('4'.toInt, ' '.toInt, 'q'.toInt)),
-      mockReplayRepository
-    ),
-    test("program handles Quit menu selection via navigation") {
-      // Navigate down 4 times with 'j' to select Quit, confirm with Enter
-      // Note: Quit selection from menu exits without calling showGoodbye
-      val inputs = Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("Exit") || combined.contains("Quit") // Verify menu item is displayed
-      )
-    }.provide(
-      Mocks.tty(Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk('j'.toInt, 'j'.toInt, 'j'.toInt, 'j'.toInt, '\r'.toInt)),
-      mockReplayRepository
-    ),
-    // NOTE: PlayGame/PlayAndRecord integration tests are not feasible because
-    // GameClock.run uses ZIO.sleep (requires TestClock.adjust) and the
-    // InputStream fiber competes with MenuController for TtyService input.
-    // These paths are covered by GameSession/GameLoopRunner unit tests instead.
-    // Quit via number key is also not possible since MenuController only maps '1'-'4'.
-    test("program handles escape key as quit") {
-      // Escape with no follow-up input is interpreted as Quit by MenuController
-      for
-        service <- ZIO.service[Mocks.TestConsoleService]
-        _       <- Main.program
-          .timeout(5.seconds)
-        output <- service.buffer.get
-        combined = output.mkString
-      yield assertTrue(
-        combined.contains("Thanks for playing!")
-      )
-    }.provide(
-      Mocks.tty(Chunk(27)),
-      Mocks.console,
-      Mocks.command,
-      Mocks.config,
-      Mocks.terminalSession(Chunk(27)),
+      Mocks.terminalSession(keys),
       mockReplayRepository
     )
+
+  private def saysGoodbyeAfter(keys: Chunk[Int]): Task[TestResult] =
+    runProgram(keys).map(transcript => assertTrue(transcript.screen.contains(Expected.Goodbye)))
+
+  private def quittingSuite = suite("quitting")(
+    test("exits with lowercase q") {
+      saysGoodbyeAfter(Chunk(Keys.Quit))
+    },
+    test("exits with uppercase Q") {
+      saysGoodbyeAfter(Chunk('Q'.toInt))
+    },
+    test("treats a lone escape key as quit") {
+      saysGoodbyeAfter(Chunk(Keys.Escape))
+    },
+    test("ignores movement keys in the menu before quit") {
+      saysGoodbyeAfter(Chunk('h'.toInt, 'l'.toInt, Keys.Down, Keys.Quit))
+    },
+    test("ignores an arrow key that does not move vertically") {
+      saysGoodbyeAfter(Keys.LeftArrow :+ Keys.Quit)
+    },
+    test("ignores unknown keys and continues") {
+      saysGoodbyeAfter(Chunk('x'.toInt, Keys.Quit))
+    },
+    test("exits when Quit is selected by navigating to it") {
+      runProgram(Chunk.fill(Expected.StepsDownToEnd)(Keys.Down) :+ Keys.Enter).map { transcript =>
+        assertTrue(transcript.screen.contains(Expected.MenuItems.last))
+      }
+    }
+  )
+
+  private def screenSuite = suite("screens")(
+    test("shows the title screen with the controls") {
+      runProgram(Chunk(Keys.Quit)).map { transcript =>
+        assertTrue(transcript.screen.contains(Expected.Title), transcript.screen.contains(Expected.Controls))
+      }
+    },
+    test("shows every menu item") {
+      runProgram(Chunk(Keys.Quit)).map { transcript =>
+        assertTrue(Expected.MenuItems.forall(transcript.screen.contains))
+      }
+    },
+    test("WatchReplay reports that there are no replays and returns to the menu") {
+      runProgram(Chunk(Keys.WatchReplay, Keys.AnyKey, Keys.Quit)).map { transcript =>
+        assertTrue(
+          transcript.messages.exists(_.contains(Expected.NoReplays)),
+          transcript.screen.contains(Expected.Goodbye)
+        )
+      }
+    },
+    test("ListReplays reports that there are no replays and returns to the menu") {
+      runProgram(Chunk(Keys.ListReplays, Keys.AnyKey, Keys.Quit)).map { transcript =>
+        assertTrue(
+          transcript.messages.exists(_.contains(Expected.NoReplays)),
+          transcript.screen.contains(Expected.Goodbye)
+        )
+      }
+    }
+  )
+
+  def spec = suite("Main Application")(
+    test("replayRepositoryLayer provides file storage without a database when storage is file") {
+      ZIO.serviceWith[ReplayRepository](repository => assertTrue(repository.isInstanceOf[FileReplayRepository]))
+    }.provide(Mocks.config, Main.replayRepositoryLayer),
+    quittingSuite,
+    screenSuite
   )

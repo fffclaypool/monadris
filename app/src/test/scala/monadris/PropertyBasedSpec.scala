@@ -78,284 +78,291 @@ object PropertyBasedSpec extends ZIOSpecDefault:
       nextShape  <- genTetrominoShape
     yield GameState.initial(firstShape, nextShape, gridWidth, gridHeight)
 
-  def spec = suite("Property-Based Tests")(
-    suite("Grid Properties")(
-      test("empty grid has all cells empty") {
-        check(Gen.int(5, 15), Gen.int(10, 25)) { (width, height) =>
-          val grid     = Grid.empty(width, height)
-          val allEmpty = (for
-            x <- 0 until width
-            y <- 0 until height
-          yield grid.isEmpty(Position(x, y))).forall(identity)
-          assertTrue(allEmpty)
-        }
-      },
-      test("placing a cell and reading it back returns the same cell") {
-        check(genValidPosition, genTetrominoShape) { (pos, shape) =>
-          val grid    = Grid.empty(gridWidth, gridHeight)
-          val cell    = Cell.Filled(shape)
-          val newGrid = grid.place(pos, cell)
-          assertTrue(newGrid.get(pos) == Some(cell))
-        }
-      },
-      test("placing a cell does not affect other cells") {
-        check(genValidPosition, genValidPosition, genTetrominoShape) { (pos1, pos2, shape) =>
-          val grid      = Grid.empty(gridWidth, gridHeight)
-          val cell      = Cell.Filled(shape)
-          val newGrid   = grid.place(pos1, cell)
-          val unchanged = pos1 == pos2 || newGrid.get(pos2) == Some(Cell.Empty)
-          assertTrue(unchanged)
-        }
-      },
-      test("clearing rows reduces or maintains block count") {
-        check(genTetrominoShape) { shape =>
-          val grid       = Grid.empty(gridWidth, gridHeight)
-          val filled     = Cell.Filled(shape)
-          val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
-            g.place(Position(x, gridHeight - 1), filled)
-          }
-          val clearedGrid = filledGrid.clearRows(List(gridHeight - 1))
-
-          def countFilled(g: Grid): Int =
-            (for
-              x <- 0 until g.width
-              y <- 0 until g.height
-              if !g.isEmpty(Position(x, y))
-            yield 1).sum
-
-          assertTrue(countFilled(clearedGrid) <= countFilled(filledGrid))
-        }
-      },
-      test("grid dimensions are preserved after operations") {
-        check(genValidPosition, genTetrominoShape) { (pos, shape) =>
-          val grid    = Grid.empty(gridWidth, gridHeight)
-          val newGrid = grid.place(pos, Cell.Filled(shape))
-          assertTrue(
-            newGrid.width == grid.width &&
-              newGrid.height == grid.height
-          )
-        }
+  private def gridPropertiesSuite = suite("Grid Properties")(
+    test("empty grid has all cells empty") {
+      check(Gen.int(5, 15), Gen.int(10, 25)) { (width, height) =>
+        val grid     = Grid.empty(width, height)
+        val allEmpty = (for
+          x <- 0 until width
+          y <- 0 until height
+        yield grid.isEmpty(Position(x, y))).forall(identity)
+        assertTrue(allEmpty)
       }
-    ),
-
-    suite("Tetromino Properties")(
-      test("every tetromino has exactly 4 blocks") {
-        check(genTetrominoShape, genRotation) { (shape, rotation) =>
-          val tetromino = Tetromino(shape, Position(5, 5), rotation)
-          assertTrue(tetromino.currentBlocks.size == 4)
-        }
-      },
-      test("rotating 4 times returns to original orientation") {
-        check(genTetromino) { tetromino =>
-          val rotated = tetromino.rotateClockwise.rotateClockwise.rotateClockwise.rotateClockwise
-          assertTrue(rotated.rotation == tetromino.rotation)
-        }
-      },
-      test("moving and reverse moving returns to original position") {
-        check(genTetromino) { tetromino =>
-          val movedAndBack = tetromino.moveLeft.moveRight
-          assertTrue(movedAndBack.position == tetromino.position)
-        }
-      },
-      test("blocks are always within reasonable bounds after spawn") {
-        check(genTetrominoShape) { shape =>
-          val tetromino      = Tetromino.spawn(shape, gridWidth)
-          val allBlocksValid = tetromino.currentBlocks.forall { pos =>
-            pos.x >= 0 && pos.x < gridWidth && pos.y >= 0
-          }
-          assertTrue(allBlocksValid)
-        }
+    },
+    test("placing a cell and reading it back returns the same cell") {
+      check(genValidPosition, genTetrominoShape) { (pos, shape) =>
+        val grid    = Grid.empty(gridWidth, gridHeight)
+        val cell    = Cell.Filled(shape)
+        val newGrid = grid.place(pos, cell)
+        assertTrue(newGrid.get(pos) == Some(cell))
       }
-    ),
+    },
+    test("placing a cell does not affect other cells") {
+      check(genValidPosition, genValidPosition, genTetrominoShape) { (pos1, pos2, shape) =>
+        val grid      = Grid.empty(gridWidth, gridHeight)
+        val cell      = Cell.Filled(shape)
+        val newGrid   = grid.place(pos1, cell)
+        val unchanged = pos1 == pos2 || newGrid.get(pos2) == Some(Cell.Empty)
+        assertTrue(unchanged)
+      }
+    },
+    test("clearing rows reduces or maintains block count") {
+      check(genTetrominoShape) { shape =>
+        val grid       = Grid.empty(gridWidth, gridHeight)
+        val filled     = Cell.Filled(shape)
+        val filledGrid = (0 until gridWidth).foldLeft(grid) { (g, x) =>
+          g.place(Position(x, gridHeight - 1), filled)
+        }
+        val clearedGrid = filledGrid.clearRows(List(gridHeight - 1))
 
-    suite("Collision Properties")(
-      test("spawned tetromino is always valid on empty grid") {
-        check(genTetrominoShape) { shape =>
-          val grid      = Grid.empty(gridWidth, gridHeight)
-          val tetromino = Tetromino.spawn(shape, grid.width)
-          assertTrue(Collision.isValidPosition(tetromino, grid))
+        def countFilled(g: Grid): Int =
+          (for
+            x <- 0 until g.width
+            y <- 0 until g.height
+            if !g.isEmpty(Position(x, y))
+          yield 1).sum
+
+        assertTrue(countFilled(clearedGrid) <= countFilled(filledGrid))
+      }
+    },
+    test("grid dimensions are preserved after operations") {
+      check(genValidPosition, genTetrominoShape) { (pos, shape) =>
+        val grid    = Grid.empty(gridWidth, gridHeight)
+        val newGrid = grid.place(pos, Cell.Filled(shape))
+        assertTrue(
+          newGrid.width == grid.width &&
+            newGrid.height == grid.height
+        )
+      }
+    }
+  )
+
+  private def tetrominoPropertiesSuite = suite("Tetromino Properties")(
+    test("every tetromino has exactly 4 blocks") {
+      check(genTetrominoShape, genRotation) { (shape, rotation) =>
+        val tetromino = Tetromino(shape, Position(5, 5), rotation)
+        assertTrue(tetromino.currentBlocks.size == 4)
+      }
+    },
+    test("rotating 4 times returns to original orientation") {
+      check(genTetromino) { tetromino =>
+        val rotated = tetromino.rotateClockwise.rotateClockwise.rotateClockwise.rotateClockwise
+        assertTrue(rotated.rotation == tetromino.rotation)
+      }
+    },
+    test("moving and reverse moving returns to original position") {
+      check(genTetromino) { tetromino =>
+        val movedAndBack = tetromino.moveLeft.moveRight
+        assertTrue(movedAndBack.position == tetromino.position)
+      }
+    },
+    test("blocks are always within reasonable bounds after spawn") {
+      check(genTetrominoShape) { shape =>
+        val tetromino      = Tetromino.spawn(shape, gridWidth)
+        val allBlocksValid = tetromino.currentBlocks.forall { pos =>
+          pos.x >= 0 && pos.x < gridWidth && pos.y >= 0
         }
-      },
-      test("wall kick returns valid position or None") {
-        check(genValidTetromino) { tetromino =>
-          val grid    = Grid.empty(gridWidth, gridHeight)
-          val result  = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
-          val isValid = result match
-            case Some(rotated) => Collision.isValidPosition(rotated, grid)
-            case None          => true
-          assertTrue(isValid)
-        }
-      },
-      test("hard drop position is always at or below current position") {
-        check(genValidTetromino) { tetromino =>
-          val grid    = Grid.empty(gridWidth, gridHeight)
+        assertTrue(allBlocksValid)
+      }
+    }
+  )
+
+  private def collisionPropertiesSuite = suite("Collision Properties")(
+    test("spawned tetromino is always valid on empty grid") {
+      check(genTetrominoShape) { shape =>
+        val grid      = Grid.empty(gridWidth, gridHeight)
+        val tetromino = Tetromino.spawn(shape, grid.width)
+        assertTrue(Collision.isValidPosition(tetromino, grid))
+      }
+    },
+    test("wall kick returns valid position or None") {
+      check(genValidTetromino) { tetromino =>
+        val grid    = Grid.empty(gridWidth, gridHeight)
+        val result  = Collision.tryRotateWithWallKick(tetromino, grid, clockwise = true)
+        val isValid = result match
+          case Some(rotated) => Collision.isValidPosition(rotated, grid)
+          case None          => true
+        assertTrue(isValid)
+      }
+    },
+    test("hard drop position is always at or below current position") {
+      check(genValidTetromino) { tetromino =>
+        val grid    = Grid.empty(gridWidth, gridHeight)
+        val dropped = Collision.hardDropPosition(tetromino, grid)
+        assertTrue(dropped.position.y >= tetromino.position.y)
+      }
+    },
+    test("hard drop position cannot move down further") {
+      check(genValidTetromino) { tetromino =>
+        val grid = Grid.empty(gridWidth, gridHeight)
+        if Collision.isValidPosition(tetromino, grid) then
           val dropped = Collision.hardDropPosition(tetromino, grid)
-          assertTrue(dropped.position.y >= tetromino.position.y)
-        }
-      },
-      test("hard drop position cannot move down further") {
-        check(genValidTetromino) { tetromino =>
-          val grid = Grid.empty(gridWidth, gridHeight)
-          if Collision.isValidPosition(tetromino, grid) then
-            val dropped = Collision.hardDropPosition(tetromino, grid)
-            assertTrue(Collision.isValidPosition(dropped, grid), !Collision.isValidPosition(dropped.moveDown, grid))
-          else assertTrue(true)
-        }
+          assertTrue(Collision.isValidPosition(dropped, grid), !Collision.isValidPosition(dropped.moveDown, grid))
+        else assertTrue(true)
       }
-    ),
+    }
+  )
 
-    suite("LineClearing Properties")(
-      test("score is always non-negative") {
-        val scoreConfig = TestServices.testConfig.score
-        check(genLinesCleared, genLevel) { (lines, level) =>
-          val score = LineClearing.calculateScore(lines, level, scoreConfig)
-          assertTrue(score >= 0)
-        }
-      },
-      test("more lines cleared means higher or equal score at same level") {
-        val scoreConfig = TestServices.testConfig.score
-        check(genLevel) { level =>
-          val scores      = (0 to 4).map(lines => LineClearing.calculateScore(lines, level, scoreConfig))
-          val isMonotonic = scores.sliding(2).forall {
-            case Seq(a, b) => b >= a
-            case _         => true
-          }
-          assertTrue(isMonotonic)
-        }
-      },
-      test("higher level means higher or equal score for same lines") {
-        val scoreConfig = TestServices.testConfig.score
-        check(genLinesCleared) { lines =>
-          val scores      = (1 to 10).map(level => LineClearing.calculateScore(lines, level, scoreConfig))
-          val isMonotonic = scores.sliding(2).forall {
-            case Seq(a, b) => b >= a
-            case _         => true
-          }
-          assertTrue(isMonotonic)
-        }
-      },
-      test("level is always at least start level") {
-        val levelConfig = TestServices.testConfig.level
-        check(Gen.int(0, 100), Gen.int(1, 10)) { (totalLines, startLevel) =>
-          val level = LineClearing.calculateLevel(totalLines, levelConfig, startLevel)
-          assertTrue(level >= startLevel)
-        }
-      },
-      test("drop interval is always positive and within bounds") {
-        val speedConfig = TestServices.testConfig.speed
-        check(genLevel) { level =>
-          val interval = LineClearing.dropInterval(level, speedConfig)
-          assertTrue(
-            interval >= speedConfig.minDropIntervalMs &&
-              interval <= speedConfig.baseDropIntervalMs
-          )
-        }
-      },
-      test("higher level means faster or equal drop speed") {
-        val speedConfig = TestServices.testConfig.speed
-        check(Gen.int(1, 19)) { level =>
-          val interval1 = LineClearing.dropInterval(level, speedConfig)
-          val interval2 = LineClearing.dropInterval(level + 1, speedConfig)
-          assertTrue(interval2 <= interval1)
-        }
+  private def lineClearingPropertiesSuite = suite("LineClearing Properties")(
+    test("score is always non-negative") {
+      val scoreConfig = TestServices.testConfig.score
+      check(genLinesCleared, genLevel) { (lines, level) =>
+        val score = LineClearing.calculateScore(lines, level, scoreConfig)
+        assertTrue(score >= 0)
       }
-    ),
+    },
+    test("more lines cleared means higher or equal score at same level") {
+      val scoreConfig = TestServices.testConfig.score
+      check(genLevel) { level =>
+        val scores      = (0 to 4).map(lines => LineClearing.calculateScore(lines, level, scoreConfig))
+        val isMonotonic = scores.sliding(2).forall {
+          case Seq(a, b) => b >= a
+          case _         => true
+        }
+        assertTrue(isMonotonic)
+      }
+    },
+    test("higher level means higher or equal score for same lines") {
+      val scoreConfig = TestServices.testConfig.score
+      check(genLinesCleared) { lines =>
+        val scores      = (1 to 10).map(level => LineClearing.calculateScore(lines, level, scoreConfig))
+        val isMonotonic = scores.sliding(2).forall {
+          case Seq(a, b) => b >= a
+          case _         => true
+        }
+        assertTrue(isMonotonic)
+      }
+    },
+    test("level is always at least start level") {
+      val levelConfig = TestServices.testConfig.level
+      check(Gen.int(0, 100), Gen.int(1, 10)) { (totalLines, startLevel) =>
+        val level = LineClearing.calculateLevel(totalLines, levelConfig, startLevel)
+        assertTrue(level >= startLevel)
+      }
+    },
+    test("drop interval is always positive and within bounds") {
+      val speedConfig = TestServices.testConfig.speed
+      check(genLevel) { level =>
+        val interval = LineClearing.dropInterval(level, speedConfig)
+        assertTrue(
+          interval >= speedConfig.minDropIntervalMs &&
+            interval <= speedConfig.baseDropIntervalMs
+        )
+      }
+    },
+    test("higher level means faster or equal drop speed") {
+      val speedConfig = TestServices.testConfig.speed
+      check(Gen.int(1, 19)) { level =>
+        val interval1 = LineClearing.dropInterval(level, speedConfig)
+        val interval2 = LineClearing.dropInterval(level + 1, speedConfig)
+        assertTrue(interval2 <= interval1)
+      }
+    }
+  )
 
-    suite("GameLogic Robustness")(
-      test("any input sequence does not throw exception") {
-        val config = TestServices.testConfig
-        check(genInputSequence) { inputs =>
-          val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = TetrominoShape.O
+  private def gameLogicRobustnessSuite = suite("GameLogic Robustness")(
+    test("any input sequence does not throw exception") {
+      val config = TestServices.testConfig
+      check(genInputSequence) { inputs =>
+        val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+        val nextShape    = TetrominoShape.O
 
-          val finalState = inputs.foldLeft(initialState) { (state, input) =>
+        val finalState = inputs.foldLeft(initialState) { (state, input) =>
+          if state.isGameOver then state
+          else GameLogic.update(state, input, nextShape, config.game)
+        }
+
+        assertTrue(true)
+      }
+    },
+    test("score never decreases") {
+      val config = TestServices.testConfig
+      check(genInputSequence) { inputs =>
+        val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+        val nextShape    = TetrominoShape.O
+
+        val scores = inputs
+          .scanLeft(initialState) { (state, input) =>
             if state.isGameOver then state
             else GameLogic.update(state, input, nextShape, config.game)
           }
+          .map(_.score)
 
-          assertTrue(true)
+        val neverDecreases = scores.sliding(2).forall {
+          case Seq(a, b) => b >= a
+          case _         => true
         }
-      },
-      test("score never decreases") {
-        val config = TestServices.testConfig
-        check(genInputSequence) { inputs =>
-          val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = TetrominoShape.O
+        assertTrue(neverDecreases)
+      }
+    },
+    test("level never decreases") {
+      val config = TestServices.testConfig
+      check(genInputSequence) { inputs =>
+        val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+        val nextShape    = TetrominoShape.O
 
-          val scores = inputs
-            .scanLeft(initialState) { (state, input) =>
-              if state.isGameOver then state
-              else GameLogic.update(state, input, nextShape, config.game)
-            }
-            .map(_.score)
-
-          val neverDecreases = scores.sliding(2).forall {
-            case Seq(a, b) => b >= a
-            case _         => true
-          }
-          assertTrue(neverDecreases)
-        }
-      },
-      test("level never decreases") {
-        val config = TestServices.testConfig
-        check(genInputSequence) { inputs =>
-          val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = TetrominoShape.O
-
-          val levels = inputs
-            .scanLeft(initialState) { (state, input) =>
-              if state.isGameOver then state
-              else GameLogic.update(state, input, nextShape, config.game)
-            }
-            .map(_.level)
-
-          val neverDecreases = levels.sliding(2).forall {
-            case Seq(a, b) => b >= a
-            case _         => true
-          }
-          assertTrue(neverDecreases)
-        }
-      },
-      test("pause toggle is idempotent after two presses") {
-        val config = TestServices.testConfig
-        check(genGameState) { state =>
-          val nextShape   = TetrominoShape.O
-          val pausedOnce  = GameLogic.update(state, Input.Pause, nextShape, config.game)
-          val pausedTwice = GameLogic.update(pausedOnce, Input.Pause, nextShape, config.game)
-          assertTrue(pausedTwice.status == state.status)
-        }
-      },
-      test("grid dimensions remain constant") {
-        val config = TestServices.testConfig
-        check(genInputSequence) { inputs =>
-          val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
-          val nextShape    = TetrominoShape.O
-
-          val finalState = inputs.foldLeft(initialState) { (state, input) =>
+        val levels = inputs
+          .scanLeft(initialState) { (state, input) =>
             if state.isGameOver then state
             else GameLogic.update(state, input, nextShape, config.game)
           }
+          .map(_.level)
 
-          assertTrue(
-            finalState.grid.width == initialState.grid.width &&
-              finalState.grid.height == initialState.grid.height
-          )
+        val neverDecreases = levels.sliding(2).forall {
+          case Seq(a, b) => b >= a
+          case _         => true
         }
+        assertTrue(neverDecreases)
       }
-    ),
+    },
+    test("pause toggle is idempotent after two presses") {
+      val config = TestServices.testConfig
+      check(genGameState) { state =>
+        val nextShape   = TetrominoShape.O
+        val pausedOnce  = GameLogic.update(state, Input.Pause, nextShape, config.game)
+        val pausedTwice = GameLogic.update(pausedOnce, Input.Pause, nextShape, config.game)
+        assertTrue(pausedTwice.status == state.status)
+      }
+    },
+    test("grid dimensions remain constant") {
+      val config = TestServices.testConfig
+      check(genInputSequence) { inputs =>
+        val initialState = GameState.initial(TetrominoShape.T, TetrominoShape.I, gridWidth, gridHeight)
+        val nextShape    = TetrominoShape.O
 
-    suite("Rotation Properties")(
-      test("clockwise and counter-clockwise are inverses") {
-        check(genRotation) { rotation =>
-          val result = rotation.rotateClockwise.rotateCounterClockwise
-          assertTrue(result == rotation)
+        val finalState = inputs.foldLeft(initialState) { (state, input) =>
+          if state.isGameOver then state
+          else GameLogic.update(state, input, nextShape, config.game)
         }
-      },
-      test("four clockwise rotations return to original") {
-        check(genRotation) { rotation =>
-          val result = rotation.rotateClockwise.rotateClockwise.rotateClockwise.rotateClockwise
-          assertTrue(result == rotation)
-        }
+
+        assertTrue(
+          finalState.grid.width == initialState.grid.width &&
+            finalState.grid.height == initialState.grid.height
+        )
       }
-    )
+    }
+  )
+
+  private def rotationPropertiesSuite = suite("Rotation Properties")(
+    test("clockwise and counter-clockwise are inverses") {
+      check(genRotation) { rotation =>
+        val result = rotation.rotateClockwise.rotateCounterClockwise
+        assertTrue(result == rotation)
+      }
+    },
+    test("four clockwise rotations return to original") {
+      check(genRotation) { rotation =>
+        val result = rotation.rotateClockwise.rotateClockwise.rotateClockwise.rotateClockwise
+        assertTrue(result == rotation)
+      }
+    }
+  )
+
+  def spec = suite("Property-Based Tests")(
+    gridPropertiesSuite,
+    tetrominoPropertiesSuite,
+    collisionPropertiesSuite,
+    lineClearingPropertiesSuite,
+    gameLogicRobustnessSuite,
+    rotationPropertiesSuite
   )

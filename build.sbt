@@ -5,10 +5,6 @@ val commonSettings = Seq(
   version                               := "0.1.0",
   scalaVersion                          := scala3Version,
   scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:imports", "-Xfatal-warnings"),
-  libraryDependencies ++= Seq(
-    "org.scalatest"       %% "scalatest" % "3.2.20" % Test,
-    "com.tngtech.archunit" % "archunit"  % "1.4.1"  % Test
-  ),
   semanticdbEnabled       := true,
   semanticdbVersion       := scalafixSemanticdb.revision,
   scalafixOnCompile       := true,
@@ -22,6 +18,11 @@ lazy val core = project
   .settings(commonSettings)
   .settings(
     name := "monadris-core",
+    // core is tested with ScalaTest so that not even its tests depend on ZIO; app uses ZIO Test
+    libraryDependencies ++= Seq(
+      "org.scalatest"       %% "scalatest" % "3.2.20" % Test,
+      "com.tngtech.archunit" % "archunit"  % "1.4.1"  % Test
+    ),
     Compile / wartremoverErrors ++= Warts.unsafe
       .filterNot(_ == Wart.DefaultArguments), // only DefaultArguments is allowed
     Compile / wartremoverErrors ++= Seq(Wart.Var, Wart.Null, Wart.Return, Wart.Throw),
