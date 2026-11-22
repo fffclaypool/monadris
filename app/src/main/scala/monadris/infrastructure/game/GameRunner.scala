@@ -11,9 +11,6 @@ import monadris.view.ScreenBuffer
 
 object GameRunner:
 
-  export monadris.input.GameCommand
-  export monadris.infrastructure.terminal.Renderer
-
   private val renderer: Renderer = Renderer.live
 
   trait RandomPiece:
