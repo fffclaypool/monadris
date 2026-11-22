@@ -16,6 +16,8 @@ object GameView:
     val DefaultTitleWidth    = 40
     val DefaultGameOverWidth = 30
     val MenuWidth            = 70
+    val FrameBorderWidth     = 2
+    val BlankFrameRow        = s"║${" " * (MenuWidth - FrameBorderWidth)}║"
 
     // Rows of the info panel, relative to the top of the screen
     val ScoreRow     = 1
@@ -188,27 +190,27 @@ object GameView:
       val prefix     = if isSelected then "▶ " else "  "
       val suffix     = if isSelected then " ◀" else "  "
       val content    = s"$prefix[${item.key}] ${item.label}$suffix"
-      val padding    = menuWidth - 2 - content.length
+      val padding    = menuWidth - Layout.FrameBorderWidth - content.length
       s"║$content${" " * padding}║"
 
     val lines = List(
       "╔════════════════════════════════════════════════════════════════════╗",
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "║  ███╗   ███╗ ██████╗ ███╗   ██╗ █████╗ ██████╗ ██████╗ ██╗███████╗ ║",
       "║  ████╗ ████║██╔═══██╗████╗  ██║██╔══██╗██╔══██╗██╔══██╗██║██╔════╝ ║",
       "║  ██╔████╔██║██║   ██║██╔██╗ ██║███████║██║  ██║██████╔╝██║███████╗ ║",
       "║  ██║╚██╔╝██║██║   ██║██║╚██╗██║██╔══██║██║  ██║██╔══██╗██║╚════██║ ║",
       "║  ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║  ██║██████╔╝██║  ██║██║███████║ ║",
       "║  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝╚══════╝ ║",
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "║                      Functional Tetris in Scala                    ║",
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "╠════════════════════════════════════════════════════════════════════╣",
-      "║                                                                    ║"
+      Layout.BlankFrameRow
     ) ++ MenuItems.all.zipWithIndex.map { case (item, idx) =>
       menuItem(item, idx)
     } ++ List(
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "╠════════════════════════════════════════════════════════════════════╣",
       "║            ↑/↓ or K/J: Navigate    Enter: Select    Q: Quit        ║",
       "╚════════════════════════════════════════════════════════════════════╝"
@@ -226,11 +228,11 @@ object GameView:
     val lines = List(
       "",
       "╔════════════════════════════════════════════════════════════════════╗",
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "║                      Thanks for playing!                           ║",
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "║                        See you again!                              ║",
-      "║                                                                    ║",
+      Layout.BlankFrameRow,
       "╚════════════════════════════════════════════════════════════════════╝",
       ""
     )
