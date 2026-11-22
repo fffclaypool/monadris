@@ -10,57 +10,69 @@ import monadris.config.*
  */
 object TestServices:
 
-  def tty(inputs: Chunk[Int]): ZLayer[Any, Nothing, TtyService] =
+  /** Hands out the queued keys; `sleep` decides how long a wait of the given length takes */
+  final private class QueueTty(queue: Queue[Int], sleeping: Long => UIO[Unit]) extends TtyService:
+    def available(): Task[Int]                                 = queue.size
+    def read(): Task[Int]                                      = queue.take
+    def sleep(ms: Long): Task[Unit]                            = sleeping(ms)
+    def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]] = queue.poll
+
+  private def queueTty(inputs: Chunk[Int], sleeping: Long => UIO[Unit]): ULayer[TtyService] =
     ZLayer.fromZIO {
       for
         queue <- Queue.unbounded[Int]
         _     <- queue.offerAll(inputs)
-      yield new TtyService:
-        def available(): Task[Int]                                 = queue.size
-        def read(): Task[Int]                                      = queue.take
-        def sleep(ms: Long): Task[Unit]                            = ZIO.unit
-        def readByteWithTimeout(timeoutMs: Int): Task[Option[Int]] =
-          queue.poll.map(_.map(_.toInt))
+      yield QueueTty(queue, sleeping)
     }
 
-  def terminalSession(inputs: Chunk[Int]): ZLayer[Any, Nothing, TerminalSession] =
+  /** Every wait returns at once, including the gravity timer, so time ticks arrive in a burst */
+  def tty(inputs: Chunk[Int]): ULayer[TtyService] =
+    queueTty(inputs, _ => ZIO.unit)
+
+  /**
+   * Key waits return at once but a wait as long as a drop interval never ends,
+   * so the game only reacts to the typed keys and the outcome is deterministic.
+   */
+  def ttyWithoutGravity(inputs: Chunk[Int]): ULayer[TtyService] =
+    queueTty(inputs, ms => if ms >= testConfig.speed.minDropIntervalMs then ZIO.never else ZIO.unit)
+
+  private object Keys:
+    val LineFeed       = 10
+    val CarriageReturn = 13
+    val Backspace      = 8
+    val Delete         = 127
+
+  /** Reads keys from a queue and keeps every shown message for assertions */
+  final class TestTerminalSession(queue: Queue[Int], val messages: Ref[List[String]]) extends TerminalSession:
+    def showMessage(message: String): Task[Unit] =
+      messages.update(_ :+ message)
+
+    def prompt(message: String): Task[String] =
+      showMessage(message) *> readLine("")
+
+    def waitForKeypress(): Task[Int] =
+      queue.take
+
+    def showMessageAndWait(message: String): Task[Unit] =
+      showMessage(message) *> showMessage("Press any key to continue...") *> queue.take.unit
+
+    def enableRawMode: Task[Unit]  = ZIO.unit
+    def disableRawMode: Task[Unit] = ZIO.unit
+
+    private def readLine(typed: String): Task[String] =
+      queue.take.flatMap {
+        case Keys.CarriageReturn | Keys.LineFeed => ZIO.succeed(typed)
+        case Keys.Delete | Keys.Backspace        => readLine(typed.dropRight(1))
+        case key                                 => readLine(typed + key.toChar)
+      }
+
+  def terminalSession(inputs: Chunk[Int]): ULayer[TestTerminalSession] =
     ZLayer.fromZIO {
       for
-        queue  <- Queue.unbounded[Int]
-        _      <- queue.offerAll(inputs)
-        output <- Ref.make(List.empty[String])
-      yield new TerminalSession:
-        def showMessage(message: String): Task[Unit] =
-          output.update(_ :+ message)
-
-        def prompt(message: String): Task[String] =
-          for
-            _    <- output.update(_ :+ message)
-            line <- readLineLoop(new StringBuilder)
-          yield line
-
-        def waitForKeypress(): Task[Int] =
-          queue.take
-
-        def showMessageAndWait(message: String): Task[Unit] =
-          for
-            _ <- output.update(_ :+ message)
-            _ <- output.update(_ :+ "Press any key to continue...")
-            _ <- queue.take
-          yield ()
-
-        def enableRawMode: Task[Unit]  = ZIO.unit
-        def disableRawMode: Task[Unit] = ZIO.unit
-
-        private def readLineLoop(acc: StringBuilder): Task[String] =
-          queue.take.flatMap { ch =>
-            ch match
-              case 13 | 10 => ZIO.succeed(acc.toString)
-              case 127 | 8 =>
-                if acc.nonEmpty then readLineLoop(acc.deleteCharAt(acc.length - 1))
-                else readLineLoop(acc)
-              case _ => readLineLoop(acc.append(ch.toChar))
-          }
+        queue    <- Queue.unbounded[Int]
+        _        <- queue.offerAll(inputs)
+        messages <- Ref.make(List.empty[String])
+      yield TestTerminalSession(queue, messages)
     }
 
   case class TestConsoleService(buffer: Ref[List[String]]) extends ConsoleService:

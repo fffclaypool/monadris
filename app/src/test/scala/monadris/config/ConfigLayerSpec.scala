@@ -19,6 +19,11 @@ object ConfigLayerSpec extends ZIOSpecDefault:
     ConfigProvider.fromMap(Map(Keys.Storage -> value)).load(ConfigLayer.replayStorageConfig.nested(Keys.Storage))
 
   def spec = suite("ConfigLayer")(
+    test("live loads a valid configuration from application.conf") {
+      ZIO
+        .serviceWith[AppConfig](config => assertTrue(ConfigValidation.validate(config) == Right(config)))
+        .provide(ConfigLayer.live)
+    },
     test("replay storage is parsed case-insensitively") {
       for
         file     <- loadStorage(Values.File)

@@ -3,56 +3,43 @@ package monadris.infrastructure.game
 import zio.*
 import zio.test.*
 
-import monadris.config.AppConfig
 import monadris.domain.*
-import monadris.infrastructure.terminal.ConsoleService
 import monadris.infrastructure.terminal.Renderer
 import monadris.infrastructure.terminal.TestServices as LocalTestServices
 import monadris.replay.*
-import monadris.view.ScreenBuffer
 
 object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
 
   private val testGridWidth  = LocalTestServices.testConfig.grid.width
   private val testGridHeight = LocalTestServices.testConfig.grid.height
 
-  def initialState: GameState =
+  private val initialState: GameState =
     GameState.initial(TetrominoShape.T, TetrominoShape.I, testGridWidth, testGridHeight)
 
-  private class MockRenderer extends Renderer:
-    private val emptyBuffer = ScreenBuffer.empty(testGridWidth + 10, testGridHeight + 5)
+  private val upcomingShapes = Vector(TetrominoShape.O, TetrominoShape.S, TetrominoShape.Z)
+  private val suiteTimeout   = 10.seconds
 
-    def render(
-      state: GameState,
-      config: AppConfig,
-      previousBuffer: Option[ScreenBuffer]
-    ): ZIO[ConsoleService, Throwable, ScreenBuffer] =
-      ZIO.succeed(emptyBuffer)
+  private object Keys:
+    val Left: Int  = 'h'.toInt
+    val Right: Int = 'l'.toInt
+    val Down: Int  = 'j'.toInt
+    val Drop: Int  = ' '.toInt
+    val Quit: Int  = 'q'.toInt
 
-    def renderGameOver(state: GameState): ZIO[ConsoleService, Throwable, Unit] =
-      ZIO.unit
+  /** Plays the given keys with gravity switched off and returns the final state and the recording */
+  private def record(keys: Int*): Task[(GameState, ReplayData)] =
+    TestPieces
+      .cycling(upcomingShapes)
+      .flatMap(RecordingGameLoopRunner.recordingGameLoop(initialState, LocalTestServices.testConfig, Renderer.live, _))
+      .provide(LocalTestServices.ttyWithoutGravity(Chunk.fromIterable(keys)), LocalTestServices.console)
 
-    def renderTitle: ZIO[ConsoleService, Throwable, Unit] =
-      ZIO.unit
+  @annotation.tailrec
+  private def replayToEnd(player: ReplayPlayerState): GameState =
+    if player.isFinished then player.gameState
+    else replayToEnd(ReplayPlayer.advanceFrame(player, LocalTestServices.testConfig.game))
 
-  private object FixedPieceGenerator extends GameRunner.RandomPiece:
-    private val shapes = Vector(
-      TetrominoShape.I,
-      TetrominoShape.O,
-      TetrominoShape.T,
-      TetrominoShape.S,
-      TetrominoShape.Z,
-      TetrominoShape.J,
-      TetrominoShape.L
-    )
-    private var index = 0
-
-    def nextShape: UIO[TetrominoShape] =
-      ZIO.succeed {
-        val shape = shapes(index % shapes.size)
-        index += 1
-        shape
-      }
+  private def recordedInputs(replay: ReplayData): Vector[Input] =
+    replay.events.collect { case ReplayEvent.PlayerInput(input, _, _) => input }
 
   private object Elapsed:
     val First: Long  = 250L
@@ -103,281 +90,54 @@ object RecordingGameLoopRunnerSpec extends ZIOSpecDefault:
       }
     ),
     suite("Recording game loop")(
-      test("Recording loop produces replay data on quit") {
-        val renderer = MockRenderer()
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(Chunk('q'.toInt)),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((finalState, replayData)) =>
-            assertTrue(
-              replayData.metadata.gridWidth == testGridWidth,
-              replayData.metadata.gridHeight == testGridHeight,
-              replayData.metadata.initialPiece == TetrominoShape.T
-            )
-          case None =>
-            assertTrue(false)
-      },
-      test("Recording captures initial piece") {
-        val renderer = MockRenderer()
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(Chunk('q'.toInt)),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((_, replayData)) =>
-            assertTrue(replayData.metadata.initialPiece == initialState.currentTetromino.shape)
-          case None =>
-            assertTrue(false)
-      },
-      test("Recording captures next piece") {
-        val renderer = MockRenderer()
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(Chunk('q'.toInt)),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((_, replayData)) =>
-            assertTrue(replayData.metadata.nextPiece == initialState.nextTetromino)
-          case None =>
-            assertTrue(false)
-      },
-      test("Recording uses correct version") {
-        val renderer = MockRenderer()
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(Chunk('q'.toInt)),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((_, replayData)) =>
-            assertTrue(replayData.metadata.version == ReplayMetadata.CurrentVersion)
-          case None =>
-            assertTrue(false)
-      }
-    ),
-    suite("Input recording")(
-      test("Records user input events") {
-        val renderer = MockRenderer()
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(Chunk('h'.toInt, 'q'.toInt)),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((_, replayData)) =>
-            val hasPlayerInputs = replayData.events.exists {
-              case ReplayEvent.PlayerInput(_, _, _) => true
-              case _                                => false
-            }
-            assertTrue(hasPlayerInputs || replayData.events.isEmpty)
-          case None =>
-            assertTrue(false)
-      },
-      test("Records multiple movement inputs before quit") {
-        val renderer = MockRenderer()
-        val inputs   = Chunk('h'.toInt, 'l'.toInt, 'j'.toInt, 'k'.toInt, 'q'.toInt)
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(inputs),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((_, replayData)) =>
-            assertTrue(replayData.events.nonEmpty)
-          case None =>
-            assertTrue(false)
-      },
-      test("Recording captures final score in metadata") {
-        val renderer = MockRenderer()
-        for result <- RecordingGameLoopRunner
-            .recordingGameLoop(
-              initialState,
-              LocalTestServices.testConfig,
-              renderer,
-              FixedPieceGenerator
-            )
-            .provide(
-              LocalTestServices.tty(Chunk('q'.toInt)),
-              LocalTestServices.console
-            )
-            .timeout(Duration.fromMillis(1000))
-        yield result match
-          case Some((finalState, replayData)) =>
-            assertTrue(
-              replayData.metadata.finalScore == finalState.score,
-              replayData.metadata.finalLevel == finalState.level,
-              replayData.metadata.finalLinesCleared == finalState.linesCleared
-            )
-          case None =>
-            assertTrue(false)
-      }
-    ),
-    suite("Event recording order")(
-      test("PieceSpawn is recorded before PlayerInput when piece locks") {
-        // Test event ordering using ReplayBuilder
-        val builder = ReplayBuilder.create(
-          timestamp = 12345L,
-          gridWidth = 10,
-          gridHeight = 20,
-          initialPiece = TetrominoShape.I,
-          nextPiece = TetrominoShape.O
-        )
-
-        // Same logic as recordEvents: record PieceSpawn first
-        val builderWithSpawn = builder.recordPieceSpawn(TetrominoShape.T)
-        val builderWithInput = builderWithSpawn.recordInput(Input.HardDrop)
-        val finalBuilder     = builderWithInput.advanceFrame
-
-        val replayData = finalBuilder.build(initialState, 23456L)
-        val events     = replayData.events
-
-        // Verify PieceSpawn is recorded before PlayerInput
-        val pieceSpawnIndex = events.indexWhere {
-          case ReplayEvent.PieceSpawn(_, _, _) => true
-          case _                               => false
-        }
-        val playerInputIndex = events.indexWhere {
-          case ReplayEvent.PlayerInput(_, _, _) => true
-          case _                                => false
-        }
-
-        assertTrue(
-          pieceSpawnIndex >= 0,
-          playerInputIndex >= 0,
-          pieceSpawnIndex < playerInputIndex
-        )
-      },
-      test("Only PlayerInput is recorded when piece does not lock") {
-        val builder = ReplayBuilder.create(
-          timestamp = 12345L,
-          gridWidth = 10,
-          gridHeight = 20,
-          initialPiece = TetrominoShape.I,
-          nextPiece = TetrominoShape.O
-        )
-
-        // Only PlayerInput is recorded when piece does not lock
-        val builderWithInput = builder.recordInput(Input.MoveLeft)
-        val finalBuilder     = builderWithInput.advanceFrame
-
-        val replayData = finalBuilder.build(initialState, 23456L)
-        val events     = replayData.events
-
-        val hasPieceSpawn = events.exists {
-          case ReplayEvent.PieceSpawn(_, _, _) => true
-          case _                               => false
-        }
-        val hasPlayerInput = events.exists {
-          case ReplayEvent.PlayerInput(Input.MoveLeft, _, _) => true
-          case _                                             => false
-        }
-
-        assertTrue(
-          !hasPieceSpawn,
-          hasPlayerInput
-        )
-      }
-    ),
-    suite("ReplayBuilder integration")(
-      test("ReplayBuilder creates valid metadata") {
-        val builder = ReplayBuilder.create(
-          timestamp = 12345L,
-          gridWidth = 10,
-          gridHeight = 20,
-          initialPiece = TetrominoShape.I,
-          nextPiece = TetrominoShape.O
-        )
-        assertTrue(
-          builder.currentFrame == 0
-        )
-      },
-      test("ReplayBuilder records inputs") {
-        val builder = ReplayBuilder
-          .create(
-            timestamp = 12345L,
-            gridWidth = 10,
-            gridHeight = 20,
-            initialPiece = TetrominoShape.I,
-            nextPiece = TetrominoShape.O
+      test("the metadata describes the grid and the pieces the game started with") {
+        record(Keys.Quit).map { (_, replay) =>
+          assertTrue(
+            replay.metadata.version == ReplayMetadata.CurrentVersion,
+            replay.metadata.gridWidth == testGridWidth,
+            replay.metadata.gridHeight == testGridHeight,
+            replay.metadata.initialPiece == initialState.currentTetromino.shape,
+            replay.metadata.nextPiece == initialState.nextTetromino
           )
-          .recordInput(Input.MoveLeft)
-          .advanceFrame
-
-        val finalState = initialState.copy(score = 500)
-        val replayData = builder.build(finalState, 23456L)
-
-        assertTrue(
-          replayData.events.nonEmpty,
-          replayData.metadata.finalScore == 500
-        )
-      },
-      test("ReplayBuilder records piece spawns") {
-        val builder = ReplayBuilder
-          .create(
-            timestamp = 12345L,
-            gridWidth = 10,
-            gridHeight = 20,
-            initialPiece = TetrominoShape.I,
-            nextPiece = TetrominoShape.O
-          )
-          .recordPieceSpawn(TetrominoShape.T)
-          .advanceFrame
-
-        val finalState = initialState
-        val replayData = builder.build(finalState, 23456L)
-
-        val hasPieceSpawn = replayData.events.exists {
-          case ReplayEvent.PieceSpawn(TetrominoShape.T, _, _) => true
-          case _                                              => false
         }
-        assertTrue(hasPieceSpawn)
+      },
+      test("quitting immediately records no events") {
+        record(Keys.Quit).map((_, replay) => assertTrue(replay.events.isEmpty))
+      },
+      test("every processed key is recorded in order, one frame each") {
+        record(Keys.Left, Keys.Right, Keys.Down, Keys.Quit).map { (_, replay) =>
+          assertTrue(
+            recordedInputs(replay) == Vector(Input.MoveLeft, Input.MoveRight, Input.MoveDown),
+            replay.events.map(_.frameNumber) == Vector.range(0L, replay.events.size.toLong)
+          )
+        }
+      },
+      test("a lock records the piece that entered the preview, before the input that caused it") {
+        record(Keys.Drop, Keys.Quit).map { (finalState, replay) =>
+          assertTrue(
+            replay.events.map(_.frameNumber).distinct.size == 1,
+            replay.events.headOption.contains(
+              ReplayEvent.PieceSpawn(upcomingShapes.head, ReplayEvent.StartOfRecordingMs, replay.events.head.elapsedMs)
+            ),
+            recordedInputs(replay) == Vector(Input.HardDrop),
+            finalState.nextTetromino == upcomingShapes.head
+          )
+        }
+      },
+      test("the metadata carries the final result of the game") {
+        record(Keys.Drop, Keys.Quit).map { (finalState, replay) =>
+          assertTrue(
+            finalState.score > initialState.score,
+            replay.metadata.finalScore == finalState.score,
+            replay.metadata.finalLevel == finalState.level,
+            replay.metadata.finalLinesCleared == finalState.linesCleared
+          )
+        }
+      },
+      test("replaying the recording reproduces the final state of the game") {
+        record(Keys.Left, Keys.Drop, Keys.Right, Keys.Drop, Keys.Down, Keys.Quit).map { (finalState, replay) =>
+          assertTrue(replayToEnd(ReplayPlayer.initialize(replay)) == finalState)
+        }
       }
     )
-  )
+  ) @@ TestAspect.timeout(suiteTimeout)

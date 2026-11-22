@@ -1,156 +1,172 @@
 package monadris.infrastructure.terminal
 
+import zio.*
+import zio.test.*
+
 import monadris.domain.Input
+import monadris.infrastructure.terminal.TerminalInput.ParseResult
+import monadris.infrastructure.terminal.TestServices as Mocks
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
+object TerminalInputSpec extends ZIOSpecDefault:
 
-class TerminalInputSpec extends AnyFlatSpec with Matchers:
+  private object Keys:
+    val Escape: Int        = 27
+    val Bracket: Int       = '['.toInt
+    val Unmapped: Int      = 'x'.toInt
+    val UnknownArrow: Char = 'X'
+    val NotABracket: Int   = 'O'.toInt
 
-  "TerminalInput.keyToInput" should "return MoveLeft for 'h'" in {
-    TerminalInput.keyToInput('h'.toInt) shouldBe Some(Input.MoveLeft)
-  }
+  private val keyBindings: List[(Char, Input)] = List(
+    'h' -> Input.MoveLeft,
+    'H' -> Input.MoveLeft,
+    'l' -> Input.MoveRight,
+    'L' -> Input.MoveRight,
+    'j' -> Input.MoveDown,
+    'J' -> Input.MoveDown,
+    'k' -> Input.RotateClockwise,
+    'K' -> Input.RotateClockwise,
+    'z' -> Input.RotateCounterClockwise,
+    'Z' -> Input.RotateCounterClockwise,
+    ' ' -> Input.HardDrop,
+    'p' -> Input.Pause,
+    'P' -> Input.Pause
+  )
 
-  it should "return MoveLeft for 'H'" in {
-    TerminalInput.keyToInput('H'.toInt) shouldBe Some(Input.MoveLeft)
-  }
+  private val arrowBindings: List[(Char, Input)] = List(
+    'A' -> Input.RotateClockwise,
+    'B' -> Input.MoveDown,
+    'C' -> Input.MoveRight,
+    'D' -> Input.MoveLeft
+  )
 
-  it should "return MoveRight for 'l'" in {
-    TerminalInput.keyToInput('l'.toInt) shouldBe Some(Input.MoveRight)
-  }
+  private val unboundKeys: List[Char] = List('x', '1', '@')
+  private val quitKeys: List[Char]    = List('q', 'Q')
+  private val nonQuitKeys: List[Int]  = List('x'.toInt, 'h'.toInt, ' '.toInt, Keys.Escape)
 
-  it should "return MoveRight for 'L'" in {
-    TerminalInput.keyToInput('L'.toInt) shouldBe Some(Input.MoveRight)
-  }
+  private def arrowSequence(code: Char): Chunk[Int] =
+    Chunk(Keys.Escape, Keys.Bracket, code.toInt)
 
-  it should "return MoveDown for 'j'" in {
-    TerminalInput.keyToInput('j'.toInt) shouldBe Some(Input.MoveDown)
-  }
+  /** Reads `count` keys from a terminal that has `typed` waiting */
+  private def readKeys(typed: Chunk[Int], count: Int): Task[List[ParseResult]] =
+    ZIO.replicateZIO(count)(TerminalInput.readKeyZIO).map(_.toList).provide(Mocks.tty(typed), Mocks.config)
 
-  it should "return MoveDown for 'J'" in {
-    TerminalInput.keyToInput('J'.toInt) shouldBe Some(Input.MoveDown)
-  }
+  private def readKey(typed: Chunk[Int]): Task[ParseResult] =
+    TerminalInput.readKeyZIO.provide(Mocks.tty(typed), Mocks.config)
 
-  it should "return RotateClockwise for 'k'" in {
-    TerminalInput.keyToInput('k'.toInt) shouldBe Some(Input.RotateClockwise)
-  }
+  private def readsAsUnknown(typed: Chunk[Int]): Task[TestResult] =
+    readKey(typed).map(result => assertTrue(result == ParseResult.Unknown))
 
-  it should "return RotateClockwise for 'K'" in {
-    TerminalInput.keyToInput('K'.toInt) shouldBe Some(Input.RotateClockwise)
-  }
+  /** Parses what follows an escape key that has already been consumed */
+  private def parseAfterEscape(rest: Chunk[Int]): Task[Option[Input]] =
+    TerminalInput.parseEscapeSequenceZIO.provide(Mocks.tty(rest), Mocks.config)
 
-  it should "return RotateCounterClockwise for 'z'" in {
-    TerminalInput.keyToInput('z'.toInt) shouldBe Some(Input.RotateCounterClockwise)
-  }
-
-  it should "return RotateCounterClockwise for 'Z'" in {
-    TerminalInput.keyToInput('Z'.toInt) shouldBe Some(Input.RotateCounterClockwise)
-  }
-
-  it should "return HardDrop for space" in {
-    TerminalInput.keyToInput(' '.toInt) shouldBe Some(Input.HardDrop)
-  }
-
-  it should "return Pause for 'p'" in {
-    TerminalInput.keyToInput('p'.toInt) shouldBe Some(Input.Pause)
-  }
-
-  it should "return Pause for 'P'" in {
-    TerminalInput.keyToInput('P'.toInt) shouldBe Some(Input.Pause)
-  }
-
-  it should "return None for unknown keys" in {
-    TerminalInput.keyToInput('x'.toInt) shouldBe None
-    TerminalInput.keyToInput('1'.toInt) shouldBe None
-    TerminalInput.keyToInput('@'.toInt) shouldBe None
-  }
-
-  "TerminalInput.isQuitKey" should "return true for 'q'" in {
-    TerminalInput.isQuitKey('q'.toInt) shouldBe true
-  }
-
-  it should "return true for 'Q'" in {
-    TerminalInput.isQuitKey('Q'.toInt) shouldBe true
-  }
-
-  it should "return false for other keys" in {
-    TerminalInput.isQuitKey('x'.toInt) shouldBe false
-    TerminalInput.isQuitKey('h'.toInt) shouldBe false
-    TerminalInput.isQuitKey(' '.toInt) shouldBe false
-    TerminalInput.isQuitKey(27) shouldBe false
-  }
-
-  "TerminalInput.EscapeKeyCode" should "be 27" in {
-    TerminalInput.EscapeKeyCode shouldBe 27
-  }
-
-  "TerminalInput.toInput" should "extract input from Arrow result" in {
-    val result = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
-    TerminalInput.toInput(result) shouldBe Some(Input.MoveLeft)
-  }
-
-  it should "convert Regular result using keyToInput" in {
-    val result = TerminalInput.ParseResult.Regular('h'.toInt)
-    TerminalInput.toInput(result) shouldBe Some(Input.MoveLeft)
-  }
-
-  it should "return None for Regular with unknown key" in {
-    val result = TerminalInput.ParseResult.Regular('x'.toInt)
-    TerminalInput.toInput(result) shouldBe None
-  }
-
-  it should "return None for Timeout" in {
-    TerminalInput.toInput(TerminalInput.ParseResult.Timeout) shouldBe None
-  }
-
-  it should "return None for Unknown" in {
-    TerminalInput.toInput(TerminalInput.ParseResult.Unknown) shouldBe None
-  }
-
-  "TerminalInput.ParseResult" should "have all expected variants" in {
-    val arrow   = TerminalInput.ParseResult.Arrow(Input.MoveLeft)
-    val regular = TerminalInput.ParseResult.Regular(65)
-    val timeout = TerminalInput.ParseResult.Timeout
-    val unknown = TerminalInput.ParseResult.Unknown
-
-    arrow shouldBe a[TerminalInput.ParseResult.Arrow]
-    regular shouldBe a[TerminalInput.ParseResult.Regular]
-    timeout shouldBe TerminalInput.ParseResult.Timeout
-    unknown shouldBe TerminalInput.ParseResult.Unknown
-  }
-
-  "TerminalInput key mappings" should "handle all vim-style keys" in {
-    TerminalInput.keyToInput('h'.toInt).isDefined shouldBe true
-    TerminalInput.keyToInput('j'.toInt).isDefined shouldBe true
-    TerminalInput.keyToInput('k'.toInt).isDefined shouldBe true
-    TerminalInput.keyToInput('l'.toInt).isDefined shouldBe true
-  }
-
-  it should "handle uppercase vim-style keys" in {
-    TerminalInput.keyToInput('H'.toInt).isDefined shouldBe true
-    TerminalInput.keyToInput('J'.toInt).isDefined shouldBe true
-    TerminalInput.keyToInput('K'.toInt).isDefined shouldBe true
-    TerminalInput.keyToInput('L'.toInt).isDefined shouldBe true
-  }
-
-  it should "return correct inputs for all mapped keys" in {
-    val mappings = List(
-      ('h', Input.MoveLeft),
-      ('H', Input.MoveLeft),
-      ('l', Input.MoveRight),
-      ('L', Input.MoveRight),
-      ('j', Input.MoveDown),
-      ('J', Input.MoveDown),
-      ('k', Input.RotateClockwise),
-      ('K', Input.RotateClockwise),
-      ('z', Input.RotateCounterClockwise),
-      ('Z', Input.RotateCounterClockwise),
-      (' ', Input.HardDrop),
-      ('p', Input.Pause),
-      ('P', Input.Pause)
-    )
-
-    mappings.foreach { case (key, expected) =>
-      TerminalInput.keyToInput(key.toInt) shouldBe Some(expected)
+  private def keyMappingSuite = suite("key mapping")(
+    test("keyToInput maps every bound key in both cases") {
+      val mapped = keyBindings.map((key, _) => TerminalInput.keyToInput(key.toInt))
+      assertTrue(mapped == keyBindings.map((_, input) => Some(input)))
+    },
+    test("keyToInput returns None for unbound keys") {
+      assertTrue(unboundKeys.flatMap(key => TerminalInput.keyToInput(key.toInt)).isEmpty)
+    },
+    test("arrowToInput maps the four arrow codes") {
+      val mapped = arrowBindings.map((code, _) => TerminalInput.arrowToInput(code.toInt))
+      assertTrue(mapped == arrowBindings.map((_, input) => Some(input)))
+    },
+    test("arrowToInput returns None for an unknown code") {
+      assertTrue(TerminalInput.arrowToInput(Keys.UnknownArrow.toInt).isEmpty)
+    },
+    test("isQuitKey accepts q in both cases only") {
+      assertTrue(
+        quitKeys.forall(key => TerminalInput.isQuitKey(key.toInt)),
+        !nonQuitKeys.exists(TerminalInput.isQuitKey)
+      )
+    },
+    test("EscapeKeyCode is the ASCII escape character") {
+      assertTrue(TerminalInput.EscapeKeyCode == Keys.Escape)
     }
-  }
+  )
+
+  private def toInputSuite = suite("toInput")(
+    test("extracts the input of an Arrow result") {
+      assertTrue(TerminalInput.toInput(ParseResult.Arrow(Input.MoveLeft)) == Some(Input.MoveLeft))
+    },
+    test("maps a Regular result through the key bindings") {
+      val mapped = keyBindings.map((key, _) => TerminalInput.toInput(ParseResult.Regular(key.toInt)))
+      assertTrue(mapped == keyBindings.map((_, input) => Some(input)))
+    },
+    test("returns None for a Regular result with an unbound key") {
+      assertTrue(TerminalInput.toInput(ParseResult.Regular(Keys.Unmapped)).isEmpty)
+    },
+    test("returns None for Timeout and Unknown") {
+      assertTrue(
+        TerminalInput.toInput(ParseResult.Timeout).isEmpty,
+        TerminalInput.toInput(ParseResult.Unknown).isEmpty
+      )
+    }
+  )
+
+  private def readKeySuite = suite("readKeyZIO")(
+    test("returns Timeout when no input is available") {
+      readKey(Chunk.empty).map(result => assertTrue(result == ParseResult.Timeout))
+    },
+    test("returns Regular for a plain key, bound or not") {
+      val typed = Chunk('h'.toInt, Keys.Unmapped)
+      readKeys(typed, typed.size).map(results => assertTrue(results == typed.toList.map(ParseResult.Regular(_))))
+    },
+    test("returns Arrow for every arrow sequence") {
+      ZIO
+        .foreach(arrowBindings)((code, _) => readKey(arrowSequence(code)))
+        .map(results => assertTrue(results == arrowBindings.map((_, input) => ParseResult.Arrow(input))))
+    },
+    test("returns Timeout once the typed keys are used up") {
+      val typed = Chunk('a'.toInt, 'b'.toInt, 'c'.toInt)
+      readKeys(typed, typed.size + 1).map { results =>
+        assertTrue(results == typed.toList.map(ParseResult.Regular(_)) :+ ParseResult.Timeout)
+      }
+    },
+    test("reads plain keys and escape sequences in the order they were typed") {
+      val typed    = ('h'.toInt +: arrowSequence('A')) ++ arrowSequence('D') :+ 'q'.toInt
+      val expected = List(
+        ParseResult.Regular('h'.toInt),
+        ParseResult.Arrow(Input.RotateClockwise),
+        ParseResult.Arrow(Input.MoveLeft),
+        ParseResult.Regular('q'.toInt)
+      )
+      readKeys(typed, expected.size).map(results => assertTrue(results == expected))
+    }
+  )
+
+  private def brokenSequenceSuite = suite("readKeyZIO with a broken escape sequence")(
+    test("a lone escape key is Unknown") {
+      readsAsUnknown(Chunk(Keys.Escape))
+    },
+    test("an escape followed by something other than a bracket is Unknown") {
+      readsAsUnknown(Chunk(Keys.Escape, Keys.NotABracket))
+    },
+    test("an escape and bracket with nothing after them is Unknown") {
+      readsAsUnknown(Chunk(Keys.Escape, Keys.Bracket))
+    },
+    test("an unknown arrow code is Unknown") {
+      readsAsUnknown(arrowSequence(Keys.UnknownArrow))
+    }
+  )
+
+  private def parseEscapeSequenceSuite = suite("parseEscapeSequenceZIO")(
+    test("returns None when nothing follows the escape key") {
+      parseAfterEscape(Chunk.empty).map(result => assertTrue(result.isEmpty))
+    },
+    test("returns None when the next byte is not a bracket") {
+      parseAfterEscape(Chunk(Keys.NotABracket)).map(result => assertTrue(result.isEmpty))
+    },
+    test("returns the input of a complete arrow sequence") {
+      parseAfterEscape(Chunk(Keys.Bracket, 'D'.toInt)).map(result => assertTrue(result == Some(Input.MoveLeft)))
+    }
+  )
+
+  def spec = suite("TerminalInput")(
+    keyMappingSuite,
+    toInputSuite,
+    readKeySuite,
+    brokenSequenceSuite,
+    parseEscapeSequenceSuite
+  )
