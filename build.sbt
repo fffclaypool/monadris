@@ -21,7 +21,7 @@ lazy val core = project
     // core is tested with ScalaTest so that not even its tests depend on ZIO; app uses ZIO Test
     libraryDependencies ++= Seq(
       "org.scalatest"       %% "scalatest" % "3.2.20" % Test,
-      "com.tngtech.archunit" % "archunit"  % "1.4.1"  % Test
+      "com.tngtech.archunit" % "archunit"  % "1.4.2"  % Test
     ),
     Compile / wartremoverErrors ++= Warts.unsafe
       .filterNot(_ == Wart.DefaultArguments), // only DefaultArguments is allowed
